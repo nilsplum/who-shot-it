@@ -1,6 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<path d="M50 50L96 50A46 46 0 0 1 73 89.84Z" fill="#ff5a5f"/><path d="M50 50L73 89.84A46 46 0 0 1 27 89.84Z" fill="#ffd23f"/>
-<path d="M50 50L27 89.84A46 46 0 0 1 4 50Z" fill="#3ddc97"/><path d="M50 50L4 50A46 46 0 0 1 27 10.16Z" fill="#4cc9f0"/>
-<path d="M50 50L27 10.16A46 46 0 0 1 73 10.16Z" fill="#b388ff"/><path d="M50 50L73 10.16A46 46 0 0 1 96 50Z" fill="#ff8fab"/>
-<circle cx="50" cy="50" r="23" fill="#15121f"/><rect x="36" y="42" width="28" height="19" rx="4" fill="#fff"/>
-<rect x="44" y="38" width="12" height="6" rx="2" fill="#fff"/><circle cx="50" cy="51.5" r="6" fill="#15121f"/><circle cx="50" cy="51.5" r="3" fill="#ffd23f"/></svg>
+<!-- The app's icon and logo: friends' photos, the front one to guess. The one source of
+     the favicon, the logo in the app, both apps' icons and launch screens, and the store
+     graphics (scripts/helpers/app-assets.mjs). Android draws #bg and #mark as two layers.
+     A static file cannot read CSS, so it repeats the few colours it needs. -->
+<defs><linearGradient id="wsi-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c4dff"/><stop offset="1" stop-color="#b388ff"/></linearGradient></defs>
+<rect id="bg" width="100" height="100" fill="url(#wsi-bg)"/>
+<g id="mark">
+<g transform="rotate(-17 50 58)"><rect x="25" y="20" width="44" height="52" rx="3.5" fill="#fff"/><rect x="29" y="24" width="36" height="36" rx="2" fill="#4cc9f0"/></g>
+<g transform="rotate(15 50 58)"><rect x="31" y="20" width="44" height="52" rx="3.5" fill="#fff"/><rect x="35" y="24" width="36" height="36" rx="2" fill="#3ddc97"/></g>
+<rect x="28" y="24" width="44" height="52" rx="3.5" fill="#fff"/><rect x="32" y="28" width="36" height="36" rx="2" fill="#15121f"/>
+<path d="M43.5 40 a6.5 6.5 0 1 1 8.9 6 q-2.4 1.2 -2.4 4.1" fill="none" stroke="#ffd23f" stroke-width="4.4" stroke-linecap="round"/><circle cx="50" cy="56.8" r="2.7" fill="#ffd23f"/>
+</g>
+</svg>

@@ -54,7 +54,8 @@ input::placeholder { color: var(--hint); }
 
 /* Home */
 .hero { text-align: center; margin: 6vh 0 28px; }
-.hero svg { width: 76px; height: 76px; animation: spin 16s linear infinite; }
+.hero .logo { width: 84px; height: 84px; border-radius: 22%; box-shadow: 0 10px 30px var(--dim); animation: bob 4s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .hero h1 { font-size: 40px; margin: 14px 0 0; letter-spacing: -1px; }
 .hero h1 span { color: var(--y); }
@@ -66,7 +67,7 @@ input::placeholder { color: var(--hint); }
 .foot { text-align: center; margin-top: 24px; }
 .foot a { color: var(--mut); font-size: 13px; text-decoration: none; }
 .hero.small { margin: 4vh 0 18px; }
-.hero.small svg { width: 60px; height: 60px; }
+.hero.small .logo { width: 64px; height: 64px; }
 .tagline { color: var(--mut); font-weight: 500; line-height: 1.45; margin: 12px auto 0; max-width: 320px; }
 .fine { color: var(--mut); font-size: 13px; font-weight: 500; line-height: 1.5; text-align: center; }
 .fine a { color: var(--ink); }

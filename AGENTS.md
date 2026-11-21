@@ -187,6 +187,8 @@ Project documentation lives in `docs/` and is the canonical place to look for ho
 | Legal text, operator details | `web/legal.html` | the e2e test checks it is reachable; `config.test.js` its date and age |
 | What exists and how to run it | `README.md` (compact) | none |
 | The apps: native parts, releasing, store forms | `docs/apps.md` | none |
+| Publishing on Google Play, step by step | `docs/guides/android.md` | none |
+| Store texts, icons, screenshots and their captions | `store/listing.md` (images in `store/images/`) | the dash rule |
 
 ---
 

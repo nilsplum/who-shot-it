@@ -1,5 +1,8 @@
 # Who Shot It?
 
+> A side project by Nils Plum. HiveDone UG (haftungsbeschränkt) is only its legal publisher (see the
+> imprint); the game is not part of HiveDone's products. Contact: whoshotit.info@gmail.com
+
 **The party game that lives in your camera roll.** Everyone at the table opens the app, and
 the game deals each player a few random photos from their own phone. Then the fun starts:
 one photo after another pops up on every screen, and everybody races to tap *whose phone it

@@ -8,6 +8,8 @@
 # Options:
 #   --no-upload               only build: dist/who-shot-it-<version>.aab and dist/ios/App.ipa
 #   --android-track internal  release to Google Play's internal test track instead
+#   --store-images            also redraw the store screenshots in store/images/ (when the
+#                             app's look changed; they are uploaded by hand)
 #
 # Every run first runs all tests, draws the icons from web/icons/icon.svg and copies web/
 # into the native projects (npx cap sync). The version is package.json's "version"; raise
@@ -26,12 +28,14 @@ source scripts/helpers/preflight.sh
 platforms=()
 upload=true
 track=production
+store_images=false
 while [ $# -gt 0 ]; do
   case "$1" in
     android | ios) platforms+=("$1") ;;
     --no-upload) upload=false ;;
     --android-track) shift; track="${1:-}" ;;
-    *) fail "Unknown option: $1" "Use: ./scripts/release-apps.sh [android] [ios] [--no-upload] [--android-track internal|production]" ;;
+    --store-images) store_images=true ;;
+    *) fail "Unknown option: $1" "Use: ./scripts/release-apps.sh [android] [ios] [--no-upload] [--android-track internal|production] [--store-images]" ;;
   esac
   shift
 done
@@ -49,8 +53,10 @@ mkdir -p dist
 ./scripts/test.sh
 echo "→ Drawing icons and launch screens"
 node scripts/helpers/app-assets.mjs
-echo "→ Taking the store screenshots"
-node scripts/helpers/store-screenshots.mjs
+if [ "$store_images" = true ]; then
+  echo "→ Drawing the store screenshots"
+  node scripts/helpers/store-images.mjs
+fi
 
 # The upload key: made once, kept in secrets/ (never committed).
 ensure_android_upload_key() {
@@ -123,4 +129,4 @@ PLIST
 for p in "${platforms[@]}"; do
   "release_$p"
 done
-echo "✓ Store graphics and screenshots: dist/store/ (upload them on the store pages when the look changed)"
+echo "✓ Store icons and images: store/images/ (texts: store/listing.md)"

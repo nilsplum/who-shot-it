@@ -51,7 +51,8 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
    `--no-upload` only builds (`dist/who-shot-it-<version>.aab`, `dist/ios/App.ipa`).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with
-Xcode 26 or newer, signed in to the Apple developer account (Xcode, Settings, Accounts);
+Xcode 26 or newer (from April 2027 Apple accepts only builds made with Xcode 27 or newer),
+signed in to the Apple developer account (Xcode, Settings, Accounts);
 the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 
 **Keys in `secrets/`** (git-ignored; back the folder up in a password manager):
@@ -68,43 +69,12 @@ Then `./scripts/release-apps.sh ios` uploads the first build. Fill in the versio
 App Privacy, age rating and the EU trader details with the answers below, then Submit for
 Review.
 
-**Google Play:** create the app in the Play Console (app name, English, game, free). Build
-the first bundle with `./scripts/release-apps.sh android --no-upload` and upload
-`dist/who-shot-it-<version>.aab` by hand (Production, Create new release; accept Play App
-Signing). Fill in the app content forms with the answers below. From then on uploads are
-automatic: create a service account in Google Cloud (project, IAM, Service accounts,
-Create, Keys, Add key, JSON), enable the "Google Play Android Developer API" in that
-project, invite the service account's email in the Play Console (Users and permissions,
-Invite, app access "Who Shot It?", permission "Release to production"), and save the key
-as `secrets/google-play.json`.
+**Google Play:** step by step in [guides/android.md](guides/android.md) (account, forms,
+the first upload by hand, the key for automatic uploads).
 
-## Store listing (texts to paste)
+## Store listing
 
-- **Name:** Who Shot It?
-- **Subtitle (App Store) / short description (Google Play):** Guess whose photo it is
-- **Category:** Games, Trivia (App Store); Game, Trivia (Google Play). Price: free.
-- **Keywords (App Store):** `party game,photos,guess who,friends,group game,camera roll,gallery,quiz,fun,multiplayer`
-  (never "roulette" or other apps' names: Apple rejects keywords with other brands)
-- **Copyright:** 2026 HiveDone UG (haftungsbeschränkt)
-- **Promotional text:** Guess whose photo it is! The party game with the photos on your phones.
-- **Description:**
-
-> Who Shot It? is the party game that lives in your camera roll.
->
-> Everyone opens the app and gets a few random photos from their own phone. Don't like
-> them? Tap No for new ones. Happy? Tap Yes. Then one photo after another pops up on every
-> screen, and everybody races to tap whose phone it came from. Right and fast scores the
-> most, and every reveal is a story.
->
-> • 2 to 12 players in the same room
-> • Free, no account, no ads
-> • Classic, or Tricky: photos start blurry, zoomed or pixelated
-> • Tune rounds, time, points and more; every option is explained
-> • Your photos, your call: nothing leaves your phone before you tap Yes, and each photo
->   is deleted right after its round
-> • Report any photo and it is gone for everyone at once
->
-> Imprint, privacy and terms: https://who-shot-it.nils-plum.workers.dev/legal
+The texts, icons and screenshots for both store pages: [store/listing.md](../store/listing.md).
 
 ## Store forms (answers that match the app and the privacy policy)
 
@@ -138,6 +108,6 @@ target audience 16 and older, no children.
 > photos). Content moderation: every player confirms their own photos (Yes/No); the flag
 > on each photo deletes it for everyone at once; the host can remove players (tap a
 > player), who cannot rejoin; nicknames with blocked words are replaced; every player
-> accepts the terms (16+) before playing; contact: support@hive-done.com.
+> accepts the terms (16+) before playing; contact: whoshotit.info@gmail.com.
 
 **Screenshots:** use only your own photos, or photos of people who agreed.

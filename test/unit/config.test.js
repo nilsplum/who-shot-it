@@ -18,7 +18,7 @@ import iosInfo from '../../ios/App/App/Info.plist?raw';
 import iosProject from '../../ios/App/App.xcodeproj/project.pbxproj?raw';
 
 const texts = import.meta.glob([
-  '../../web/**/*.{js,mjs,html,css}', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
+  '../../web/**/*.{js,mjs,html,css,svg}', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
   '../../android/app/src/main/java/**/*.java', '../../android/app/src/main/AndroidManifest.xml', '../../android/app/build.gradle',
   '../../ios/App/App/*.swift', '../../ios/App/App/Info.plist', '../../ios/App/App/PrivacyInfo.xcprivacy',
 ], { query: '?raw', import: 'default', eager: true });
