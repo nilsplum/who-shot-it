@@ -21,10 +21,12 @@
   },
   // A Durable Object class is registered once; never edit or remove a deployed migration.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
-  // The production domain. It must be a zone in the same Cloudflare account (README, Deploy).
-  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }],
-  // One public address only: no *.workers.dev copy and no preview links.
-  "workers_dev": false,
+  // The public address. Until the domain is bought, the game runs on the account's
+  // https://who-shot-it.<subdomain>.workers.dev. To move to the domain (a zone in the same
+  // Cloudflare account), add  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }]
+  // and set workers_dev to false, so there is one public address only (README, Deploy).
+  "workers_dev": true,
+  // No preview links per upload: every version would be a second public copy of the game.
   "preview_urls": false,
   // No stored request logs (privacy policy: we keep no logs). `npx wrangler tail` streams live.
   "observability": { "enabled": false },

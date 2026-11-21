@@ -27,31 +27,48 @@ player and changes after every pickup. Code: `web/js/device.js` (`shortcutLink`)
 
 ## Build it (iPhone, Shortcuts app, about 5 minutes)
 
-1. Open **Shortcuts**, tap **+**. Tap the name at the top and rename it to exactly
+Actions are added with the search field at the bottom of the editor. On an iPhone set to
+German, search for the name in brackets.
+
+1. Open **Shortcuts**, tap **+**. Tap the name at the top → **Rename** → exactly
    **`Who Shot It`** (no question mark; it must match `SHORTCUT.name`).
-2. Add the action **Find Photos**:
-   - **Add Filter** → **Is a Screenshot** → set it to **is not** (or switch it off).
-   - **Add Filter** → **Media Type** → **is Image** (so videos are skipped).
+2. Add **Find Photos** (*Fotos suchen*):
+   - **Add Filter**, tap the filter's first word and pick **Is Not a Screenshot**.
+   - **Add Filter** again, pick **Media Type** and set it to **Image** (so videos are skipped).
    - **Sort by** → **Random**.
-   - **Limit** → on, **Get 24 Photos**.
-3. Add **Repeat with Each** (it repeats with each item in *Photos*).
-4. Inside the repeat, add **Resize Image**: resize *Repeat Item* to **width 1080**, height
-   **Auto**.
-5. Below it, add **Convert Image**: convert *Resized Image* to **JPEG**. Tap the arrow to show
-   more: **Quality 70 %**, **Preserve Metadata off** (no location data leaves the phone).
-6. Below it, add **Get Contents of URL**:
-   - URL: tap the field and pick the variable **Shortcut Input**.
-   - Show more: **Method POST**, **Request Body File**, **File** = *Converted Image*.
-7. Leave **End Repeat** as it is. Nothing else follows (iOS returns to the game by itself).
-8. If the editor shows a line *Receive … input from …* at the top, make sure it accepts
-   **Text** (or *Any*).
+   - Turn on **Limit** and set the row below it to **24** (tap the number, or use +).
+3. Add **Repeat with Each** (*Mit jedem wiederholen*). It repeats with each item in *Photos*.
+4. Add **Resize Image** (*Bildgröße ändern*) and make sure it sits between **Repeat with
+   Each** and **End Repeat** (drag it there if it landed below). It reads *Resize Repeat Item
+   to Width × Auto Height*: tap **Width**, type **1080**, leave **Auto Height**.
+5. Below it, add **Convert Image** (*Bild konvertieren*): *Resized Image* to **JPEG**. Tap the
+   arrow (›) on the action to show more: **Quality** about **70 %**, **Preserve Metadata**
+   off (no location data leaves the phone).
+6. Below it, add **Get Contents of URL** (*Inhalte von URL abrufen*):
+   - Tap **URL** and pick the variable **Shortcut Input** (*Kurzbefehleingabe*) in the bar
+     above the keyboard (or through **Select Variable**).
+   - Tap the arrow (›) to show more: **Method** **POST**, **Request Body** **File**, then tap
+     **File** and pick **Converted Image**.
+7. Check the order, then tap **Done**. Nothing follows *End Repeat*: iOS returns to the game
+   by itself.
+   ```
+   Find Photos
+   Repeat with Each item in Photos
+     Resize Image
+     Convert Image
+     Get Contents of URL
+   End Repeat
+   ```
+   If a line *Receive … input from …* shows at the top, it must accept **Any** (the default)
+   or **Text**.
 
 ## Share it
 
-In the Shortcuts list, touch and hold **Who Shot It** → **Share** → **Copy iCloud Link**.
-Paste the link (`https://www.icloud.com/shortcuts/…`) as `SHORTCUT.installUrl` in
-`web/shared/config.js`, replacing the `TODO_OPERATOR:` text. The shortcut contains no
-personal data: the upload link is handed over each time it runs.
+iCloud Sync for Shortcuts must be on (Settings → Apps → Shortcuts → **iCloud Sync**). In the
+Shortcuts list, tap **…** on **Who Shot It** to open it, tap the **Share** button, then
+**Copy iCloud Link** → **Copy Link**. Paste the link (`https://www.icloud.com/shortcuts/…`)
+as `SHORTCUT.installUrl` in `web/shared/config.js`, replacing the `TODO_OPERATOR:` text.
+The shortcut contains no personal data: the upload link is handed over each time it runs.
 
 ## Check it
 

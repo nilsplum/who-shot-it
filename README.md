@@ -1,8 +1,17 @@
 # Who Shot It?
 
-A party game in the browser: everyone gets random photos from their own phone, then a photo
-pops up and everybody taps whose it is. Fast and right scores more. No app, no account, free.
-Photos never leave a phone before its owner taps **Yes**, and are deleted after their round.
+**The party game that lives in your camera roll.** Everyone at the table joins from their
+phone's browser, and the game deals each player a few random photos from their own phone.
+Then the fun starts: one photo after another pops up on every screen, and everybody races to
+tap *whose phone it came from*. Was the blurry 2 a.m. kebab Ana's? Is the 400th cat picture
+Ben's? Right and fast scores the most, and every reveal is a story.
+
+- **No app, no account, free.** Open the link, pick an emoji, play. 2 to 12 players.
+- **Your photos, your call.** Don't like what you were dealt? Tap **No** for new ones.
+  Nothing leaves a phone before its owner taps **Yes**, and each photo is deleted right after
+  its round.
+- **Modes for every crowd:** Classic, Blur, Zoom, Pixel or a Mix of them, speed or fixed
+  points, a streak bonus, and more.
 
 Runs entirely on Cloudflare's free plan: one Worker plus one Durable Object per game room.
 
@@ -20,8 +29,9 @@ Needs Node.js 22.12 or newer (`package.json`, `engines`).
 ## Deploy
 
 One time:
-1. The domain (`whoshot.it`, set in `wrangler.jsonc` → `routes`) must be a zone in your
-   Cloudflare account. To use another one, change it there; nothing else names the domain.
+1. The address, set in `wrangler.jsonc`: for now `who-shot-it.<your subdomain>.workers.dev`.
+   To move to a domain (planned: `whoshot.it`), make it a zone in your Cloudflare account,
+   add it as `routes` and set `workers_dev` to `false` there; nothing else names the address.
 2. Build and share the iPhone shortcut and paste its iCloud link into
    `web/shared/config.js` → `SHORTCUT.installUrl` ([docs/ios-shortcut.md](docs/ios-shortcut.md)).
 3. `npx wrangler login` on the machine you deploy from.

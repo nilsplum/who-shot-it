@@ -9,9 +9,6 @@ preflight_deploy
 
 ./scripts/test.sh
 echo "→ Deploying to Cloudflare"
+# Wrangler prints the live address (workers.dev or the domain, as set in wrangler.jsonc).
 npx wrangler deploy
-domain=$(node -e "
-  const text = require('fs').readFileSync('wrangler.jsonc', 'utf8');
-  console.log((text.match(/\"pattern\":\s*\"([^\"]+)\"/) || [])[1] || '');
-")
-echo "✓ Live at https://${domain}"
+echo "✓ Deployed. The live address is listed above."
