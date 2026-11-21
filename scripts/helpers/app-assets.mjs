@@ -1,7 +1,7 @@
 /**
  * Draws every app icon and launch screen of both apps, and the store graphics, from the
  * one logo `web/icons/icon.svg` in the app's colours (the tokens in `web/css/app.css`).
- * Run by `./scripts/build-apps.sh` before every build, so the native projects always show
+ * Run by `./scripts/release-apps.sh` before every build, so the native projects always show
  * the current logo; the output is identical for identical input, so an unchanged logo
  * changes no file.
  *

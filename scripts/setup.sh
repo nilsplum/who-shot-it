@@ -10,4 +10,4 @@ echo "→ Installing dependencies (exact versions from package-lock.json)"
 npm ci --no-audit --no-fund
 echo "→ Installing the test browser (Chromium for Playwright)"
 npx playwright install chromium
-echo "✓ Setup done. Next: ./scripts/test.sh, ./scripts/dev.sh, ./scripts/deploy.sh or ./scripts/build-apps.sh"
+echo "✓ Setup done. Next: ./scripts/test.sh, ./scripts/dev.sh, ./scripts/deploy.sh or ./scripts/release-apps.sh"

@@ -2,7 +2,7 @@
 # Preflight checks shared by every script in scripts/. Each check is one function that
 # prints a short reason and the exact fix when it fails; each script runs its bundle
 # (preflight_setup, preflight_test, preflight_dev, preflight_deploy, preflight_android,
-# preflight_ios) before doing anything. Sourced, never run directly. Expects to be called
+# preflight_ios) before doing anything; release-apps.sh adds check_play_upload_key. Sourced, never run directly. Expects to be called
 # from the repo root.
 
 fail() {
@@ -73,10 +73,15 @@ check_xcode() {
   xcodebuild -version >/dev/null 2>&1 || fail "Xcode is missing (iPhone builds need a Mac with Xcode)." "Install Xcode from the Mac App Store, open it once, then run: sudo xcode-select -s /Applications/Xcode.app"
 }
 
-# Signing uses the Apple developer team chosen once in Xcode (Signing & Capabilities).
+# Signing uses the Apple developer team set in the iPhone project (DEVELOPMENT_TEAM).
 check_ios_team() {
   grep -q "DEVELOPMENT_TEAM = " ios/App/App.xcodeproj/project.pbxproj \
     || fail "No Apple developer team is set for the iPhone app." "Open ios/App/App.xcodeproj in Xcode, target App, Signing & Capabilities: tick 'Automatically manage signing' and pick your team. Commit the change."
+}
+
+# Uploads to Google Play sign in with a service account key (docs/apps.md, Google Play).
+check_play_upload_key() {
+  [ -f secrets/google-play.json ] || fail "The Google Play upload key is missing (secrets/google-play.json)." "Create it once as described in docs/apps.md (Google Play), or build only: ./scripts/release-apps.sh android --no-upload"
 }
 
 preflight_setup() { check_node; }

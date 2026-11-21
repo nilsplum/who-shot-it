@@ -12,7 +12,7 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 | Registering it | `MainActivity.java` | `MainViewController` in `PhonePlugin.swift`, used by `SceneDelegate.swift` |
 | Permissions, invite links `whoshotit://join/<CODE>`, portrait only | `AndroidManifest.xml` | `Info.plist` |
 | Privacy manifest | (none on Android) | `PrivacyInfo.xcprivacy` |
-| Version (from `package.json`) | `android/app/build.gradle` | passed in by `./scripts/build-apps.sh` |
+| Version (from `package.json`) | `android/app/build.gradle` | passed in by `./scripts/release-apps.sh` |
 | Icons and launch screens | drawn from `web/icons/icon.svg` by `scripts/helpers/app-assets.mjs` | same |
 
 Official plugins: `@capacitor/app` (invite links, Android back button, resume) and
@@ -39,20 +39,72 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
    version number twice.
 2. If the server changed: `./scripts/deploy.sh` first. Installed apps update slowly, so the
    server must keep understanding the previous app version.
-3. `./scripts/build-apps.sh` (or `android` / `ios` only). It runs every test, then writes
-   `dist/who-shot-it-<version>.aab` and `dist/ios/App.ipa`.
-4. Upload: the `.aab` in the Google Play Console (Production, Create new release); the
-   `.ipa` with Apple's free **Transporter** app. Then submit both for review.
+3. `./scripts/release-apps.sh` (or `ios` / `android` only). It runs every test, builds,
+   signs and uploads:
+   - **iPhone:** to App Store Connect. About 15 minutes later the build is in TestFlight
+     (install it on your iPhone with Apple's TestFlight app). To publish: App Store
+     Connect, the app, the version, pick the build, **Submit for Review**.
+   - **Android:** to Google Play, released on the production track: Google reviews it
+     (hours to a few days), then it goes live. `--android-track internal` releases to the
+     internal test track instead.
+
+   `--no-upload` only builds (`dist/who-shot-it-<version>.aab`, `dist/ios/App.ipa`).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with
-Xcode 26 or newer, signed in to the Apple developer account (Xcode, Settings, Accounts),
-and the team chosen once for the app (open `ios/App/App.xcodeproj`, target App, Signing &
-Capabilities, Automatically manage signing, pick the team; commit the change).
+Xcode 26 or newer, signed in to the Apple developer account (Xcode, Settings, Accounts);
+the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 
-**Android upload key:** the first Android build creates `secrets/android-upload.jks` and
-its password file. Back up `secrets/` (a password manager). Enrol in Play App Signing (the
-default): Google signs what players install, and a lost upload key can be replaced
-through Google support.
+**Keys in `secrets/`** (git-ignored; back the folder up in a password manager):
+- `android-upload.jks` and `android-upload.properties`: the Android upload key, created by
+  the first Android build. With Play App Signing (the default) Google signs what players
+  install, and a lost upload key can be replaced through Google support.
+- `google-play.json`: the key of the service account that uploads to Google Play.
+
+## First release (once per store, by hand)
+
+**App Store:** in App Store Connect create the app (My Apps, +, New App: iOS, name
+`Who Shot It?`, language English, bundle ID `com.hivedone.whoshotit`, SKU `whoshotit`).
+Then `./scripts/release-apps.sh ios` uploads the first build. Fill in the version page,
+App Privacy, age rating and the EU trader details with the answers below, then Submit for
+Review.
+
+**Google Play:** create the app in the Play Console (app name, English, game, free). Build
+the first bundle with `./scripts/release-apps.sh android --no-upload` and upload
+`dist/who-shot-it-<version>.aab` by hand (Production, Create new release; accept Play App
+Signing). Fill in the app content forms with the answers below. From then on uploads are
+automatic: create a service account in Google Cloud (project, IAM, Service accounts,
+Create, Keys, Add key, JSON), enable the "Google Play Android Developer API" in that
+project, invite the service account's email in the Play Console (Users and permissions,
+Invite, app access "Who Shot It?", permission "Release to production"), and save the key
+as `secrets/google-play.json`.
+
+## Store listing (texts to paste)
+
+- **Name:** Who Shot It?
+- **Subtitle (App Store) / short description (Google Play):** Guess whose photo it is
+- **Category:** Games, Trivia (App Store); Game, Trivia (Google Play). Price: free.
+- **Keywords (App Store):** `party game,photos,guess who,friends,group game,camera roll,gallery,quiz,fun,multiplayer`
+  (never "roulette" or other apps' names: Apple rejects keywords with other brands)
+- **Copyright:** 2026 HiveDone UG (haftungsbeschränkt)
+- **Promotional text:** Guess whose photo it is! The party game with the photos on your phones.
+- **Description:**
+
+> Who Shot It? is the party game that lives in your camera roll.
+>
+> Everyone opens the app and gets a few random photos from their own phone. Don't like
+> them? Tap No for new ones. Happy? Tap Yes. Then one photo after another pops up on every
+> screen, and everybody races to tap whose phone it came from. Right and fast scores the
+> most, and every reveal is a story.
+>
+> • 2 to 12 players in the same room
+> • Free, no account, no ads
+> • Classic, or Tricky: photos start blurry, zoomed or pixelated
+> • Tune rounds, time, points and more; every option is explained
+> • Your photos, your call: nothing leaves your phone before you tap Yes, and each photo
+>   is deleted right after its round
+> • Report any photo and it is gone for everyone at once
+>
+> Imprint, privacy and terms: https://who-shot-it.nils-plum.workers.dev/legal
 
 ## Store forms (answers that match the app and the privacy policy)
 

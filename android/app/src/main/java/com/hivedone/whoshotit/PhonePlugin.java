@@ -106,9 +106,14 @@ public class PhonePlugin extends Plugin {
         resolveAccess(call);
     }
 
-    /** One random photo not in `exclude`: `{ id, data }` (base64 JPEG), or `{}` when none is left. */
+    /** One random photo not in `exclude`: `{ id, data }` (base64 JPEG), or `{}` when none is left (or without photo access). */
     @PluginMethod
     public void randomPhoto(PluginCall call) {
+        String access = access();
+        if (!"full".equals(access) && !"limited".equals(access)) {
+            call.resolve(new JSObject());
+            return;
+        }
         JSArray list = call.getArray("exclude", new JSArray());
         Set<String> exclude = new HashSet<>();
         for (int i = 0; i < list.length(); i++) exclude.add(list.optString(i));

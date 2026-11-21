@@ -25,7 +25,7 @@ room, stored in the EU.
 | `./scripts/test.sh` | All tests: unit + integration (inside the Workers runtime), then phone-sized browsers playing a full game with a stand-in photo library. `--no-e2e` skips the browsers. |
 | `./scripts/dev.sh [android\|ios]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. |
 | `./scripts/deploy.sh` | Checks, runs every test, deploys the server to Cloudflare. |
-| `./scripts/build-apps.sh [android] [ios]` | Runs every test, then builds the signed store files into `dist/`. |
+| `./scripts/release-apps.sh [android] [ios]` | Runs every test, builds the signed apps and uploads them to App Store Connect and Google Play (`--no-upload`: only build into `dist/`). |
 
 Needs Node.js 22.12 or newer (`package.json`, `engines`); app builds need Android Studio
 (Android) or a Mac with Xcode 26+ (iPhone), see [docs/apps.md](docs/apps.md).
@@ -37,8 +37,9 @@ It refuses while a `TODO_OPERATOR:` value is left or the machine is not logged i
 deploys only if every test passes. Keep Cloudflare's cookie-setting extras (Bot Fight Mode,
 Web Analytics, Zaraz) off: the privacy policy promises no cookies and no analytics.
 
-**Apps:** raise `"version"` in `package.json`, run `./scripts/build-apps.sh`, upload the
-files from `dist/`. Store setup, signing and the answers for the store forms:
+**Apps:** raise `"version"` in `package.json`, run `./scripts/release-apps.sh`. It uploads
+both apps; Google Play releases after its review, on the App Store you press "Submit for
+Review". Store setup, the first release by hand, and the answers for the store forms:
 [docs/apps.md](docs/apps.md).
 
 **The server's address** is `SERVER.origin` in `web/shared/config.js` (and `wrangler.jsonc`;

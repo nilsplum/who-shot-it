@@ -103,5 +103,5 @@ test('in a browser the page is the website: the invite page and the legal page',
   await expect(page.getByRole('link', { name: 'Google Play (Android)' })).toBeVisible();
   await page.goto('/legal');
   await expect(page.getByRole('heading', { name: 'Imprint (Impressum)' })).toBeVisible();
-  await expect(page.getByText('Hünensteig 36')).toBeVisible();
+  await expect(page.getByText('Zum Isetal 1')).toBeVisible();
 });

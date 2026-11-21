@@ -13,8 +13,11 @@ const FIXTURES = path.join(import.meta.dirname, '..', 'fixtures');
 /** The fixture JPEGs as base64, the way the native plugin hands photos over. */
 export const library = [1, 2, 3, 4, 5, 6].map((i) => fs.readFileSync(path.join(FIXTURES, `photo-${i}.jpg`)).toString('base64'));
 
-/** Runs in the page before the app (a Playwright init script): it must be self-contained. */
-function installFakePhone(photos) {
+/**
+ * Runs in the page before the app (a Playwright init script): it must be self-contained.
+ * Also used by scripts/helpers/store-screenshots.mjs with its own drawn library.
+ */
+export function installFakePhone(photos) {
   let access = 'ask';
   window.Capacitor = {
     Plugins: {

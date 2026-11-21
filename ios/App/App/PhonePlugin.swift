@@ -51,8 +51,15 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// One random photo not in `exclude`: `{ id, data }` (base64 JPEG), or `{}` when none is left.
+    /// One random photo not in `exclude`: `{ id, data }` (base64 JPEG), or `{}` when none is
+    /// left. Without photo access it answers `{}` at once: touching the library would make
+    /// iOS ask on its own, outside the app's "Continue" step.
     @objc func randomPhoto(_ call: CAPPluginCall) {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else {
+            call.resolve([:])
+            return
+        }
         let exclude = Set((call.getArray("exclude") ?? []).compactMap { $0 as? String })
         let maxSide = CGFloat(call.getInt("maxSide") ?? 1080)
         let quality = CGFloat(call.getDouble("quality") ?? 0.75)

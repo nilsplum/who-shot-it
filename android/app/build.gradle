@@ -1,6 +1,6 @@
 // The Android app's build. The version comes from package.json (the one place it is set):
 // versionName is "1.2.3", versionCode 10203, so every release counts up. Release builds
-// are signed by ./scripts/build-apps.sh with the upload key from secrets/ (passed in as
+// are signed by ./scripts/release-apps.sh with the upload key from secrets/ (passed in as
 // Android Studio's own "injected signing" properties, so no password is stored here).
 apply plugin: 'com.android.application'
 
