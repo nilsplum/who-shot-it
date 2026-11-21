@@ -1,19 +1,20 @@
 /**
- * The browser's state: what this device remembers (`device`, in localStorage) and what
- * the current visit knows (`session`).
+ * The app's state: what this phone remembers (`device`, in the app's local storage) and
+ * what the app knows while it runs (`session`).
  *
  * Mechanisms: `main.js` reads and changes both and repaints; views only read them.
  * `session.view` is always the latest full snapshot the room sent (`src/game/view.js`).
  *
  * Invariants:
- * - localStorage holds only what the game needs on this device (privacy policy, "Your
- *   device"): the random player key, name, avatar, the room this device is in (so a
- *   reload or the iPhone shortcut's return lands back in the game), the host settings
- *   to start the next game with, and whether the shortcut has worked here once. No
- *   cookies, nothing else. Storage may be unavailable (private mode): everything still
- *   works for the visit, it is just not remembered.
- * - The player key is this device's secret identity in every room. It is made once with
- *   the crypto random source and only ever sent in `hello` and the `Authorization` header.
+ * - Local storage holds only what the game needs on this phone (privacy policy, "On
+ *   your phone"): name, avatar, the settings for the next game, which version of the
+ *   terms was accepted, and the current game with its player key (so the app lands back
+ *   in the game after it was closed). Nothing else; storage that fails is ignored,
+ *   everything still works while the app runs, it is just not remembered.
+ * - The player key is this phone's secret identity in one game (`keyFor`): made with the
+ *   crypto random source when the phone joins a game, kept for that game only (also
+ *   after leaving it, so a removed player stays removed), replaced by the next game's.
+ *   It is only ever sent in `hello` and the `Authorization` header.
  */
 
 import { EMOJIS, LIMITS, isRoomCode, normalizeSettings } from '../shared/config.js';
@@ -22,6 +23,7 @@ const STORAGE_KEY = 'whoshotit';
 const KEY_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 const newKey = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => KEY_CHARS[b & 63]).join('');
+const isKey = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(value);
 
 function read() {
   try {
@@ -34,12 +36,16 @@ function read() {
 const saved = read();
 
 export const device = {
-  key: typeof saved.key === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(saved.key) ? saved.key : newKey(),
   name: typeof saved.name === 'string' ? saved.name.slice(0, LIMITS.nameMax) : '',
   avatar: EMOJIS.includes(saved.avatar) ? saved.avatar : EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-  room: isRoomCode(saved.room) ? saved.room : null,
   settings: normalizeSettings(saved.settings),
-  shortcutOk: saved.shortcutOk === true,
+  /** The terms version (`LEGAL.version`) this phone accepted, or null. */
+  agreed: typeof saved.agreed === 'string' ? saved.agreed : null,
+  /** The game this phone is in, or null. */
+  room: isRoomCode(saved.room) ? saved.room : null,
+  /** The player key, and the game it belongs to. */
+  key: isKey(saved.key) && isRoomCode(saved.keyRoom) ? saved.key : null,
+  keyRoom: isKey(saved.key) && isRoomCode(saved.keyRoom) ? saved.keyRoom : null,
 };
 
 export function saveDevice() {
@@ -48,20 +54,38 @@ export function saveDevice() {
   } catch {}
 }
 
+/** The player key for game `code`: the one this phone already has there, else a new one. */
+export function keyFor(code) {
+  if (device.keyRoom !== code || !device.key) {
+    device.key = newKey();
+    device.keyRoom = code;
+    saveDevice();
+  }
+  return device.key;
+}
+
 saveDevice();
 
 export const session = {
-  /** The room this tab is in, or null on the home screen. */
+  /** The room this app is in, or null outside a game. */
   code: null,
   /** A room code from an invite link, shown as "Join <CODE>" on the home screen. */
   invite: null,
+  /** True on the "New game" step between the home screen and creating the room. */
+  setup: false,
   /** The latest view the room sent, or null before the first one. */
   view: null,
   /** 'connecting' | 'open' | 'down' | 'replaced' */
   conn: 'connecting',
   downSince: 0,
-  /** The open sheet: 'settings' | 'help' | 'avatar' | 'invite' | 'leave' | 'ios' | null. */
+  /** The open sheet: 'settings' | 'help' | 'avatar' | 'invite' | 'leave' | 'report' | 'remove' | null. */
   sheet: null,
+  /** The setting whose "?" explanation is open in the settings sheet, or null. */
+  helpKey: null,
+  /** The player the host is about to remove ('remove' sheet). */
+  target: null,
+  /** Photo access as the phone last reported it ('full' | 'limited' | 'denied' | 'ask'), or null before asking. */
+  access: null,
   /** The answer just tapped, shown before the room confirms it: { photo, id }. */
   pick: null,
   /** When the latest view arrived (performance.now()) and its `left`, for local timers. */
@@ -69,7 +93,5 @@ export const session = {
   /** performance.now() when each photo was first shown, for effects without a timer. */
   shownAt: {},
   uploading: false,
-  poolLoading: false,
-  /** The pool token already picked up, so a late view never triggers a second pickup. */
-  poolTaken: null,
+  creating: false,
 };

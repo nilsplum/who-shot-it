@@ -1,11 +1,13 @@
 /**
- * A round on screen: round counter and score, the timer bar, the photo, the answer
- * buttons (everyone answers, the owner included, and anyone may pick themselves), who
- * has answered, and the reveal.
+ * A round on screen: round counter and score, the timer bar, the photo (with a flag to
+ * report it), the answer buttons (everyone answers, the owner included, and anyone may
+ * pick themselves), who has answered, and the reveal.
  *
  * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
  * photo (and the next one), tells the room once it is loaded, starts the effect when the
- * `stage` part changes and animates the timer bar (`#tbar`) every frame.
+ * `stage` part changes and animates the timer bar (`#tbar`) every frame. Photo links in
+ * the view are server paths; `serverUrl` makes them full addresses. The host can tap a
+ * player in the "who has answered" row to remove them (`views/sheets.js`).
  *
  * Invariants: the reveal keeps the answer buttons in place, so the eye stays where it
  * was: the owner's turns green, a wrong own pick red; under each name are the avatars of
@@ -13,6 +15,7 @@
  * among the answers ("Answers: Only 4") are added below, so every score is visible.
  */
 
+import { serverUrl } from '../api.js';
 import { avatar, esc } from '../ui.js';
 
 function bar(view) {
@@ -24,13 +27,19 @@ function bar(view) {
     <span class="pts">${me ? me.score : 0}${gained > 0 ? `<span class="gain">+${gained}</span>` : ''}</span>`;
 }
 
-/** The photo, or a spinner until it is loaded. Pixel mode draws on a canvas. */
+/**
+ * The photo, or a spinner until it is loaded. Pixel mode draws on a canvas. A photo gone
+ * during the reveal (reported, or its owner left) leaves a plain sign behind.
+ */
 function stage(view, loaded) {
   const r = view.round;
+  if (view.phase === 'reveal' && !r.photo) return '<div class="loader gone">🚫</div>';
   if (view.phase === 'load' || !r.photo || !loaded) return '<div class="loader"><div class="spin"></div></div>';
-  const media = view.phase === 'show' && r.mode === 'pixel' ? '<canvas></canvas>' : `<img alt="" src="${esc(r.photo)}">`;
+  const src = esc(serverUrl(r.photo));
+  const media = view.phase === 'show' && r.mode === 'pixel' ? '<canvas></canvas>' : `<img alt="" src="${src}">`;
   // Phase and round in the markup make the reveal repaint the plain photo, ending any effect.
-  return `<div class="frame" data-round="${r.n}" data-phase="${view.phase}">${media}</div>`;
+  return `<div class="frame" data-round="${r.n}" data-phase="${view.phase}">${media}</div>
+    <button class="flag" data-act="report" aria-label="Report this photo">⚑</button>`;
 }
 
 function optionButton(view, id, { picked, late }) {
@@ -63,7 +72,11 @@ function options(view, { picked, late, loaded }) {
 function dots(view, host) {
   if (view.phase !== 'show') return '';
   const answered = new Set(view.round.answered);
-  return `<div class="dots">${view.players.map((p) => avatar(p, answered.has(p.id) ? 'on' : '')).join('')}</div>
+  const dot = (p) => {
+    const a = avatar(p, answered.has(p.id) ? 'on' : '');
+    return host && p.id !== view.me.id ? `<button class="bare" data-act="remove" data-v="${esc(p.id)}" aria-label="${esc(p.name)}: remove from game">${a}</button>` : a;
+  };
+  return `<div class="dots">${view.players.map(dot).join('')}</div>
     ${host ? '<button class="link" data-act="resolve">Reveal now</button>' : ''}`;
 }
 

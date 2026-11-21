@@ -1,158 +1,100 @@
 /**
- * The player's photo choice in the lobby: candidates on the device, the random set of n
- * shown with No/Yes, and shrinking each photo before it may leave the phone.
+ * The player's photo choice in the lobby: n random photos from the phone, shown with
+ * "Play with these?" No/Yes.
  *
- * Mechanisms: candidates come from one of three sources, all ending in `setCandidates`:
- * the folder picker ("All photos" on Android and computers), the photo picker ("Choose
- * photos"), or the iPhone shortcut's pool (`api.takePool`). `roll` draws n random photos
- * and shrinks them; "No" rolls again, "Yes" uploads exactly these shrunk JPEGs
- * (`api.uploadPhotos`).
+ * Mechanisms: `main.js` calls `roll` when the lobby needs a set (a new game, a new
+ * "Photos per player", or "No"). Each slot asks the phone for one random photo
+ * (`phone.randomPhoto`), so the grid fills in photo by photo; "Yes" uploads exactly these
+ * JPEGs (`api.uploadPhotos`).
  *
  * Invariants:
- * - Nothing leaves the device before "Yes": candidates are local File/Blob objects.
- * - Uploads are always the re-encoded canvas JPEGs (at most LIMITS.photoMaxSide on the
- *   longest side, at most LIMITS.photoMaxBytes), which also strips location data.
- * - A roll prefers photos not shown yet; only when the candidates run out do earlier
- *   ones come back (never the set on screen, if there are enough others).
- * - A newer roll cancels an older one still shrinking (`rollId`).
+ * - Nothing leaves the phone before "Yes": the set is local Blobs (already shrunk and
+ *   re-encoded on the phone, see `phone.js`).
+ * - A roll prefers photos not shown yet (`seen`); only when the phone has none left do
+ *   earlier ones come back, never the set on screen if there are others.
+ * - A newer roll cancels an older one still running (`rollId`).
  */
 
-import { LIMITS } from '../shared/config.js';
+import { randomPhoto } from './phone.js';
 
 export const photos = {
-  /** Local File/Blob candidates. */
-  candidates: [],
-  /** Indexes of candidates already shown. */
-  seen: new Set(),
-  /** The set on screen: { index, blob, url, bad }. */
+  /** The set on screen: { id, blob, url } per slot; a slot still loading has no url. */
   chosen: [],
+  /** Phone photo ids already shown in this lobby. */
+  seen: new Set(),
   /** The set size the current roll was made for (the "Photos per player" setting). */
   size: 0,
   /** True once the set was played, so the next lobby draws a fresh one. */
   spent: false,
+  /** True while a roll is running. */
+  rolling: false,
+  /** True when the phone had no photo to give at all (an empty or fully hidden library). */
+  empty: false,
   rollId: 0,
 };
 
-export const isImageFile = (file) => /^image\//.test(file.type) || /\.(jpe?g|png|heic|heif|webp|gif|avif)$/i.test(file.name || '');
-
-/** Pure: which candidate indexes the next roll shows. */
-export function pickIndexes(total, size, seen, current, rng = Math.random) {
-  const all = [...Array(total).keys()];
-  let pool = all.filter((i) => !seen.has(i));
-  if (pool.length < size) {
-    // Start over, but keep the set on screen out if there are enough others.
-    seen.clear();
-    current.forEach((i) => seen.add(i));
-    pool = all.filter((i) => !seen.has(i));
-    if (pool.length < size) pool = all;
-  }
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  return pool.slice(0, size);
-}
-
-function releaseChosen() {
+function release() {
   photos.chosen.forEach((c) => c.url && URL.revokeObjectURL(c.url));
   photos.chosen = [];
 }
 
-export function setCandidates(list) {
-  releaseChosen();
-  photos.candidates = list.filter(isImageFile);
+/** Forgets the set and everything seen (leaving the room, or photo access changed). */
+export function resetPhotos() {
+  release();
   photos.seen = new Set();
   photos.size = 0;
   photos.spent = false;
+  photos.rolling = false;
+  photos.empty = false;
   photos.rollId += 1;
 }
 
-export function clearPhotos() {
-  setCandidates([]);
-}
-
-export const isRolling = () => photos.chosen.some((c) => !c.blob && !c.bad);
 export const readyBlobs = () => photos.chosen.filter((c) => c.blob).map((c) => c.blob);
 
-async function decode(file) {
-  try {
-    return await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
-    const url = URL.createObjectURL(file);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      return img;
-    } finally {
-      URL.revokeObjectURL(url);
+/** One new photo, starting over (but not with the set on screen) once all were seen. */
+async function draw(onScreen) {
+  let photo = await randomPhoto([...photos.seen]);
+  if (!photo && photos.seen.size) {
+    photos.seen = new Set(onScreen);
+    photo = await randomPhoto([...photos.seen]);
+    if (!photo && onScreen.length) {
+      photos.seen = new Set();
+      photo = await randomPhoto([]);
     }
   }
-}
-
-/** The photo re-encoded as a JPEG small enough to upload, or null if it cannot be read. */
-export async function shrink(file) {
-  const src = await decode(file);
-  const w0 = src.width || src.naturalWidth;
-  const h0 = src.height || src.naturalHeight;
-  if (!w0 || !h0) return null;
-  const scale = Math.min(1, LIMITS.photoMaxSide / Math.max(w0, h0));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(w0 * scale));
-  canvas.height = Math.max(1, Math.round(h0 * scale));
-  const ctx = canvas.getContext('2d');
-  // JPEG has no transparency: transparent parts of a PNG become black, not random noise.
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
-  if (src.close) src.close();
-  for (const quality of [0.82, 0.7, 0.55]) {
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
-    if (blob && blob.size <= LIMITS.photoMaxBytes) return blob;
-  }
-  return null;
+  if (photo) photos.seen.add(photo.id);
+  return photo;
 }
 
 /**
- * Draws `size` random photos and shrinks them one by one, calling `onChange` after each,
- * so the grid fills in as they become ready. Unreadable photos are replaced by others.
+ * Draws `size` random photos one by one, calling `onChange` after each, so the grid
+ * fills in as they arrive. A photo the phone cannot hand over in time is replaced by
+ * another; a phone with fewer photos than `size` gives a smaller set.
  */
 export async function roll(size, onChange) {
   const id = ++photos.rollId;
-  const total = photos.candidates.length;
-  const n = Math.min(size, total);
-  const current = photos.chosen.map((c) => c.index);
-  releaseChosen();
-  photos.size = size;
-  photos.spent = false;
-  const indexes = pickIndexes(total, n, photos.seen, current);
-  indexes.forEach((i) => photos.seen.add(i));
-  photos.chosen = indexes.map((index) => ({ index, blob: null, url: null, bad: false }));
+  const onScreen = photos.chosen.map((c) => c.id).filter(Boolean);
+  release();
+  Object.assign(photos, { size, spent: false, rolling: true, empty: false });
+  photos.chosen = Array.from({ length: size }, () => ({ id: null, blob: null, url: null }));
   onChange();
-  const spare = [...Array(total).keys()].filter((i) => !photos.seen.has(i));
-  for (let k = 0; k < photos.chosen.length; k++) {
-    const slot = photos.chosen[k];
-    for (;;) {
-      let blob = null;
+  for (const slot of photos.chosen) {
+    let photo = null;
+    for (let attempt = 0; attempt < 3 && !photo; attempt++) {
       try {
-        blob = await shrink(photos.candidates[slot.index]);
-      } catch {}
-      if (id !== photos.rollId) return;
-      if (blob) {
-        slot.blob = blob;
-        slot.url = URL.createObjectURL(blob);
-        break;
+        photo = await draw(onScreen);
+        if (!photo) break;
+      } catch {
+        // Too slow (an iCloud original that does not arrive): try another photo.
       }
-      // Unreadable (for example a format this browser cannot decode): try another one.
-      if (!spare.length) {
-        slot.bad = true;
-        break;
-      }
-      slot.index = spare.splice(Math.floor(Math.random() * spare.length), 1)[0];
-      photos.seen.add(slot.index);
     }
+    if (id !== photos.rollId) return;
+    if (!photo) break;
+    Object.assign(slot, { id: photo.id, blob: photo.blob, url: URL.createObjectURL(photo.blob) });
     onChange();
   }
-  photos.chosen = photos.chosen.filter((c) => !c.bad);
+  photos.chosen = photos.chosen.filter((c) => c.blob);
+  photos.rolling = false;
+  photos.empty = photos.chosen.length === 0;
   onChange();
 }

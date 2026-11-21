@@ -1,7 +1,8 @@
 /**
- * End-to-end tests: real phones-sized browsers (Chromium, Pixel 7 emulation) playing
- * against the real app served by `wrangler dev` (Worker, Durable Objects and static files,
- * all local). ./scripts/test.sh starts each run with empty local storage.
+ * End-to-end tests: phone-sized browsers (Chromium, Pixel 7 emulation) playing the real
+ * app page against the real server run by `wrangler dev` (Worker, Durable Objects and
+ * static files, all local), with the native photo plugin replaced by a fake library
+ * (test/e2e/fake-phone.js). ./scripts/test.sh starts each run with empty local storage.
  */
 import { defineConfig, devices } from '@playwright/test';
 

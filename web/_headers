@@ -1,8 +1,8 @@
-# Security headers for every static file Cloudflare serves from web/ (Workers static
-# assets read this file; it is not served itself). API responses set their own headers
-# in src/http.js. The CSP allows only this origin: fonts are self-hosted, nothing is
-# loaded from third parties. Inline style attributes carry per-player colours and photo
-# previews (blob: URLs).
+# Security headers for every file Cloudflare serves from web/ when a browser opens the
+# website (Workers static assets read this file; it is not served itself). The apps load
+# web/ from their own bundle and use the CSP in index.html instead. API responses set
+# their own headers in src/http.js. The CSP allows only this origin: fonts are bundled,
+# nothing is loaded from third parties. Inline style attributes carry per-player colours.
 /*
   Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer

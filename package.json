@@ -1,12 +1,21 @@
 {
   "name": "who-shot-it",
+  "version": "1.0.0",
   "private": true,
-  "description": "Who Shot It? A party game: guess whose photo it is. Cloudflare Workers + Durable Objects.",
+  "description": "Who Shot It? The party game with the photos on your phones. iOS and Android apps (Capacitor) and a Cloudflare Workers + Durable Objects server.",
   "type": "module",
   "engines": {
     "node": ">=22.12"
   },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
+    "@capacitor/share": "8.0.3"
+  },
   "devDependencies": {
+    "@capacitor/cli": "8.6.2",
     "@cloudflare/vitest-plugin": "1.9.0",
     "@playwright/test": "1.65.1",
     "vitest": "5.1.1",

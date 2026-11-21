@@ -1,14 +1,15 @@
 /**
  * The Worker and the room's Durable Object together, over real HTTP and WebSocket requests
- * in the Workers runtime: creating and joining rooms, uploads, the game flow driven by
- * the alarm, photo access rules, the iPhone pool and deleting everything at the end.
+ * in the Workers runtime: who may call the API, creating and joining rooms, uploads, the
+ * game flow driven by the alarm, photo access rules, reports and removed players, and
+ * deleting everything at the end.
  */
 import { env, exports } from 'cloudflare:workers';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { API, CLOSE } from '../../web/shared/api.js';
-import { LIMITS, TIMING } from '../../web/shared/config.js';
-import { parsePool } from '../../web/js/api.js';
+import { LIMITS, SERVER, TIMING } from '../../web/shared/config.js';
+import { rooms } from '../../src/worker.js';
 import photo1 from '../fixtures/photo-1.jpg?inline';
 import photo2 from '../fixtures/photo-2.jpg?inline';
 
@@ -72,7 +73,7 @@ function upload(code, key, blobs) {
   return call(API.photos(code), { method: 'PUT', headers: { Authorization: `Bearer ${key}` }, body: form });
 }
 
-const stub = (code) => env.ROOMS.getByName(code);
+const stub = (code) => rooms(env).getByName(code);
 const countRows = (code, table) => runInDurableObject(stub(code), (instance) => instance.sql.exec(`SELECT COUNT(*) AS n FROM ${table}`).one().n);
 
 /** Moves the room's clock forward by running its alarm with a faked Date. */
@@ -81,6 +82,30 @@ async function advance(code, ms) {
   vi.setSystemTime(Date.now() + ms);
   await runDurableObjectAlarm(stub(code));
 }
+
+describe('who may call the API', () => {
+  test('the store apps get CORS headers, including the preflight for their Authorization header', async () => {
+    for (const origin of SERVER.appOrigins) {
+      const pre = await call(API.photos('ABCD'), { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'PUT' } });
+      expect(pre.status).toBe(204);
+      expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      expect(pre.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+      const res = await call(API.rooms(), { method: 'POST', headers: { Origin: origin }, body: '{}' });
+      expect(res.status).toBe(201);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+    }
+  });
+
+  test('other web pages are refused, sockets included; the server\'s own pages are not', async () => {
+    const evil = { Origin: 'https://evil.example' };
+    expect((await call(API.rooms(), { method: 'POST', headers: evil, body: '{}' })).status).toBe(403);
+    const code = await createRoom();
+    expect((await call(API.socket(code), { headers: { ...evil, Upgrade: 'websocket' } })).status).toBe(403);
+    const own = await call(API.rooms(), { method: 'POST', headers: { Origin: ORIGIN }, body: '{}' });
+    expect(own.status).toBe(201);
+    expect(own.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+});
 
 describe('rooms and players', () => {
   test('a new room greets its first player as host, with the creator\'s settings', async () => {
@@ -237,37 +262,31 @@ describe('leaving and closing', () => {
   });
 });
 
-describe('the iPhone pool', () => {
-  test('the shortcut uploads, finishes, and the browser picks the photos up once', async () => {
-    const code = await createRoom();
+describe('reports and removed players', () => {
+  test('a reported photo is deleted from storage at once; a removed player cannot come back', async () => {
+    const code = await createRoom({ photos: 3 });
     const ann = await connect(code, 'Ann');
-    const view = await ann.until((v) => v.me);
-    const token = view.me.pool.token;
-    expect((await call(API.poolUpload(code, 'wrongtoken'), { method: 'POST', body: JPEGS[0] })).status).toBe(404);
-    expect((await call(API.poolUpload(code, token), { method: 'POST', body: 'text' })).status).toBe(415);
-    for (const jpeg of JPEGS) expect((await call(API.poolUpload(code, token), { method: 'POST', body: jpeg })).status).toBe(201);
+    const ben = await connect(code, 'Ben');
+    await ann.until((v) => v.players.length === 2);
+    await upload(code, ann.key, JPEGS);
+    await upload(code, ben.key, []);
+    await advance(code, TIMING.countdownMs);
+    const load = await ben.until((v) => v.phase === 'load');
+    ben.send({ type: 'report' });
+    await ben.until((v) => v.phase === 'load' && v.round.n === 2);
+    expect(await countRows(code, 'photos')).toBe(1);
+    expect((await call(load.round.photo)).status).toBe(404);
 
-    const done = await call(API.poolDone(code, token), { redirect: 'manual' });
-    expect(done.status).toBe(302);
-    expect(done.headers.get('Location')).toBe(`/${code}`);
-    await ann.until((v) => v.me.pool.done && v.me.pool.count === 2);
-
-    expect((await call(API.pool(code), { headers: { Authorization: `Bearer ${keyFor('Nobody')}` } })).status).toBe(401);
-    const res = await call(API.pool(code), { headers: { Authorization: `Bearer ${ann.key}` } });
-    const blobs = parsePool(await res.arrayBuffer());
-    expect(blobs).toHaveLength(2);
-    expect(new Uint8Array(await blobs[1].arrayBuffer())).toEqual(JPEGS[1]);
-
-    const after = await ann.until((v) => v.me.pool.token !== token);
-    expect(after.me.pool).toMatchObject({ count: 0, done: false });
-    expect(await countRows(code, 'pool')).toBe(0);
-    // The old link is dead.
-    expect((await call(API.poolUpload(code, token), { method: 'POST', body: JPEGS[0] })).status).toBe(404);
+    ann.send({ type: 'kick', target: load.me.id });
+    expect(await ben.closedWith()).toBe(CLOSE.stale);
+    const back = await connect(code, 'Ben');
+    expect(await back.closedWith()).toBe(CLOSE.removed);
+    await ann.until((v) => v.players.length === 1);
   });
 });
 
-describe('static app', () => {
-  test('invite links serve the app; the legal page is reachable', async () => {
+describe('the website', () => {
+  test("invite links serve the app's page (it shows the invite in a browser); the legal page is reachable", async () => {
     const invite = await call('/ABCD', { headers: { Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate' } });
     expect(invite.status).toBe(200);
     expect(await invite.text()).toContain('<div id="app">');

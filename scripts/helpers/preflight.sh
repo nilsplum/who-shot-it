@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Preflight checks shared by every script in scripts/. Each check is one function that
 # prints a short reason and the exact fix when it fails; each script runs its bundle
-# (preflight_setup, preflight_test, preflight_dev, preflight_deploy) before doing anything.
-# Sourced, never run directly. Expects to be called from the repo root.
+# (preflight_setup, preflight_test, preflight_dev, preflight_deploy, preflight_android,
+# preflight_ios) before doing anything. Sourced, never run directly. Expects to be called
+# from the repo root.
 
 fail() {
   echo "✗ $1" >&2
@@ -40,12 +41,47 @@ check_cloudflare_login() {
 
 check_operator_todos() {
   local left
-  left=$(grep -rn "TODO_OPERATOR:" web src wrangler.jsonc 2>/dev/null || true)
+  left=$(grep -rn "TODO_OPERATOR:" web src wrangler.jsonc capacitor.config.json android/app/src ios/App/App 2>/dev/null || true)
   [ -z "$left" ] || fail "Some values only the operator can provide are still missing:
-$left" "Fill them in (README, Deploy), then deploy again."
+$left" "Fill them in (README, Release), then run the script again."
+}
+
+# Android builds need Java 21 or newer. Uses JAVA_HOME if it is set, else Android
+# Studio's bundled Java, else any installed one; exports JAVA_HOME for Gradle.
+check_java() {
+  local candidates=("${JAVA_HOME:-}" "/Applications/Android Studio.app/Contents/jbr/Contents/Home")
+  candidates+=("$(/usr/libexec/java_home -v 21+ 2>/dev/null || true)" "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home")
+  for home in "${candidates[@]}"; do
+    [ -n "$home" ] && [ -x "$home/bin/java" ] || continue
+    if "$home/bin/java" -version 2>&1 | head -1 | grep -Eq 'version "(2[1-9]|[3-9][0-9])'; then
+      export JAVA_HOME="$home"
+      return 0
+    fi
+  done
+  fail "Java 21 or newer is missing (Android builds need it)." "Install Android Studio (it brings Java 21): https://developer.android.com/studio"
+}
+
+# The Android SDK: ANDROID_HOME, or Android Studio's default place. Writes it to
+# android/local.properties (git-ignored), where Gradle looks for it.
+check_android_sdk() {
+  local sdk="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+  [ -d "$sdk/platform-tools" ] || fail "The Android SDK is missing." "Install Android Studio and open it once (it installs the SDK), or set ANDROID_HOME."
+  echo "sdk.dir=$sdk" > android/local.properties
+}
+
+check_xcode() {
+  xcodebuild -version >/dev/null 2>&1 || fail "Xcode is missing (iPhone builds need a Mac with Xcode)." "Install Xcode from the Mac App Store, open it once, then run: sudo xcode-select -s /Applications/Xcode.app"
+}
+
+# Signing uses the Apple developer team chosen once in Xcode (Signing & Capabilities).
+check_ios_team() {
+  grep -q "DEVELOPMENT_TEAM = " ios/App/App.xcodeproj/project.pbxproj \
+    || fail "No Apple developer team is set for the iPhone app." "Open ios/App/App.xcodeproj in Xcode, target App, Signing & Capabilities: tick 'Automatically manage signing' and pick your team. Commit the change."
 }
 
 preflight_setup() { check_node; }
 preflight_test() { check_node; check_dependencies; check_test_browser; }
 preflight_dev() { check_node; check_dependencies; }
 preflight_deploy() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_cloudflare_login; }
+preflight_android() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_java; check_android_sdk; }
+preflight_ios() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_xcode; check_ios_team; }

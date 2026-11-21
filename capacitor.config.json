@@ -1,0 +1,9 @@
+{
+  "appId": "com.hivedone.whoshotit",
+  "appName": "Who Shot It?",
+  "webDir": "web",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {}
+}

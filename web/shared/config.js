@@ -1,40 +1,79 @@
 /**
- * The single source of truth for everything the browser and the server must agree on:
- * the brand, the iPhone shortcut, the game settings (options, defaults, labels, help),
- * the limits, the timings and the scoring.
+ * The single source of truth for everything the app and the server must agree on: the
+ * brand and app identity, where the server lives, the game settings (options, defaults,
+ * labels, help) and the two presets, the limits, the timings and the scoring.
  *
  * Mechanisms: the Worker and the room's Durable Object import this file (Wrangler bundles
- * it), and the browser loads it unchanged as an ES module from `/shared/config.js`. So a
- * value changed here changes both sides at once, and nothing else may hardcode one of
- * these values.
+ * it); the app loads it unchanged as an ES module from its bundle (`web/` is the app's
+ * page inside both store apps, see `capacitor.config.json`). So a value changed here
+ * changes both sides at once, and nothing else may hardcode one of these values.
  *
  * Invariants:
  * - Settings are always read through `normalizeSettings` / `normalizeSetting`: a value
  *   that is not one of a setting's options falls back to its default, so a stale or
- *   tampered client can never put an unknown value into a room.
+ *   tampered app can never put an unknown value into a room.
  * - Values a setting stores are plain JSON (numbers, strings, booleans), because the room
  *   state is persisted and sent as JSON.
- * - The static files that restate the brand name for crawlers and link previews
- *   (`index.html`, `legal.html`, `manifest.webmanifest`) are pinned to `APP.name` by
- *   `test/unit/config.test.js`.
- * - `TODO_OPERATOR` marks a value only the operator can provide; `scripts/deploy.sh`
- *   refuses to deploy while one is left anywhere in the shipped files.
+ * - Files that cannot import this module restate a few values, and
+ *   `test/unit/config.test.js` pins each copy: the brand name (`index.html`, `legal.html`,
+ *   `capacitor.config.json`, the native projects), the app id (`capacitor.config.json`,
+ *   the native projects), the link scheme (the native projects), the server's address
+ *   (`wrangler.jsonc` and the page's Content-Security-Policy in `index.html`) and the
+ *   terms version and minimum age (`legal.html`).
  */
 
 export const APP = {
   name: 'Who Shot It?',
+  /** The store id of both apps: Android application id and iOS bundle id. */
+  id: 'com.hivedone.whoshotit',
+  /** Invite links of the form `whoshotit://join/ABCD` open the app straight in a game. */
+  scheme: 'whoshotit',
+};
+
+export const SERVER = {
+  /**
+   * Where the apps reach the server (API, room sockets, photos) and where the website
+   * with the legal page and invite links lives. Changing it needs a new app release, so
+   * an old address stays served until no installed app uses it any more (README, Deploy).
+   */
+  origin: 'https://who-shot-it.nils-plum.workers.dev',
+  /**
+   * The origins of the app's own page inside the store apps (Capacitor's defaults:
+   * iOS serves the bundle from `capacitor://localhost`, Android from `https://localhost`).
+   * The server allows cross-origin calls from exactly these (`src/http.js`).
+   */
+  appOrigins: ['capacitor://localhost', 'https://localhost'],
+  /** Game rooms, and the photos in them, live only in data centres in the EU. */
+  jurisdiction: 'eu',
 };
 
 /**
- * The iPhone "All photos" route. Browsers cannot read the iOS photo library, but an Apple
- * Shortcut can: the app opens it with an upload link, the shortcut sends random photos to
- * the player's private pool in the room and then returns to the browser. How to build and
- * share it: `docs/ios-shortcut.md`. `name` must match the shortcut's name exactly.
+ * The legal texts (`web/legal.html`) as the app needs them: everyone accepts the terms
+ * once before playing (`views/welcome.js`), and accepts again when `version` changes. The
+ * version is the "Last updated" date of the legal page (pinned by a test); change it only
+ * for a change players must agree to again. `minAge` is also the age set in both stores.
  */
-export const SHORTCUT = {
-  name: 'Who Shot It',
-  // Apple hosts and signs the shared shortcut; players add it from this page with one tap.
-  installUrl: 'https://www.icloud.com/shortcuts/ad91ab40f2904bb7b13a6502c52859de',
+export const LEGAL = {
+  version: '2026-11-21',
+  minAge: 16,
+};
+
+/**
+ * Words a nickname may not contain (insults, slurs, obscenities; English and German).
+ * Such a name becomes "Player" (`cleanName` in `src/game/state.js`). Kept short and
+ * unambiguous, so real names are never caught; photos are filtered by their owners (No /
+ * Yes) and by the report button.
+ */
+export const BLOCKED_WORDS = [
+  'fuck', 'shit', 'cunt', 'bitch', 'whore', 'slut', 'nigger', 'nigga', 'faggot', 'retard', 'hitler', 'porn',
+  'fick', 'scheiss', 'fotze', 'nutte', 'schlampe', 'wichser', 'arschloch', 'missgeburt', 'schwuchtel', 'kanake', 'spast',
+];
+
+/** Store pages, shown on the website's invite page. `null` hides a store until it exists. */
+export const STORES = {
+  android: `https://play.google.com/store/apps/details?id=${APP.id}`,
+  // Set to the App Store link (https://apps.apple.com/app/id…) once the app record exists.
+  ios: null,
 };
 
 /** Avatars a player can pick (the picker shows them in this order). */
@@ -48,35 +87,53 @@ export const EFFECTS = ['classic', 'blur', 'zoom', 'pixel'];
 
 /**
  * The host's game settings, in the order the settings sheet shows them. `options` are
- * [value, label] pairs; `help` (optional) is one short line per value, shown under the
- * row for the selected value. `0` means "no limit" for rounds and time.
+ * [value, label] pairs; `0` means "no limit" for rounds and time. `help` (for every
+ * setting that is not obvious) is what the "?" next to it explains: short lines of
+ * [which options, what they mean in practice], in words a grandma understands.
  */
 export const SETTINGS = [
   { key: 'photos', label: 'Photos per player', default: 5, options: [[3, '3'], [5, '5'], [10, '10']] },
-  { key: 'rounds', label: 'Rounds', default: 0, options: [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30'], [0, 'All']] },
-  { key: 'time', label: 'Time per photo', default: 10, options: [[5, '5 s'], [10, '10 s'], [15, '15 s'], [20, '20 s'], [30, '30 s'], [0, '∞']] },
+  {
+    key: 'rounds', label: 'Rounds', default: 0,
+    options: [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30'], [0, 'All']],
+    help: [['5 to 30', 'The game ends after this many photos.'], ['All', 'Every photo in the game is shown once.']],
+  },
+  {
+    key: 'time', label: 'Time per photo', default: 10,
+    options: [[5, '5 s'], [10, '10 s'], [15, '15 s'], [20, '20 s'], [30, '30 s'], [0, '∞']],
+    help: [['5 s to 30 s', 'How long everyone has to answer.'], ['∞', 'No clock. The photo stays until everyone has answered.']],
+  },
   {
     key: 'mode', label: 'Mode', default: 'classic',
     options: [['classic', 'Classic'], ['blur', 'Blur'], ['zoom', 'Zoom'], ['pixel', 'Pixel'], ['mix', 'Mix']],
-    help: {
-      classic: 'The photo shows right away.',
-      blur: 'Starts blurry and gets sharp. Tap early for more points.',
-      zoom: 'Starts close on a detail and zooms out.',
-      pixel: 'Starts pixelated and gets clearer.',
-      mix: 'A random mode every round.',
-    },
+    help: [
+      ['Classic', 'The photo shows right away.'],
+      ['Blur', 'It starts blurry and gets sharp.'],
+      ['Zoom', 'It starts very close and zooms out.'],
+      ['Pixel', 'It starts in big blocks and gets clear.'],
+      ['Mix', 'A different one for every photo.'],
+    ],
   },
-  { key: 'points', label: 'Points', default: 'speed', options: [['speed', 'Speed counts'], ['fixed', 'Fixed']] },
-  { key: 'answers', label: 'Answers', default: 0, options: [[0, 'All players'], [4, 'Only 4']] },
-  { key: 'streak', label: 'Streak bonus', default: true, options: [[true, 'On'], [false, 'Off']] },
+  {
+    key: 'points', label: 'Points', default: 'speed', options: [['speed', 'Speed counts'], ['fixed', 'Fixed']],
+    help: [['Speed counts', 'Right and fast gets the most points.'], ['Fixed', 'Every right answer gets the same points.']],
+  },
+  {
+    key: 'answers', label: 'Answers', default: 0, options: [[0, 'All players'], [4, 'Only 4']],
+    help: [['All players', 'You can pick anyone in the game.'], ['Only 4', 'You pick from 4 names. Easier in big groups.']],
+  },
+  {
+    key: 'streak', label: 'Streak bonus', default: true, options: [[true, 'On'], [false, 'Off']],
+    help: [['On', 'Right several times in a row? You get extra points.'], ['Off', 'No extra points.']],
+  },
   {
     key: 'fair', label: 'Photo picks', default: true, options: [[true, 'Fair'], [false, 'Random']],
-    help: {
-      true: 'Everyone’s photos come up equally often.',
-      false: 'Any photo can come up.',
-    },
+    help: [['Fair', 'Everyone’s photos come up equally often.'], ['Random', 'Any photo can come up, so some people come up more.']],
   },
-  { key: 'auto', label: 'Next round', default: true, options: [[true, 'Automatic'], [false, 'Host taps']] },
+  {
+    key: 'auto', label: 'Next round', default: true, options: [[true, 'Automatic'], [false, 'Host taps']],
+    help: [['Automatic', 'The next photo comes by itself.'], ['Host taps', 'The host decides when the next photo comes.']],
+  },
 ];
 
 export const LIMITS = {
@@ -86,21 +143,21 @@ export const LIMITS = {
   codeLength: 4,
   /** Room code characters: no 0/O, 1/I/L, so a code read aloud is never ambiguous. */
   codeAlphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
-  /** Longest side of a photo after the browser shrinks it before upload. */
+  /** Longest side of a photo after the phone shrinks it, before it may be uploaded. */
   photoMaxSide: 1080,
+  /** JPEG quality the phone encodes with (0 to 1). */
+  photoQuality: 0.75,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */
   photoMaxBytes: 1_500_000,
-  /** Most photos one iPhone shortcut run may put into a player's pool. */
-  poolMax: 30,
-  /** Largest WebSocket message the room accepts from a browser (all of them are tiny). */
+  /** Largest WebSocket message the room accepts from an app (all of them are tiny). */
   messageMaxBytes: 2048,
 };
 
-/** All durations in milliseconds. The server owns every timer; browsers only display them. */
+/** All durations in milliseconds. The server owns every timer; apps only display them. */
 export const TIMING = {
   /** 3-2-1 before the first round once everyone is ready. */
   countdownMs: 3000,
-  /** Longest wait for every browser to have the round's photo before the timer starts. */
+  /** Longest wait for every app to have the round's photo before the timer starts. */
   loadMaxMs: 6000,
   /** Extra time after the answer timer, for answers still on the wire. */
   answerGraceMs: 1500,
@@ -116,16 +173,16 @@ export const TIMING = {
   hostGraceMs: 8000,
   /** A player offline this long in the lobby is removed, so the others can start. */
   lobbyDropMs: 60000,
-  /** iPhone pool photos are deleted after this time if the browser never picks them up. */
-  poolTtlMs: 15 * 60 * 1000,
   /** A room with no activity for this long is deleted with everything in it. */
   roomIdleMs: 2 * 60 * 60 * 1000,
-  /** Browsers ping this often; the room answers without waking up. */
+  /** Apps ping this often; the room answers without waking up. */
   pingMs: 15000,
   /** A socket without a ping for this long is treated as gone. */
   socketStaleMs: 45000,
   /** While sockets are open, the room checks for stale ones this often. */
   sweepMs: 30000,
+  /** Longest wait for the phone to hand over one photo (an iCloud original may download). */
+  photoPickMs: 20000,
 };
 
 /** Points: a right answer earns min..max by speed (or `fixed`), plus a streak bonus. */
@@ -160,4 +217,19 @@ export function normalizeSettings(input) {
     out[s.key] = v === undefined ? s.default : v;
   }
   return out;
+}
+
+/**
+ * The two ways most groups play, offered when a game is created. A preset is a complete
+ * set of settings: picking one replaces them all, and the settings sheet fine-tunes from
+ * there. The first one is the defaults.
+ */
+export const PRESETS = [
+  { key: 'classic', icon: '📸', label: 'Classic', text: 'See the photo, guess whose it is.', settings: {} },
+  { key: 'tricky', icon: '🌀', label: 'Tricky', text: 'Photos start blurry, zoomed or pixelated.', settings: { mode: 'mix', time: 15 } },
+].map((p) => Object.freeze({ ...p, settings: Object.freeze(normalizeSettings({ ...SETTINGS_DEFAULTS, ...p.settings })) }));
+
+/** The preset these settings are exactly, or null when they are custom. */
+export function presetOf(settings) {
+  return PRESETS.find((p) => SETTINGS.every((s) => p.settings[s.key] === settings[s.key])) || null;
 }

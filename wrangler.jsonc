@@ -1,5 +1,7 @@
-// Cloudflare deployment of Who Shot It?: one Worker (src/worker.js) that serves the static
-// browser app from web/ and hands every room to its own Durable Object (src/room.js).
+// Cloudflare deployment of Who Shot It?: one Worker (src/worker.js) that is the server
+// of both store apps (API, room sockets, photos) and serves the website from web/ (in a
+// browser the app's page shows the invite page; /legal the legal texts). Every room is
+// its own Durable Object (src/room.js), stored in the EU (SERVER.jurisdiction).
 // Everything runs on the Workers Free plan (SQLite-backed Durable Objects only).
 // `./scripts/deploy.sh` deploys this file; `./scripts/dev.sh` and the tests run it locally.
 {
@@ -11,7 +13,7 @@
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
-    // Unknown paths serve index.html, so an invite link https://<domain>/<CODE> opens the game.
+    // Unknown paths serve index.html, so an invite link https://<server>/<CODE> shows the invite page.
     "not_found_handling": "single-page-application",
     // Only the API runs the Worker; every other file is served directly by Cloudflare.
     "run_worker_first": ["/api/*"]
@@ -21,14 +23,15 @@
   },
   // A Durable Object class is registered once; never edit or remove a deployed migration.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
-  // The public address. Until the domain is bought, the game runs on the account's
-  // https://who-shot-it.<subdomain>.workers.dev. To move to the domain (a zone in the same
-  // Cloudflare account), add  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }]
-  // and set workers_dev to false, so there is one public address only (README, Deploy).
+  // The public address, SERVER.origin in web/shared/config.js (pinned by a test): for now
+  // the account's https://who-shot-it.<subdomain>.workers.dev. To move to a domain (a zone
+  // in the same Cloudflare account), add  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }]
+  // and change SERVER.origin. The apps have the address built in, so keep workers_dev on
+  // until no installed app uses the old address any more (README, Release).
   "workers_dev": true,
   // No preview links per upload: every version would be a second public copy of the game.
   "preview_urls": false,
-  // No stored request logs (privacy policy: we keep no logs). `npx wrangler tail` streams live.
+  // No stored request logs (privacy policy: we store no logs). `npx wrangler tail` streams live.
   "observability": { "enabled": false },
   // No Wrangler usage telemetry from the deploy machine.
   "send_metrics": false

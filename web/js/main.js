@@ -1,56 +1,68 @@
 /**
- * The browser app's controller: boots, joins and leaves rooms, handles every tap, keeps
- * the photo choice in step with the room, and repaints.
+ * The app's controller: boots, joins and leaves rooms, handles every tap, deals the
+ * player's photos, and repaints.
  *
  * Mechanisms:
- * - Boot: `/<CODE>` either rejoins the room this device is in (reload, or the return
- *   from the iPhone shortcut) or shows the one-tap join screen of an invite link.
+ * - Boot: opened in a plain browser (`phone.inApp` is false) this page is the website and
+ *   shows only the invite page (`views/landing.js`). In the store apps, the terms come
+ *   first once (`views/welcome.js`); then the app rejoins the game this phone was in
+ *   (after the app was closed), and an invite link (`phone.onInvite`) turns the home
+ *   screen into "Join <CODE>".
+ * - Create: "Create game" opens the "New game" step (`session.setup`, presets and
+ *   settings for this phone), "Start game" creates the room with those settings.
  * - In a room, `RoomSocket` delivers the player's view; every view replaces
  *   `session.view`, preloads the round's and the next round's photo, acknowledges a
- *   loaded photo (`loaded`), and repaints. Actions are sent as small messages; the server
- *   decides what happens.
+ *   loaded photo (`loaded`), deals photos when the lobby needs a set (`dealIfNeeded`),
+ *   and repaints. Actions are sent as small messages; the server decides what happens.
+ * - Photo access is asked once ("Continue", then the phone's own question) and checked
+ *   again whenever the app comes back to the front, since the player may have changed
+ *   it in the phone's settings.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from `session.clock`.
+ * - The Android back button closes a sheet, steps back from "New game", asks before
+ *   leaving a game, and otherwise puts the app in the background.
  *
  * Invariants:
- * - The browser never decides game outcomes: it shows only what the view says, and an
+ * - The app never decides game outcomes: it shows only what the view says, and an
  *   optimistic answer (`session.pick`) is replaced by the room's own as soon as it comes.
  * - All taps go through `data-act` and the `ACTIONS` table; sheets are the only dialogs.
  */
 
 import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LIMITS, REACTIONS, TIMING, isRoomCode, normalizeSetting } from '../shared/config.js';
-import { createRoom, takePool, uploadPhotos } from './api.js';
+import { APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting } from '../shared/config.js';
+import { createRoom, serverUrl, uploadPhotos } from './api.js';
 import { RoomSocket } from './connection.js';
-import { keepAwake } from './device.js';
 import { startEffect, stopEffects } from './effects.js';
-import { clearPhotos, isImageFile, photos, readyBlobs, roll, setCandidates } from './photos.js';
+import { askPhotoAccess, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
+import { photos, readyBlobs, resetPhotos, roll } from './photos.js';
 import { createPainter } from './render.js';
-import { device, saveDevice, session } from './store.js';
+import { device, keyFor, saveDevice, session } from './store.js';
 import { floatEmoji, toast } from './ui.js';
 import { endScreen } from './views/end.js';
 import { gameScreen } from './views/game.js';
 import { homeScreen } from './views/home.js';
+import { landingScreen } from './views/landing.js';
 import { lobbyScreen } from './views/lobby.js';
+import { newGameScreen } from './views/newgame.js';
 import { awayScreen, bannerHtml, countdownHtml, joiningScreen } from './views/overlays.js';
-import { sheetScreen } from './views/sheets.js';
+import { inviteLink, sheetScreen } from './views/sheets.js';
+import { welcomeScreen } from './views/welcome.js';
 
 const $ = (id) => document.getElementById(id);
 const paintApp = createPainter($('app'));
 const paintSheet = createPainter($('sheet'));
-const pickFiles = $('pick-files');
-const pickFolder = $('pick-folder');
 
 let socket = null;
-let creating = false;
 let lastReactAt = 0;
 let ackedPhoto = null;
-/** Preloaded photos by URL: { img, state: 'loading' | 'ok' | 'error' }. */
+let checkingAccess = false;
+/** Preloaded photos by server path: { img, state: 'loading' | 'ok' | 'error' }. */
 const images = new Map();
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => v.phase === 'load' || v.phase === 'show' || v.phase === 'reveal';
+const canReadPhotos = () => session.access === 'full' || session.access === 'limited';
 
 // ---------- Time ----------
 
@@ -75,7 +87,8 @@ function context() {
 
 function screen() {
   const v = session.view;
-  if (!session.code) return homeScreen(context());
+  if (device.agreed !== LEGAL.version) return welcomeScreen();
+  if (!session.code) return session.setup ? newGameScreen(context()) : homeScreen(context());
   if (session.conn === 'replaced') return awayScreen;
   if (!v || !v.me) return joiningScreen;
   if (inLobby(v)) return lobbyScreen(context());
@@ -98,15 +111,13 @@ function startStage() {
   const time = v.settings.time * 1000;
   const total = time ? time * TIMING.effectShare : TIMING.untimedEffectMs;
   const elapsed = time ? time - leftNow() : performance.now() - (session.shownAt[v.round.photo] || performance.now());
-  startEffect(stage, { mode: v.round.mode, zoom: v.round.zoom, src: v.round.photo, duration: total - elapsed });
+  startEffect(stage, { mode: v.round.mode, zoom: v.round.zoom, src: serverUrl(v.round.photo), duration: total - elapsed });
 }
 
 function render() {
   const changed = paintApp(screen());
   if (changed.includes('stage')) startStage();
-  const sheet = sheetScreen(context());
-  if (sheet) paintSheet(sheet);
-  else paintSheet(null);
+  paintSheet(sheetScreen(context()));
   setHtml($('cover'), countdownHtml(session.view, leftNow()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
@@ -128,7 +139,7 @@ function frame() {
 // ---------- Room ----------
 
 function hello() {
-  return { type: 'hello', key: device.key, name: device.name, avatar: device.avatar };
+  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar };
 }
 
 function openSocket(code) {
@@ -137,14 +148,9 @@ function openSocket(code) {
 }
 
 function enterRoom(code) {
-  session.code = code;
-  session.invite = null;
-  session.view = null;
-  session.conn = 'connecting';
-  session.sheet = null;
+  Object.assign(session, { code, invite: null, setup: false, view: null, conn: 'connecting', sheet: null });
   device.room = code;
   saveDevice();
-  history.replaceState(null, '', `/${code}`);
   openSocket(code);
   keepAwake(true);
   render();
@@ -156,7 +162,7 @@ function exitRoom(message) {
   Object.assign(session, { code: null, view: null, sheet: null, pick: null, conn: 'connecting', shownAt: {} });
   device.room = null;
   saveDevice();
-  history.replaceState(null, '', '/');
+  resetPhotos();
   keepAwake(false);
   stopEffects();
   if (message) toast(message);
@@ -181,24 +187,25 @@ function onEnd(code) {
     session.conn = 'replaced';
     render();
   } else if (code === CLOSE.full) exitRoom('This game is full.');
+  else if (code === CLOSE.removed) exitRoom('The host removed you from this game.');
   else if (code === CLOSE.gone) exitRoom(session.view ? 'This game is over.' : 'No game with this code.');
 }
 
 /** Preloads the photo on screen and the next one; acknowledges the current one once. */
 function preload(v) {
   const wanted = v.round ? [v.round.photo, v.round.next].filter(Boolean) : [];
-  for (const url of images.keys()) if (!wanted.includes(url)) images.delete(url);
-  for (const url of wanted) {
-    if (images.has(url)) continue;
+  for (const path of images.keys()) if (!wanted.includes(path)) images.delete(path);
+  for (const path of wanted) {
+    if (images.has(path)) continue;
     const entry = { img: new Image(), state: 'loading' };
-    images.set(url, entry);
+    images.set(path, entry);
     entry.img.onload = () => { entry.state = 'ok'; acknowledge(); render(); };
     entry.img.onerror = () => { entry.state = 'error'; acknowledge(); render(); };
-    entry.img.src = url;
+    entry.img.src = serverUrl(path);
   }
 }
 
-/** Tells the room this browser can show the round's photo (or never will), once per photo. */
+/** Tells the room this app can show the round's photo (or never will), once per photo. */
 function acknowledge() {
   const v = session.view;
   if (!v || v.phase !== 'load') return;
@@ -221,51 +228,48 @@ function onMessage(msg) {
   if (!v.me) return;
   if (previous && previous.hostId !== v.hostId && v.hostId === v.me.id) toast('You’re the host now 👑');
   if (v.phase === 'show' && !session.shownAt[v.round.photo]) session.shownAt[v.round.photo] = performance.now();
-  // Lobby-only sheets close when the game starts; the leave question closes after it.
-  if (!inLobby(v) && ['settings', 'invite', 'ios'].includes(session.sheet)) session.sheet = null;
-  if (!inRound(v) && session.sheet === 'leave') session.sheet = null;
+  // Sheets that no longer fit close by themselves.
+  if (!inLobby(v) && ['settings', 'invite'].includes(session.sheet)) session.sheet = null;
+  if (!inRound(v) && ['leave', 'report'].includes(session.sheet)) session.sheet = null;
+  if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
   preload(v);
   acknowledge();
-  syncPhotos(v);
+  dealIfNeeded();
   render();
 }
 
 // ---------- Photos ----------
 
-function reroll() {
+/** Deals a fresh set when the lobby needs one and the app may read photos. */
+function dealIfNeeded() {
   const v = session.view;
-  if (v && v.me) roll(v.settings.photos, render);
-}
-
-/** Keeps the local photo choice in step with the room. */
-function syncPhotos(v) {
-  if (!inLobby(v)) return;
-  const pool = v.me.pool;
-  if (pool.done && pool.token !== session.poolTaken && !session.poolLoading) loadPool(pool.token);
-  // A new game, or a new "Photos per player", needs a fresh set.
-  if (!v.me.ready && photos.candidates.length && !session.uploading && (photos.spent || photos.size !== v.settings.photos)) reroll();
-}
-
-async function loadPool(token) {
-  session.poolLoading = true;
-  session.poolTaken = token;
-  render();
-  try {
-    const blobs = await takePool(session.code, device.key);
-    if (!blobs.length) toast('No photos arrived. Try again.');
-    else {
-      device.shortcutOk = true;
-      saveDevice();
-      setCandidates(blobs);
-      reroll();
-    }
-  } catch {
-    toast('Photos could not be loaded. Try again.');
-  } finally {
-    session.poolLoading = false;
-    render();
+  if (!v || !v.me || !inLobby(v) || v.me.ready || session.uploading) return;
+  if (session.access === null) {
+    checkAccess();
+    return;
   }
+  if (!canReadPhotos()) return;
+  // A new game, or a new "Photos per player", needs a fresh set.
+  const stale = photos.spent || (photos.size > 0 && photos.size !== v.settings.photos);
+  if (stale || (!photos.rolling && !photos.chosen.length && !photos.empty)) roll(v.settings.photos, render);
+}
+
+/** Asks the phone what the app may read; a change since last time starts over. */
+async function checkAccess() {
+  if (!inApp() || checkingAccess) return;
+  checkingAccess = true;
+  try {
+    const access = await photoAccess();
+    if (access !== session.access || photos.empty) resetPhotos();
+    session.access = access;
+  } catch {
+    session.access = 'denied';
+  } finally {
+    checkingAccess = false;
+  }
+  dealIfNeeded();
+  render();
 }
 
 async function readyWith(blobs) {
@@ -273,7 +277,7 @@ async function readyWith(blobs) {
   session.uploading = true;
   render();
   try {
-    await uploadPhotos(session.code, device.key, blobs);
+    await uploadPhotos(session.code, keyFor(session.code), blobs);
   } catch {
     toast('Upload failed. Try again.');
   } finally {
@@ -281,20 +285,6 @@ async function readyWith(blobs) {
     render();
   }
 }
-
-function onFilesPicked(input, emptyMessage) {
-  const files = [...(input.files || [])].filter(isImageFile);
-  input.value = '';
-  if (!files.length) {
-    toast(emptyMessage);
-    return;
-  }
-  setCandidates(files);
-  reroll();
-}
-
-pickFiles.addEventListener('change', () => onFilesPicked(pickFiles, 'No photos picked.'));
-pickFolder.addEventListener('change', () => onFilesPicked(pickFolder, 'No photos in this folder.'));
 
 // ---------- Actions ----------
 
@@ -308,15 +298,13 @@ function needName() {
 
 function openSheet(name) {
   session.sheet = name;
+  session.helpKey = null;
   render();
 }
 
-async function shareLink() {
-  const url = `${location.origin}/${session.code}`;
-  if (navigator.share) {
-    navigator.share({ title: APP.name, text: 'Join my game!', url }).catch(() => {});
-    return;
-  }
+async function shareInvite() {
+  const url = inviteLink(session.code);
+  if (await share({ text: `Join my game in ${APP.name}! Code: ${session.code}`, url })) return;
   try {
     await navigator.clipboard.writeText(url);
     toast('Link copied');
@@ -331,24 +319,46 @@ function leaveNow() {
 }
 
 const ACTIONS = {
+  agree: () => {
+    device.agreed = LEGAL.version;
+    saveDevice();
+    render();
+  },
   help: () => openSheet('help'),
   avatar: () => openSheet('avatar'),
   pickavatar: (value) => {
     if (!EMOJIS.includes(value)) return;
     device.avatar = value;
     saveDevice();
-    session.sheet = null;
+    openSheet(null);
+  },
+  create: () => {
+    if (needName()) return;
+    session.setup = true;
     render();
   },
-  async create() {
-    if (needName() || creating) return;
-    creating = true;
+  back: () => {
+    session.setup = false;
+    render();
+  },
+  preset: (key) => {
+    const preset = PRESETS.find((p) => p.key === key);
+    if (!preset) return;
+    device.settings = { ...preset.settings };
+    saveDevice();
+    render();
+  },
+  async start() {
+    if (needName() || session.creating) return;
+    session.creating = true;
+    render();
     try {
       enterRoom(await createRoom(device.settings));
     } catch {
       toast('Could not create a game. Try again.');
     } finally {
-      creating = false;
+      session.creating = false;
+      render();
     }
   },
   join() {
@@ -364,13 +374,16 @@ const ACTIONS = {
   },
   newgame: () => {
     session.invite = null;
-    history.replaceState(null, '', '/');
     render();
   },
   leave: () => (session.view && inRound(session.view) ? openSheet('leave') : leaveNow()),
   leavenow: leaveNow,
   close: () => openSheet(null),
   settings: () => openSheet('settings'),
+  explain: (key) => {
+    session.helpKey = session.helpKey === key ? null : key;
+    render();
+  },
   set: (value, el) => {
     let parsed;
     try {
@@ -380,23 +393,27 @@ const ACTIONS = {
     }
     const key = el.dataset.k;
     if (normalizeSetting(key, parsed) === undefined) return;
-    send({ type: 'setting', key, value: parsed });
-    // Remembered for the next game this device creates.
-    device.settings[key] = parsed;
+    // In a game the host changes the room's settings; either way this phone remembers
+    // them for the next game it creates.
+    if (session.view && session.view.me) send({ type: 'setting', key, value: parsed });
+    device.settings = { ...device.settings, [key]: parsed };
     saveDevice();
-  },
-  invite: () => openSheet('invite'),
-  share: shareLink,
-  folder: () => pickFolder.click(),
-  choose: () => pickFiles.click(),
-  ios: () => openSheet('ios'),
-  guess: () => readyWith([]),
-  no: () => reroll(),
-  yes: () => readyWith(readyBlobs()),
-  other: () => {
-    clearPhotos();
     render();
   },
+  invite: () => openSheet('invite'),
+  share: shareInvite,
+  async allow() {
+    session.access = await askPhotoAccess().catch(() => 'denied');
+    dealIfNeeded();
+    render();
+  },
+  opensettings: openSettings,
+  guess: () => readyWith([]),
+  no: () => {
+    const v = session.view;
+    if (v && v.me) roll(v.settings.photos, render);
+  },
+  yes: () => readyWith(readyBlobs()),
   unready: () => send({ type: 'unready' }),
   answer: (id) => {
     const v = session.view;
@@ -414,12 +431,36 @@ const ACTIONS = {
     send({ type: 'react', emoji });
     floatEmoji(emoji);
   },
+  report: () => openSheet('report'),
+  reportnow: () => {
+    send({ type: 'report' });
+    openSheet(null);
+    toast('Photo deleted. Thank you!');
+  },
+  remove: (id) => {
+    session.target = id;
+    openSheet('remove');
+  },
+  removenow: () => {
+    send({ type: 'kick', target: session.target });
+    openSheet(null);
+  },
   here: () => {
     session.conn = 'connecting';
     openSocket(session.code);
     render();
   },
 };
+
+/** The Android back button; false means "nothing to go back to" (the app goes to the background). */
+function back() {
+  if (session.sheet) openSheet(null);
+  else if (session.setup) ACTIONS.back();
+  else if (session.code) openSheet('leave');
+  else if (session.invite) ACTIONS.newgame();
+  else return false;
+  return true;
+}
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
@@ -449,21 +490,27 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- Boot ----------
 
-const pathCode = location.pathname.slice(1).toUpperCase();
-// Back from a failed shortcut run: set it up again instead of offering a dead link.
-const shortcutFailed = new URLSearchParams(location.search).has('setup');
-if (shortcutFailed) {
-  device.shortcutOk = false;
-  saveDevice();
+if (!inApp()) {
+  // The website: the invite page for "/<CODE>", the plain one for "/".
+  const code = location.pathname.slice(1).toUpperCase();
+  paintApp(landingScreen(isRoomCode(code) ? code : null));
+} else {
+  if (device.room && device.name && device.agreed === LEGAL.version) enterRoom(device.room);
+  onInvite((code) => {
+    if (session.code === code) return;
+    if (session.code) {
+      toast('Leave this game first.');
+      return;
+    }
+    Object.assign(session, { invite: code, setup: false, sheet: null });
+    render();
+  });
+  onBack(back);
+  onResume(() => {
+    if (socket) socket.checkNow();
+    if (session.access !== null) checkAccess();
+  });
+  render();
+  setInterval(render, 250);
+  requestAnimationFrame(frame);
 }
-if (isRoomCode(pathCode)) {
-  if (device.room === pathCode && device.name) {
-    enterRoom(pathCode);
-    if (shortcutFailed) session.sheet = 'ios';
-  } else session.invite = pathCode;
-} else if (location.pathname !== '/') {
-  history.replaceState(null, '', '/');
-}
-render();
-setInterval(render, 250);
-requestAnimationFrame(frame);

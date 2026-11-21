@@ -1,6 +1,8 @@
 /**
  * Everything drawn over the screens: the 3-2-1 countdown, the "Reconnecting…" banner,
- * and the two full screens without game content (joining, and "playing in another tab").
+ * and the two full screens without game content (joining, and "this game is open
+ * somewhere else": the same player connected again, for example after the app was
+ * restored while an older connection was still alive).
  *
  * Mechanisms: `main.js` paints the countdown into `#cover` and the banner into `#banner`;
  * the banner appears only after the connection has been down for a moment, so short
@@ -27,6 +29,6 @@ export const joiningScreen = {
 
 export const awayScreen = {
   key: 'away',
-  layout: `<div class="wrap"><div class="away"><p>You’re playing in another tab.</p><button class="btn main" data-act="here">Play here</button></div></div>`,
+  layout: `<div class="wrap"><div class="away"><p>This game is open somewhere else.</p><button class="btn main" data-act="here">Play here</button></div></div>`,
   parts: {},
 };

@@ -1,25 +1,28 @@
 <!doctype html>
 <!--
   All legal texts in one page: Imprint (Impressum, § 5 DDG), Privacy Policy (GDPR Art. 13),
-  Terms of Use and Reporting content (EU Digital Services Act). Linked from the start screen
-  and the "How to play" sheet. This page is the single home of the operator's details.
-  When what the app stores, sends or deletes changes, the privacy section changes in the
-  same commit (AGENTS.md, legal documents).
+  Terms of Use, Reporting content (EU Digital Services Act) and open-source licences.
+  Served at "/legal" on the server (the store listings link here) and opened from the app
+  in the phone's browser (welcome screen, start screen, "How to play"). This page is the
+  single home of the operator's details. It promises upper limits ("at the latest") and
+  categories rather than implementation details, so small changes do not make it wrong;
+  when what the app stores, sends, shows to others or deletes changes, the privacy
+  section changes in the same commit (AGENTS.md, legal documents). "Last updated" is
+  LEGAL.version in web/shared/config.js (pinned by a test): changing it asks every player
+  to accept the terms again.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Legal · Who Shot It?</title>
-<meta name="robots" content="noindex">
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 <main class="legal">
-  <a class="back" href="/">‹ Back to the game</a>
   <h1>Legal</h1>
-  <nav><a href="#imprint">Imprint</a><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#report">Report content</a></nav>
+  <nav><a href="#imprint">Imprint</a><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#report">Report content</a><a href="#licences">Licences</a></nav>
 
   <h2 id="imprint">Imprint (Impressum)</h2>
   <p>Information pursuant to § 5 DDG (German Digital Services Act).</p>
@@ -30,48 +33,68 @@
   <p>We are neither willing nor obliged to take part in dispute resolution proceedings before a consumer arbitration board.</p>
 
   <h2 id="privacy">Privacy Policy</h2>
-  <p>We keep this short because we collect very little: no account, no cookies, no tracking, no analytics, no ads.</p>
+  <p>Who Shot It? is a party game app. It works without an account, ads, tracking, analytics or cookies. We process only what a game needs, mostly for a few minutes, and keep nothing once the game is over.</p>
 
   <h3>Who is responsible</h3>
   <p>The controller is HiveDone UG (haftungsbeschränkt), see the <a href="#imprint">Imprint</a>. Questions about your data: <a href="mailto:support@hive-done.com">support@hive-done.com</a>.</p>
 
-  <h3>What we process and why</h3>
+  <h3>On your phone</h3>
   <ul>
-    <li><strong>Game data:</strong> the name and avatar you choose, your answers and reactions. We need them to run your game (Art. 6(1)(b) GDPR). The other players in your game see them.</li>
-    <li><strong>Your photos:</strong> they stay on your device until you tap “Yes”. Then only the photos you see are made smaller, uploaded and shown to the players in your game. Each photo is deleted right after its round, when you change your choice or leave, when the game ends, and at the latest when the game room closes. We do not look at, analyse or use your photos for anything else (Art. 6(1)(b) GDPR).</li>
-    <li><strong>“All photos” on iPhone:</strong> the Apple Shortcut you run sends up to 30 random photos to your private storage in the game room. Only your own device gets them, and we delete them as soon as it has; if it never does, after 15 minutes.</li>
-    <li><strong>Technical data:</strong> when you use the site, your browser sends your IP address and technical details (such as browser type and time) to our host. This is needed to deliver the site and keep it secure (Art. 6(1)(f) GDPR). We do not store logs ourselves.</li>
-    <li><strong>Email:</strong> if you write to us, we use your message only to answer it (Art. 6(1)(b) or (f) GDPR).</li>
+    <li><strong>Your photos:</strong> with your permission, the app reads your photo library on your phone to pick random photos for you. This happens only on your phone. Nothing is sent before you tap “Yes”; then only the photos on screen are sent, made smaller and without location or other photo data.</li>
+    <li><strong>Saved on your phone:</strong> your name, avatar and game settings, which version of these terms you accepted, and the game you are in with a random key for that game. This is strictly necessary for the game you asked for (§ 25(2) No. 2 TDDDG). Deleting the app deletes it.</li>
+  </ul>
+
+  <h3>On our server, and why</h3>
+  <ul>
+    <li><strong>Game data:</strong> the name and avatar you choose, a random key for the game, your answers, points and reactions. We need them to run your game (Art. 6(1)(b) GDPR).</li>
+    <li><strong>The photos you confirm:</strong> stored only to show them to the players in your game (Art. 6(1)(b) GDPR). We do not look at, analyse or use them for anything else. If other people can be seen in a photo, we process it on the basis of our and your legitimate interest in playing a private game with friends, limited to that game and to the time described below (Art. 6(1)(f) GDPR).</li>
+    <li><strong>Removed players:</strong> the random game key of a player the host removed is kept with the game, so they cannot join it again (Art. 6(1)(f) GDPR).</li>
+    <li><strong>Connection data:</strong> to deliver the game and protect it from misuse, our host processes your IP address and technical details (such as device type and time) (Art. 6(1)(f) GDPR). We do not store logs ourselves.</li>
+    <li><strong>Reports and emails:</strong> we use them to handle your request or report (Art. 6(1)(c) GDPR with Art. 16 DSA, otherwise Art. 6(1)(b) or (f) GDPR).</li>
   </ul>
 
   <h3>How long we keep it</h3>
-  <p>A game room and everything in it (names, answers, any photo not yet deleted) is deleted when the last player leaves, and at the latest 2 hours after the last activity in it.</p>
+  <p>Each photo is deleted right after its round, and earlier when it is reported, when its owner changes their choice, leaves or is removed. A game and everything in it is deleted when its last player leaves, and at the latest 24 hours after its last activity. Emails are deleted once your request is handled, unless the law requires us to keep them.</p>
 
-  <h3>Your device</h3>
-  <p>The game stores a few things in your browser’s local storage, only for the game you asked for: a random player key, your name and avatar, the game you are in, your game settings and whether the iPhone shortcut worked. This is strictly necessary for the service (§ 25(2) No. 2 TDDDG), so no consent is needed. You can delete it in your browser settings at any time.</p>
-
-  <h3>Our host</h3>
-  <p>The site runs on Cloudflare (Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA), which processes the data above on our behalf under a data processing agreement (Art. 28 GDPR). Cloudflare may process data outside the EU, including in the USA; transfers are covered by the EU-U.S. Data Privacy Framework, under which Cloudflare is certified, and by standard contractual clauses. More: <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">Cloudflare’s privacy policy</a>.</p>
+  <h3>Who receives it</h3>
+  <ul>
+    <li><strong>The players in your game</strong> see your name, avatar, points, reactions and the photos you confirm.</li>
+    <li><strong>Our host,</strong> Cloudflare, Inc. (101 Townsend St., San Francisco, CA 94107, USA), runs the server for us under a data processing agreement (Art. 28 GDPR). Games and their photos are stored and processed in data centres in the EU. Access from outside the EU (for example for maintenance or security) cannot be ruled out; for such transfers, Cloudflare is certified under the EU-U.S. Data Privacy Framework (adequacy decision, Art. 45 GDPR), and standard contractual clauses apply in addition. More: <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">Cloudflare’s privacy policy</a>.</li>
+    <li><strong>The app stores:</strong> Apple (App Store) and Google (Google Play) process data when you download and update the app, as controllers in their own right and under their own privacy policies. We may see anonymous download statistics from them.</li>
+  </ul>
+  <p>We use no other services, no third-party code that collects data, and no automated decision-making.</p>
 
   <h3>Your rights</h3>
-  <p>You can ask for access to your data, correction, deletion, restriction of processing and data portability, and you can object to processing based on Art. 6(1)(f) GDPR (Art. 15 to 21 GDPR). Just email us. You can also complain to a data protection authority, for example the one where you live, or ours: the Berlin Commissioner for Data Protection and Freedom of Information (<a href="https://www.datenschutz-berlin.de" rel="noopener">datenschutz-berlin.de</a>).</p>
-  <p>You do not have to give us any data, but without a name you cannot join a game. We make no automated decisions about you.</p>
+  <p>You have the right of access, rectification, erasure, restriction of processing and data portability (Art. 15 to 20 GDPR). Just email us. Because there are no accounts and games are deleted so quickly, we can often no longer find data about you; please tell us your game code and roughly when you played.</p>
+  <p><strong>Right to object:</strong> you can object at any time, for reasons arising from your particular situation, to processing based on Art. 6(1)(f) GDPR (Art. 21 GDPR).</p>
+  <p>You can also complain to a data protection supervisory authority, in particular in the EU country where you live or work (Art. 77 GDPR).</p>
+  <p>You do not have to give us any data, but without a name you cannot join a game. The game is not meant for anyone under 16.</p>
 
   <h2 id="terms">Terms of Use</h2>
   <ul>
-    <li><strong>The service:</strong> Who Shot It? is a free party game by HiveDone UG (haftungsbeschränkt). No account is needed.</li>
-    <li><strong>Age:</strong> you must be 16 or older, or have your parents’ permission.</li>
-    <li><strong>Your photos:</strong> only share photos you are allowed to share, and only if the people in them would agree. Never share anything illegal, hateful, violent or sexual, and never anything involving minors in a harmful way. You keep all rights to your photos; you only allow us to show them to the players in your game, for that game.</li>
-    <li><strong>Moderation:</strong> we do not look at photos. If we learn of content that is illegal or breaks these terms, we delete it and can block access to the game it is in.</li>
+    <li><strong>The service:</strong> Who Shot It? is a free party game by HiveDone UG (haftungsbeschränkt). No account is needed. By playing you accept these terms. If you got the app from Apple’s App Store, Apple’s standard licence terms for apps also apply.</li>
+    <li><strong>Age:</strong> you must be 16 or older.</li>
+    <li><strong>Your photos and names:</strong> only share photos you are allowed to share and that the people in them would agree to. Never share anything sexual, violent, hateful, insulting, humiliating or otherwise illegal, and nothing that harms or exposes minors. The same goes for names. You keep all rights to your photos; you only allow us to store them and show them to the players in your game, for that game.</li>
+    <li><strong>How content is kept in check:</strong> every player decides which of their photos to share. Anyone in a game can report a photo; it is then deleted for everyone at once. The host can remove a player, who cannot join that game again. Names containing blocked words are automatically replaced by “Player”. We do not look at photos ourselves. If we learn of content that is illegal or breaks these terms, we delete it and can exclude players from the game or the app.</li>
     <li><strong>Availability:</strong> we offer the game as it is and may change or end it at any time.</li>
-    <li><strong>Liability:</strong> we are fully liable for intent and gross negligence, for injury to life, body or health, and under the German Product Liability Act. Otherwise, because the service is free of charge, we are not liable, as far as the law allows.</li>
+    <li><strong>Liability:</strong> we are liable without limitation for intent and gross negligence, for injury to life, body or health, under the German Product Liability Act and within the scope of any guarantee. For slight negligence we are liable only for breaching an obligation that is essential for the game to work and that you may rely on, and then only for typical, foreseeable damage. Otherwise our liability for slight negligence is excluded.</li>
+    <li><strong>Changes:</strong> we may update these terms. When a change matters for you, the app asks you to accept the new version.</li>
     <li><strong>Law:</strong> German law applies. If you are a consumer, the mandatory consumer protection of the country you live in still applies.</li>
   </ul>
 
   <h2 id="report">Report content</h2>
-  <p>Our single point of contact for users, authorities, the European Commission and the European Board for Digital Services (Art. 11 and 12 DSA) is <a href="mailto:support@hive-done.com">support@hive-done.com</a>, in English or German.</p>
-  <p>To report illegal content (Art. 16 DSA), email us: the game code and roughly when you saw it, what the content shows, why you believe it is illegal, your name and email (not needed when reporting child sexual abuse material), and a statement that your report is accurate and complete to the best of your knowledge.</p>
-  <p>We handle reports quickly and carefully, delete illegal content, and tell you and, where possible, the person who shared it what we decided and why. Photos are deleted after each round and every game room after at most 2 hours, so reported content is often gone already.</p>
+  <p><strong>In the app:</strong> tap ⚑ on any photo. It is deleted for everyone at once.</p>
+  <p><strong>To us:</strong> our single point of contact for users, authorities, the European Commission and the European Board for Digital Services (Art. 11 and 12 DSA) is <a href="mailto:support@hive-done.com">support@hive-done.com</a>, in English or German. To report illegal content (Art. 16 DSA), email us: the game code and roughly when you saw it, what the content shows, why you believe it is illegal, your name and email (not needed when reporting child sexual abuse material), and a statement that your report is accurate and complete to the best of your knowledge.</p>
+  <p>We handle reports quickly and carefully, confirm them, delete illegal content, and tell you and, where we can reach them, the person who shared it what we decided and why. If content suggests a threat to someone’s life or safety, we inform the authorities. Photos are deleted after their round and games within a day at the latest, so reported content is often gone already.</p>
+
+  <h2 id="licences">Open-source licences</h2>
+  <p>The apps are built with open-source software under these licences:</p>
+  <ul>
+    <li>Capacitor and its App and Share plugins (MIT; Copyright (c) 2017-present Drifty Co., Copyright 2020-present Ionic): <a href="/vendor/capacitor.LICENSE.txt">licence</a></li>
+    <li>qrcode-generator (MIT; Copyright (c) 2009 Kazuhiko Arase): <a href="/vendor/qrcode.LICENSE.txt">licence</a></li>
+    <li>Inter font (SIL Open Font License 1.1; Copyright 2016 The Inter Project Authors): <a href="/fonts/inter-variable.LICENSE.txt">licence</a></li>
+    <li>Bricolage Grotesque font (SIL Open Font License 1.1; Copyright 2022 The Bricolage Grotesque Project Authors): <a href="/fonts/bricolage-grotesque-800.LICENSE.txt">licence</a></li>
+  </ul>
 
   <p class="muted">Last updated: 21 November 2026</p>
 </main>

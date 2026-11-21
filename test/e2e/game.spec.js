@@ -1,56 +1,85 @@
 /**
- * Three friends play a whole game in three phone browsers: create, invite link, reload,
- * settings, photo choice, the automatic start, five rounds, the end and "Play again".
+ * Friends play a whole game on three phones (the real app UI, a fake photo library):
+ * the terms, the "New game" step with a preset and the settings "?", joining by code,
+ * the host removing a player, the photos dealt with "Play with these?", reload, the
+ * automatic start, a reported photo, five rounds, the end and "Play again". Plus the
+ * website (the same page in a plain browser): invite page and legal page.
  */
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { newPhone } from './fake-phone.js';
 
-const PHOTOS = [1, 2, 3, 4, 5, 6].map((i) => path.join(import.meta.dirname, '..', 'fixtures', `photo-${i}.jpg`));
-
-async function phone(browser) {
-  const context = await browser.newContext();
-  return context.newPage();
+/** Opens the app on a new phone: terms accepted, name typed. */
+async function openApp(browser, name) {
+  const page = await newPhone(browser);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'I agree, let’s play' }).click();
+  await page.fill('#name', name);
+  return page;
 }
 
-test('three friends play a full game and start another one', async ({ browser }) => {
-  const host = await phone(browser);
-  await host.goto('/');
-  await host.fill('#name', 'Ann');
-  await host.getByRole('button', { name: 'Create game' }).click();
-  await expect(host).toHaveURL(/\/[A-Z0-9]{4}$/);
-  const code = new URL(host.url()).pathname.slice(1);
+async function join(page, code) {
+  await page.fill('#code', code);
+  await page.getByRole('button', { name: 'Join', exact: true }).click();
+}
 
-  await host.locator('.cfg').click();
+/** The first time: "Continue" (the phone's question is answered "Allow all"), then Yes. */
+async function choosePhotos(page, count) {
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('.q')).toHaveText('Play with these?');
+  await expect(page.locator('.grid div[style]')).toHaveCount(count);
+  await page.getByRole('button', { name: 'Yes' }).click();
+  await expect(page.getByText('✓ Ready')).toBeVisible();
+}
+
+test('friends play a full game and start another one', async ({ browser }) => {
+  const host = await openApp(browser, 'Ann');
+  await host.getByRole('button', { name: 'Create game' }).click();
+
+  // New game: a preset, then fine-tuning in the settings, with a "?" explanation.
+  await host.getByRole('button', { name: /Tricky/ }).click();
+  await expect(host.locator('.preset.on')).toContainText('Tricky');
+  await host.getByRole('button', { name: /Game settings/ }).click();
+  await host.getByRole('button', { name: 'What does Streak bonus mean?' }).click();
+  await expect(host.locator('.help')).toContainText('You get extra points.');
   await host.locator('[data-k="photos"][data-v="3"]').click();
   await host.locator('[data-k="rounds"][data-v="5"]').click();
   await host.getByRole('button', { name: 'Done' }).click();
+  await expect(host.locator('.preset.on')).toHaveCount(0);
+  await expect(host.locator('.cfgbtn')).toContainText('Custom · 3 photos · 5 rounds · 15 s · Mix');
+  await host.getByRole('button', { name: 'Start game' }).click();
   await expect(host.locator('.cfg')).toContainText('3 photos · 5 rounds');
+  const code = (await host.locator('.code').innerText()).replace(/\s/g, '');
 
   const guests = [];
-  for (const name of ['Ben', 'Cleo']) {
-    const page = await phone(browser);
-    await page.goto(`/${code}`);
-    await page.fill('#name', name);
-    await page.getByRole('button', { name: `Join ${code}` }).click();
+  for (const name of ['Ben', 'Cleo', 'Dan']) {
+    const page = await openApp(browser, name);
+    await join(page, code);
     guests.push(page);
   }
-  const everyone = [host, ...guests];
+  await expect(host.locator('.chip')).toHaveCount(4);
+
+  // The host removes Dan, who cannot come back.
+  const dan = guests.pop();
+  await host.getByRole('button', { name: 'Dan: remove from game' }).click();
+  await host.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(dan.getByText('The host removed you from this game.')).toBeVisible();
+  await join(dan, code);
+  await expect(dan.getByText('The host removed you from this game.')).toBeVisible();
   await expect(host.locator('.chip')).toHaveCount(3);
 
-  // A reload lands back in the same room as the same player.
+  // A reload lands back in the same game as the same player.
   await guests[0].reload();
-  await expect(guests[0].locator('.code')).toContainText(code.split('').join(''));
+  await expect(guests[0].locator('.code')).toContainText(code);
   await expect(host.locator('.chip')).toHaveCount(3);
 
-  for (const page of everyone) {
-    await page.setInputFiles('#pick-files', PHOTOS);
-    await expect(page.locator('.q')).toHaveText('Play with these?');
-    await expect(page.locator('.grid div[style]')).toHaveCount(3);
-    await page.getByRole('button', { name: 'Yes' }).click();
-    await expect(page.getByText('✓ Ready')).toBeVisible();
-  }
+  const everyone = [host, ...guests];
+  for (const page of everyone) await choosePhotos(page, 3);
 
-  for (let round = 1; round <= 5; round++) {
+  // Round 1 is reported: the photo goes for everyone and the game moves on.
+  await expect(guests[1].locator('.rnd')).toHaveText('1 / 5');
+  await guests[1].getByRole('button', { name: 'Report this photo' }).click();
+  await guests[1].getByRole('button', { name: 'Delete photo' }).click();
+  for (let round = 2; round <= 5; round++) {
     for (const page of everyone) {
       await expect(page.locator('.rnd')).toHaveText(`${round} / 5`);
       await page.locator('button.opt').first().click();
@@ -67,9 +96,12 @@ test('three friends play a full game and start another one', async ({ browser })
   }
 });
 
-test('the legal page has the imprint and is linked from the start screen', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Legal & privacy' }).click();
+test('in a browser the page is the website: the invite page and the legal page', async ({ page }) => {
+  await page.goto('/ABCD');
+  await expect(page.getByText('You’re invited to game')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open in the app' })).toHaveAttribute('href', 'whoshotit://join/ABCD');
+  await expect(page.getByRole('link', { name: 'Google Play (Android)' })).toBeVisible();
+  await page.goto('/legal');
   await expect(page.getByRole('heading', { name: 'Imprint (Impressum)' })).toBeVisible();
   await expect(page.getByText('Hünensteig 36')).toBeVisible();
 });

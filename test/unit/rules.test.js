@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { LIMITS, SCORING, TIMING } from '../../web/shared/config.js';
 import { apply, nextWake } from '../../src/game/rules.js';
-import { referencedPhotoIds, referencedPoolTokens } from '../../src/game/state.js';
+import { referencedPhotoIds } from '../../src/game/state.js';
 import { T0, idOf, roomWith, seededRandom } from '../helpers.js';
 
 const rng = seededRandom(7);
@@ -68,6 +68,8 @@ describe('joining', () => {
   test('names are cleaned and required; the room has a size limit', () => {
     let room = roomWith(['  Ann\u0007  ']);
     expect(room.players[0].name).toBe('Ann');
+    // Blocked words become "Player", also when disguised; real names stay.
+    expect(roomWith(['B1TCH', 'Dick', 'Arsch loch', 'Hitchcock']).players.map((p) => p.name)).toEqual(['Player', 'Dick', 'Player', 'Hitchcock']);
     room = apply(room, { type: 'join', key: 'key-blank-00000000', name: '   ', avatar: '🦊' }, T0, rng);
     expect(room.players).toHaveLength(1);
     const names = Array.from({ length: LIMITS.maxPlayers + 2 }, (_, i) => `P${i}`);
@@ -274,7 +276,7 @@ describe('leaving and connections', () => {
     const lobby = driver(roomWith(['Ann', 'Ben', 'Cleo']));
     lobby.by('Ann', 'leave');
     expect(lobby.room.hostId).toBe(idOf(lobby.room, 'Ben'));
-    // In the lobby an offline host keeps the role (for example while fetching photos).
+    // In the lobby an offline host keeps the role (for example while in the phone's settings).
     lobby.by('Ben', 'disconnect').wait(TIMING.hostGraceMs * 2);
     expect(lobby.room.hostId).toBe(idOf(lobby.room, 'Ben'));
     const game = started(['Ann', 'Ben', 'Cleo'], { time: 0 });
@@ -282,18 +284,6 @@ describe('leaving and connections', () => {
     expect(game.room.hostId).toBe(idOf(game.room, 'Ann'));
     game.wait(1);
     expect(game.room.hostId).toBe(idOf(game.room, 'Ben'));
-  });
-
-  test('shortcut uploads keep a player who is away in the Shortcuts app in the lobby', () => {
-    const d = driver(roomWith(['Ann', 'Ben']));
-    const token = d.room.players[1].pool.token;
-    d.by('Ben', 'disconnect');
-    for (let i = 0; i < 5; i++) d.wait(TIMING.lobbyDropMs / 2).do('poolAdd', { token });
-    d.wait(TIMING.lobbyDropMs / 2).do('poolDone', { token });
-    d.wait(TIMING.lobbyDropMs - 1);
-    expect(d.room.players).toHaveLength(2);
-    d.wait(1);
-    expect(d.room.players).toHaveLength(1);
   });
 
   test('offline players leave the lobby after a while, but stay in a running game', () => {
@@ -321,26 +311,33 @@ describe('leaving and connections', () => {
   });
 });
 
-describe('the iPhone pool', () => {
-  test('photos count up to the limit, then the browser takes them and the link changes', () => {
-    const d = driver(roomWith(['Ann']));
-    const token = d.room.players[0].pool.token;
-    for (let i = 0; i < LIMITS.poolMax + 3; i++) d.do('poolAdd', { token });
-    expect(d.room.players[0].pool.count).toBe(LIMITS.poolMax);
-    expect(referencedPoolTokens(d.room)).toEqual([token]);
-    d.do('poolDone', { token });
-    expect(d.room.players[0].pool.done).toBe(true);
-    d.by('Ann', 'poolTaken');
-    expect(d.room.players[0].pool).toMatchObject({ count: 0, done: false });
-    expect(d.room.players[0].pool.token).not.toBe(token);
-    expect(referencedPoolTokens(d.room)).toEqual([]);
+describe('reports and removed players', () => {
+  test('a reported photo is deleted at once: mid-guess the game moves on, in the reveal it just goes', () => {
+    const d = loadAll(started());
+    const photo = d.room.game.plan[0].photo;
+    d.by('Ben', 'report');
+    expect(d.room).toMatchObject({ phase: 'load', game: { round: 2 } });
+    expect(referencedPhotoIds(d.room)).not.toContain(photo);
+    expect(Object.values(d.room.game.results || {})).toEqual([]);
+    loadAll(d).by('Ann', 'resolve');
+    const revealed = d.room.game.plan[1].photo;
+    d.by('Cleo', 'report');
+    expect(d.room.phase).toBe('reveal');
+    expect(d.room.game.plan[1].photo).toBeNull();
+    expect(referencedPhotoIds(d.room)).not.toContain(revealed);
   });
 
-  test('an uncollected pool expires', () => {
-    const d = driver(roomWith(['Ann']));
-    d.do('poolAdd', { token: d.room.players[0].pool.token });
-    d.wait(TIMING.poolTtlMs);
-    expect(d.room.players[0].pool.count).toBe(0);
+  test('only the host removes a player; their photos go and their key cannot rejoin', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo'])).by('Ben', 'ready', { photos: ['b1'] });
+    d.by('Cleo', 'kick', { target: idOf(d.room, 'Ben') });
+    expect(d.room.players).toHaveLength(3);
+    d.by('Ann', 'kick', { target: idOf(d.room, 'Ann') });
+    expect(d.room.players).toHaveLength(3);
+    d.by('Ann', 'kick', { target: idOf(d.room, 'Ben') });
+    expect(d.room.players.map((p) => p.name)).toEqual(['Ann', 'Cleo']);
+    expect(referencedPhotoIds(d.room)).toEqual([]);
+    d.do('join', { key: 'key-Ben-0000000000', name: 'Ben', avatar: '🐼' });
+    expect(d.room.players).toHaveLength(2);
   });
 });
 

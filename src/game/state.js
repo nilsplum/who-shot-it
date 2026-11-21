@@ -7,26 +7,28 @@
  * sockets or the clock: time and randomness always come in as arguments.
  *
  * Invariants:
- * - A player's `key` is the secret their browser proves its identity with. It never
- *   leaves the server: `view.js` builds what browsers see from an explicit list of fields.
+ * - A player's `key` is the secret their app proves its identity with. It never leaves
+ *   the server: `view.js` builds what apps see from an explicit list of fields.
  * - `players` stays in join order; the host role and ties always follow that order.
  * - No two players in a room share an avatar (`freeAvatar`).
  * - Photo ids in the state are the only references to stored photo blobs: whatever the
  *   state no longer references, the Durable Object deletes (`referencedPhotoIds`).
+ * - `banned` holds the keys of players the host removed, so they cannot rejoin this
+ *   room; like every key it never leaves the server.
  *
  * Room shape:
  *   { code, createdAt, touchedAt, closed, hadPlayers, hostId, settings, phase, deadline,
- *     players: [Player], game: Game | null }
+ *     players: [Player], banned: [key], game: Game | null }
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, photos: [id],
- *             score, streak, pool: { token, count, done, at } }
+ *             score, streak }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
  *             results: { [id]: { pick, points } } | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
  */
 
-import { EMOJIS, LIMITS, normalizeSettings } from '../../web/shared/config.js';
+import { BLOCKED_WORDS, EMOJIS, LIMITS, normalizeSettings } from '../../web/shared/config.js';
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -56,16 +58,12 @@ export function newRoom(code, now, settings) {
     phase: 'lobby',
     deadline: null,
     players: [],
+    banned: [],
     game: null,
   };
 }
 
-/** A fresh, empty iPhone pool. The token is the secret part of the shortcut's upload link. */
-export function newPool(rng) {
-  return { token: makeId(rng, 24), count: 0, done: false, at: null };
-}
-
-export function newPlayer({ id, key, name, avatar, now, rng }) {
+export function newPlayer({ id, key, name, avatar, now }) {
   return {
     id,
     key,
@@ -78,14 +76,24 @@ export function newPlayer({ id, key, name, avatar, now, rng }) {
     photos: [],
     score: 0,
     streak: 0,
-    pool: newPool(rng),
   };
 }
 
-/** Trimmed, control characters removed, cut to the limit; `''` if nothing is left. */
+/** A name reduced to plain letters, so "F.u_c k" or "fvck" style tricks are caught too. */
+const lettersOf = (name) => name.toLowerCase()
+  .replace(/[0@4]/g, (c) => ({ 0: 'o', '@': 'a', 4: 'a' }[c])).replace(/[1!]/g, 'i').replace(/3/g, 'e').replace(/[5$]/g, 's')
+  .replace(/ß/g, 'ss').normalize('NFD').replace(/[^a-z]/g, '');
+
+/**
+ * Trimmed, control characters removed, cut to the limit; `''` if nothing is left. A name
+ * with a blocked word (`BLOCKED_WORDS`) becomes "Player": the app stores' rules ask for a
+ * filter on what players show each other.
+ */
 export function cleanName(value) {
   if (typeof value !== 'string') return '';
-  return value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, LIMITS.nameMax).trim();
+  const name = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, LIMITS.nameMax).trim();
+  const letters = lettersOf(name);
+  return name && BLOCKED_WORDS.some((w) => letters.includes(w)) ? 'Player' : name;
 }
 
 /**
@@ -102,7 +110,6 @@ export function freeAvatar(room, wanted, rng, exceptId = null) {
 
 export const playerById = (room, id) => room.players.find((p) => p.id === id) || null;
 export const playerByKey = (room, key) => room.players.find((p) => p.key === key) || null;
-export const playerByPoolToken = (room, token) => room.players.find((p) => p.pool.token === token) || null;
 export const connectedPlayers = (room) => room.players.filter((p) => p.connected);
 
 export const inGame = (room) => room.phase === 'load' || room.phase === 'show' || room.phase === 'reveal';
@@ -112,7 +119,7 @@ export function currentEntry(room) {
   return room.game && inGame(room) ? room.game.plan[room.game.round - 1] || null : null;
 }
 
-/** The plan entry after the current one, or null (browsers preload its photo). */
+/** The plan entry after the current one, or null (apps preload its photo). */
 export function nextEntry(room) {
   return room.game && inGame(room) ? room.game.plan[room.game.round] || null : null;
 }
@@ -138,16 +145,6 @@ export function isServablePhoto(room, photoId) {
   const current = currentEntry(room);
   const next = nextEntry(room);
   return Boolean(photoId) && ((current && current.photo === photoId) || (next && next.photo === photoId));
-}
-
-/** Pool tokens whose uploaded photos must be kept (the pool has photos and has not expired). */
-export function referencedPoolTokens(room) {
-  return room.players.filter((p) => p.pool.count > 0).map((p) => p.pool.token);
-}
-
-export function canAddToPool(room, token) {
-  const player = playerByPoolToken(room, token);
-  return Boolean(player) && !player.pool.done && player.pool.count < LIMITS.poolMax;
 }
 
 /** Everyone (at least two) is here and ready, and at least one photo is in the game. */

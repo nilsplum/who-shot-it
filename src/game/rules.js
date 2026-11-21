@@ -2,10 +2,10 @@
  * The game's state machine: every event a room can receive, and every timer it runs.
  *
  * Mechanisms: part of the pure game logic. The room's Durable Object (`src/room.js`) turns
- * each browser message, upload and alarm into an event, calls `apply`, persists the new
+ * each app message, upload and alarm into an event, calls `apply`, persists the new
  * room, deletes photos it no longer references, sends every player their view and sets
  * its one alarm to `nextWake`. The server is the only authority over phases, timers,
- * scores, the round plan and the host role; browsers only render what `view.js` sends.
+ * scores, the round plan and the host role; apps only render what `view.js` sends.
  *
  * Invariants:
  * - `apply` is pure: it never mutates the room it gets (it works on a clone) and takes
@@ -13,7 +13,10 @@
  * - After every event, `settle` runs all due timers and derived transitions until the room
  *   is stable, so no state can wait for a timer that already passed. Consequently
  *   `nextWake` never returns a time in the past for a room `apply` returned.
- * - Host-only events (settings, resolve, next, again) are ignored from anyone else.
+ * - Host-only events (settings, resolve, next, again, kick) are ignored from anyone else.
+ * - Any player may report the photo on screen: it is removed for everyone at once (the
+ *   app store and EU content rules ask for a report and a block mechanism; the host's
+ *   "Remove" is the block, and a removed player's key cannot rejoin the room).
  * - Phases: lobby -> countdown -> (load -> show -> reveal) per round -> end -> lobby.
  *   A countdown falls back to the lobby whenever "everyone is ready" stops being true.
  */
@@ -22,8 +25,8 @@ import { EFFECTS, LIMITS, TIMING, normalizeSetting } from '../../web/shared/conf
 import { buildPlan, shuffle } from './plan.js';
 import { pointsFor } from './score.js';
 import {
-  answerTimeMs, canAddToPool, canStart, cleanName, connectedPlayers, inGame, makeId,
-  freeAvatar, newPlayer, newPool, playerById, playerByKey, playerByPoolToken,
+  answerTimeMs, canStart, cleanName, connectedPlayers, currentEntry, freeAvatar, inGame, makeId,
+  newPlayer, playerById, playerByKey,
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
@@ -144,7 +147,7 @@ function endGame(room) {
 
 /**
  * Removes a player for good: their photos go at once (the round on screen moves on if it
- * was theirs and still being guessed), and so do their pool and answers.
+ * was theirs and still being guessed), and so do their answers.
  */
 function removePlayer(room, playerId, now, rng) {
   if (!playerById(room, playerId)) return;
@@ -168,7 +171,7 @@ const HANDLERS = {
   /** First message of every socket: joins the room, or resumes the player with this key. */
   join(room, { key, name, avatar }, now, rng) {
     const clean = cleanName(name);
-    if (!clean || typeof key !== 'string' || !key) return;
+    if (!clean || typeof key !== 'string' || !key || room.banned.includes(key)) return;
     const existing = playerByKey(room, key);
     if (existing) {
       existing.connected = true;
@@ -182,7 +185,7 @@ const HANDLERS = {
     }
     if (room.players.length >= LIMITS.maxPlayers) return;
     const id = makeId(rng);
-    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now, rng }));
+    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now }));
     room.hadPlayers = true;
     if (!room.hostId) room.hostId = id;
   },
@@ -259,31 +262,23 @@ const HANDLERS = {
   },
 
   /**
-   * One photo arrived from the iPhone shortcut (the blob is already stored). The player's
-   * browser is in the background meanwhile, so uploads count as the player still being
-   * here: the lobby must not drop them while their photos are on the way.
+   * A player reports the photo on screen. It is deleted at once, for everyone: while it is
+   * still being guessed the game moves on to the next photo (nobody scores), during the
+   * reveal it just disappears.
    */
-  poolAdd(room, { token }, now) {
-    if (!canAddToPool(room, token)) return;
-    const p = playerByPoolToken(room, token);
-    p.pool.count += 1;
-    if (!p.pool.at) p.pool.at = now;
-    if (!p.connected) p.goneAt = now;
+  report(room, { playerId }, now, rng) {
+    const entry = currentEntry(room);
+    if (!playerById(room, playerId) || !entry || !entry.photo) return;
+    entry.photo = null;
+    if (room.phase !== 'reveal') nextRound(room, now, rng);
   },
 
-  /** The shortcut finished; the browser now fetches the pool. */
-  poolDone(room, { token }, now) {
-    const p = playerByPoolToken(room, token);
-    if (!p || p.pool.done) return;
-    p.pool.done = true;
-    if (!p.pool.at) p.pool.at = now;
-    if (!p.connected) p.goneAt = now;
-  },
-
-  /** The browser has the pool: its photos are deleted and the upload link changes. */
-  poolTaken(room, { playerId }, now, rng) {
-    const p = playerById(room, playerId);
-    if (p) p.pool = newPool(rng);
+  /** The host removes a player (and all their photos) and keeps them out of this room. */
+  kick(room, { playerId, target }, now, rng) {
+    const p = playerById(room, target);
+    if (!isHost(room, playerId) || !p || target === playerId) return;
+    room.banned.push(p.key);
+    removePlayer(room, target, now, rng);
   },
 
   tick() {},
@@ -348,9 +343,6 @@ function settle(room, now, rng) {
     room.closed = true;
     return;
   }
-  for (const p of room.players) {
-    if (p.pool.at && now >= p.pool.at + TIMING.poolTtlMs) p.pool = newPool(rng);
-  }
   if (inLobby(room)) {
     for (const p of room.players.slice()) {
       if (!p.connected && p.goneAt !== null && now >= p.goneAt + TIMING.lobbyDropMs) removePlayer(room, p.id, now, rng);
@@ -366,7 +358,8 @@ function settle(room, now, rng) {
   // The host role: always held by a player, handed on in join order when the host leaves.
   // During a game (and on the end screen) the host is needed for "Next" and "Play again",
   // so an offline host also hands over after a short grace while someone else is here. In
-  // the lobby the host keeps the role until dropped, so fetching photos never costs it.
+  // the lobby the host keeps the role until dropped, so a short trip to the phone's
+  // settings (photo access) never costs it.
   const host = playerById(room, room.hostId);
   const firstConnected = connectedPlayers(room)[0] || null;
   if (!host) room.hostId = (firstConnected || room.players[0] || {}).id || null;
@@ -398,7 +391,6 @@ export function nextWake(room) {
   if (room.deadline !== null) times.push(room.deadline);
   const someoneHere = connectedPlayers(room).length > 0;
   for (const p of room.players) {
-    if (p.pool.at) times.push(p.pool.at + TIMING.poolTtlMs);
     if (p.connected || p.goneAt === null) continue;
     if (inLobby(room)) times.push(p.goneAt + TIMING.lobbyDropMs);
     else if (p.id === room.hostId && someoneHere) times.push(p.goneAt + TIMING.hostGraceMs);

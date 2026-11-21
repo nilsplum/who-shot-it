@@ -6,7 +6,8 @@
  * WebSocket messages, uploads and its alarm into events, applies them with
  * `rules.apply`, and then `commit`s: persist the room, delete every photo the room no
  * longer references, send each player their view, and set the one alarm to
- * `rules.nextWake`. Photos and iPhone pool photos live in this object's SQLite storage.
+ * `rules.nextWake`. The photos of the game live in this object's SQLite storage, which
+ * the Worker pins to the EU (`SERVER.jurisdiction`).
  *
  * Invariants:
  * - A Durable Object handles one event at a time, but an `await` lets the next one in.
@@ -14,11 +15,11 @@
  *   without any `await` in between; the room is never changed across a wait.
  * - Sockets use the Hibernation API: between messages the object may be evicted from
  *   memory, so everything needed later is in storage or in the socket's attachment
- *   (`{ playerId, openedAt, lastReact }`). Browser pings are answered by the runtime
+ *   (`{ playerId, openedAt, lastReact }`). App pings are answered by the runtime
  *   without waking the object.
- * - Deleting is declarative: blobs are kept only while `referencedPhotoIds` /
- *   `referencedPoolTokens` name them, so every rule that drops a photo from the state
- *   (round over, game over, unready, leave, settings change, expiry) deletes it here.
+ * - Deleting is declarative: blobs are kept only while `referencedPhotoIds` names them,
+ *   so every rule that drops a photo from the state (round over, game over, unready,
+ *   leave, removed player, reported photo, settings change) deletes it here.
  * - A closed room deletes all of its storage and closes its sockets at once.
  */
 
@@ -26,14 +27,11 @@ import { DurableObject } from 'cloudflare:workers';
 import { CLOSE, matchRoomRoute } from '../web/shared/api.js';
 import { LIMITS, REACTIONS, TIMING } from '../web/shared/config.js';
 import { apply, nextWake } from './game/rules.js';
-import {
-  canAddToPool, cleanName, isServablePhoto, makeId, newRoom, playerById, playerByKey, playerByPoolToken,
-  referencedPhotoIds, referencedPoolTokens,
-} from './game/state.js';
+import { cleanName, isServablePhoto, makeId, newRoom, playerById, playerByKey, referencedPhotoIds } from './game/state.js';
 import { viewFor } from './game/view.js';
 import { bearerKey, cryptoRandom, fail, isJpeg, isPlayerKey, json, tooLarge } from './http.js';
 
-/** Browser messages that become events, each with exactly the fields the rules read. */
+/** App messages that become events, each with exactly the fields the rules read. */
 const CLIENT_EVENTS = {
   leave: () => ({}),
   unready: () => ({}),
@@ -43,6 +41,8 @@ const CLIENT_EVENTS = {
   resolve: () => ({}),
   next: () => ({}),
   again: () => ({}),
+  report: () => ({}),
+  kick: (m) => ({ target: m.target }),
 };
 
 const attachment = (ws) => {
@@ -68,7 +68,6 @@ export class Room extends DurableObject {
   migrate() {
     this.sql.exec('CREATE TABLE IF NOT EXISTS room (id INTEGER PRIMARY KEY CHECK (id = 1), state TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, data BLOB NOT NULL)');
-    this.sql.exec('CREATE TABLE IF NOT EXISTS pool (token TEXT NOT NULL, seq INTEGER NOT NULL, data BLOB NOT NULL, PRIMARY KEY (token, seq))');
   }
 
   // ---------- State changes ----------
@@ -88,7 +87,6 @@ export class Room extends DurableObject {
     if (JSON.stringify(room) !== JSON.stringify(previous)) {
       this.sql.exec('INSERT OR REPLACE INTO room (id, state) VALUES (1, ?)', JSON.stringify(room));
       this.sql.exec('DELETE FROM photos WHERE id NOT IN (SELECT value FROM json_each(?))', JSON.stringify(referencedPhotoIds(room)));
-      this.sql.exec('DELETE FROM pool WHERE token NOT IN (SELECT value FROM json_each(?))', JSON.stringify(referencedPoolTokens(room)));
       this.broadcast();
     }
     this.schedule();
@@ -122,7 +120,8 @@ export class Room extends DurableObject {
     for (const ws of this.ctx.getWebSockets()) {
       const { playerId } = attachment(ws);
       if (!playerId) continue;
-      // A socket whose player is no longer in the room reconnects and says hello again.
+      // A socket whose player is no longer in the room reconnects and says hello again
+      // (a removed player's hello is then answered with CLOSE.removed).
       if (!playerById(this.room, playerId)) {
         ws.serializeAttachment({ ...attachment(ws), playerId: null });
         ws.close(CLOSE.stale, 'rejoin');
@@ -149,9 +148,6 @@ export class Room extends DurableObject {
     if (!this.room) return fail(404, 'no_room');
     if (route.name === 'setPhotos') return this.setPhotos(request);
     if (route.name === 'photo') return this.photo(route.id);
-    if (route.name === 'takePool') return this.takePool(request);
-    if (route.name === 'poolUpload') return this.poolUpload(request, route.id);
-    if (route.name === 'poolDone') return this.poolDone(route.id);
     return fail(404, 'not_found');
   }
 
@@ -170,7 +166,7 @@ export class Room extends DurableObject {
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ playerId: null, openedAt: Date.now(), lastReact: 0 });
-    // A code without a room still gets a socket, so the browser can read the close code
+    // A code without a room still gets a socket, so the app can read the close code
     // (a refused upgrade looks like a network error and would be retried forever).
     if (!this.room) server.close(CLOSE.gone, 'gone');
     else this.schedule();
@@ -213,50 +209,8 @@ export class Room extends DurableObject {
     if (!isServablePhoto(this.room, id)) return fail(404, 'not_found');
     const row = this.sql.exec('SELECT data FROM photos WHERE id = ?', id).toArray()[0];
     if (!row) return fail(404, 'not_found');
-    // Ids are random and single-use, so the browser may keep the photo for the round.
+    // Ids are random and single-use, so the app may keep the photo for the round.
     return new Response(row.data, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600' } });
-  }
-
-  /** One photo from the iPhone shortcut, sent raw to the player's secret pool link. */
-  async poolUpload(request, token) {
-    if (!canAddToPool(this.room, token)) return fail(404, 'no_pool');
-    if (tooLarge(request, LIMITS.photoMaxBytes)) return fail(413, 'too_large');
-    const bytes = new Uint8Array(await request.arrayBuffer());
-    if (bytes.length > LIMITS.photoMaxBytes) return fail(413, 'too_large');
-    if (!isJpeg(bytes)) return fail(415, 'not_jpeg');
-    if (!this.room || !canAddToPool(this.room, token)) return fail(404, 'no_pool');
-    const player = playerByPoolToken(this.room, token);
-    this.sql.exec('INSERT INTO pool (token, seq, data) VALUES (?, ?, ?)', token, player.pool.count, bytes);
-    this.dispatch({ type: 'poolAdd', token });
-    return json({ ok: true }, 201);
-  }
-
-  /** The shortcut's success callback: marks the pool complete and returns to the game. */
-  poolDone(token) {
-    const code = this.room.code;
-    this.dispatch({ type: 'poolDone', token });
-    return new Response(null, { status: 302, headers: { Location: `/${code}`, 'Cache-Control': 'no-store' } });
-  }
-
-  /**
-   * The browser picks up its pool: all photos in one response (each as a 4-byte big-endian
-   * length and the JPEG), then they are deleted and the upload link changes.
-   */
-  takePool(request) {
-    const player = playerByKey(this.room, bearerKey(request));
-    if (!player) return fail(401, 'unknown_player');
-    const rows = this.sql.exec('SELECT data FROM pool WHERE token = ? ORDER BY seq', player.pool.token).toArray();
-    const parts = rows.map((r) => new Uint8Array(r.data));
-    const out = new Uint8Array(parts.reduce((n, p) => n + 4 + p.length, 0));
-    const view = new DataView(out.buffer);
-    let offset = 0;
-    for (const p of parts) {
-      view.setUint32(offset, p.length);
-      out.set(p, offset + 4);
-      offset += 4 + p.length;
-    }
-    this.dispatch({ type: 'poolTaken', playerId: player.id });
-    return new Response(out, { headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' } });
   }
 
   // ---------- WebSocket ----------
@@ -300,7 +254,8 @@ export class Room extends DurableObject {
     this.dispatch({ type: 'join', key, name, avatar });
     const player = this.room && playerByKey(this.room, key);
     if (!player) {
-      ws.close(CLOSE.full, 'full');
+      if (this.room && this.room.banned.includes(key)) ws.close(CLOSE.removed, 'removed');
+      else ws.close(CLOSE.full, 'full');
       return;
     }
     // One socket per player: an older tab of the same player hands over to this one.

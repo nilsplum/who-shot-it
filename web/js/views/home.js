@@ -1,13 +1,18 @@
 /**
  * The start screen: name, avatar, create a game or join one.
  *
- * Mechanisms: shown while the player is in no room. Opened through an invite link
- * (`/<CODE>`), it becomes a one-tap join screen for that code, with creating a new game
- * as a small link below. Actions (`data-act`) are handled in `main.js`.
+ * Mechanisms: shown in the app while the player is in no game. Opened through an invite
+ * link (`phone.onInvite`), it becomes a one-tap join screen for that code, with creating
+ * a new game as a small link below. "Create game" leads to the "New game" step
+ * (`views/newgame.js`). Actions (`data-act`) are handled in `main.js`.
  */
 
 import { LIMITS } from '../../shared/config.js';
+import { serverUrl } from '../api.js';
 import { LOGO, colourOf, esc } from '../ui.js';
+
+/** The legal page opens in the phone's browser (it lives on the server, `web/legal.html`). */
+export const legalLink = (text = 'Legal &amp; privacy') => `<a href="${esc(serverUrl('/legal'))}" target="_blank" rel="noopener">${text}</a>`;
 
 export function homeScreen({ device, session }) {
   const invite = session.invite;
@@ -26,7 +31,7 @@ export function homeScreen({ device, session }) {
       </div>
       ${invite ? '<button class="link" data-act="newgame">Create a new game</button>' : ''}
       <div class="spacer"></div>
-      <div class="foot"><a href="/legal">Legal &amp; privacy</a></div>
+      <div class="foot">${legalLink()}</div>
     </div>`,
     parts: {
       avatar: `<button class="av" data-act="avatar" aria-label="Pick your avatar" style="--c:${colourOf(device.avatar)}">${esc(device.avatar)}</button>`,

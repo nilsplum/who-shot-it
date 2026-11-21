@@ -17,14 +17,13 @@ function inShow() {
   return room;
 }
 
-test('player keys and pool tokens of others never appear in a view', () => {
-  const room = inShow();
+test("no player key, not even the viewer's own or a removed player's, appears in a view", () => {
+  let room = inShow();
+  room = apply(room, { type: 'kick', playerId: idOf(room, 'Ann'), target: idOf(room, 'Cleo') }, T0 + TIMING.countdownMs, rng);
+  expect(room.banned).toHaveLength(1);
   const view = JSON.stringify(viewFor(room, idOf(room, 'Ann'), T0));
-  for (const p of room.players) {
-    expect(view).not.toContain(p.key);
-    if (p.name !== 'Ann') expect(view).not.toContain(p.pool.token);
-  }
-  expect(view).toContain(room.players[0].pool.token);
+  for (const key of [...room.players.map((p) => p.key), ...room.banned]) expect(view).not.toContain(key);
+  expect(view).not.toContain('banned');
 });
 
 test('the owner and the picks stay hidden until the reveal', () => {

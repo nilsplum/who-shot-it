@@ -1,5 +1,5 @@
 /**
- * Vitest runs the unit tests (pure game logic and pure browser helpers) and the
+ * Vitest runs the unit tests (pure game logic, the shared config and pure app helpers) and the
  * integration tests (Worker + Durable Object over HTTP and WebSocket) inside the real
  * Workers runtime (workerd), configured from wrangler.jsonc by the Cloudflare plugin.
  * Run them through ./scripts/test.sh, never ad hoc.

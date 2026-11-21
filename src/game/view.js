@@ -1,5 +1,5 @@
 /**
- * What one player's browser may see of a room: the only data that ever leaves the server
+ * What one player's app may see of a room: the only data that ever leaves the server
  * over the room's WebSocket.
  *
  * Mechanisms: part of the pure game logic; the room's Durable Object sends
@@ -10,14 +10,15 @@
  * - Built from an explicit list of fields, never by copying a player or the room, so a
  *   player's secret `key` can never leak.
  * - The owner of the photo on screen stays hidden until the reveal, and so do the other
- *   players' picks: before that a browser only learns who has answered, and its own pick.
- * - Remaining times are relative (`left`, in ms), so a browser's wrong clock never matters.
+ *   players' picks: before that an app only learns who has answered, and its own pick.
+ * - Remaining times are relative (`left`, in ms), so a phone's wrong clock never matters.
+ * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
  */
 
 import { API } from '../../web/shared/api.js';
 import { currentEntry, inGame, nextEntry, playerById } from './state.js';
 
-/** Milliseconds left on the timer the browser shows for the current phase, or null. */
+/** Milliseconds left on the timer the app shows for the current phase, or null. */
 function msLeft(room, now) {
   const left = (t) => Math.max(0, t - now);
   if (room.phase === 'countdown' || room.phase === 'reveal') return room.deadline !== null ? left(room.deadline) : null;
@@ -66,9 +67,7 @@ export function viewFor(room, playerId, now) {
     phase: room.phase,
     hostId: room.hostId,
     settings: room.settings,
-    me: me
-      ? { id: me.id, ready: me.ready, photoCount: me.photos.length, pool: { token: me.pool.token, count: me.pool.count, done: me.pool.done } }
-      : null,
+    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length } : null,
     players: room.players.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
     })),

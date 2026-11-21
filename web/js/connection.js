@@ -1,5 +1,5 @@
 /**
- * The browser's live connection to its room: one WebSocket that reconnects by itself.
+ * The app's live connection to its room: one WebSocket that reconnects by itself.
  *
  * Mechanisms: `main.js` opens one `RoomSocket` per room. Each (re)connect starts with a
  * `hello` (the player key, name and avatar), and the room answers with a full snapshot of
@@ -8,19 +8,20 @@
  *
  * Invariants:
  * - Reconnects back off (0.5 s doubling to 5 s, with jitter) and happen at once when the
- *   page becomes visible or the network returns, because phones kill sockets in the
- *   background.
+ *   app comes back to the front or the network returns, because phones kill sockets in
+ *   the background (`checkNow`, also called by `main.js` when the app resumes).
  * - A missing pong means a dead connection: the socket is dropped and replaced at once,
- *   without waiting for the browser's slow close.
- * - Close codes that end the session (`CLOSE.replaced/full/gone/left`) stop reconnecting
+ *   without waiting for the WebView's slow close.
+ * - Close codes that end the session (`CLOSE.replaced/full/gone/left/removed`) stop reconnecting
  *   and are reported to `onEnd`; everything else is retried.
  * - Messages sent while disconnected are dropped (the banner tells the player).
  */
 
-import { API, CLOSE } from '../shared/api.js';
+import { CLOSE } from '../shared/api.js';
 import { TIMING } from '../shared/config.js';
+import { socketUrl } from './api.js';
 
-const FINAL = new Set([CLOSE.replaced, CLOSE.full, CLOSE.gone, CLOSE.left]);
+const FINAL = new Set([CLOSE.replaced, CLOSE.full, CLOSE.gone, CLOSE.left, CLOSE.removed]);
 
 export class RoomSocket {
   /**
@@ -48,8 +49,7 @@ export class RoomSocket {
   connect() {
     clearTimeout(this.retryTimer);
     this.detach();
-    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${scheme}//${location.host}${API.socket(this.code)}`);
+    const ws = new WebSocket(socketUrl(this.code));
     this.ws = ws;
     ws.onopen = () => {
       this.attempts = 0;
@@ -114,7 +114,7 @@ export class RoomSocket {
     this.ws.send('ping');
   }
 
-  /** Page visible again or network back: reconnect now instead of waiting for the backoff. */
+  /** App in front again or network back: reconnect now instead of waiting for the backoff. */
   checkNow() {
     if (this.ended) return;
     if (!this.ws || this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING) {

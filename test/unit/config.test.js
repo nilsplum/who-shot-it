@@ -1,13 +1,30 @@
 /**
- * The shared config (web/shared/config.js) and the facts other files restate from it.
+ * The shared config (web/shared/config.js) and every file that restates one of its
+ * values because it cannot import it: the web page, the legal page, the Capacitor
+ * config, the native projects and wrangler.jsonc. A copy that drifts fails here.
  */
 import { describe, expect, test } from 'vitest';
-import { APP, EMOJIS, LIMITS, SETTINGS, SETTINGS_DEFAULTS, isRoomCode, normalizeSetting, normalizeSettings } from '../../web/shared/config.js';
+import {
+  APP, EMOJIS, LEGAL, LIMITS, PRESETS, SERVER, SETTINGS, SETTINGS_DEFAULTS, isRoomCode, normalizeSetting, normalizeSettings, presetOf,
+} from '../../web/shared/config.js';
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
-import manifest from '../../web/manifest.webmanifest?raw';
+import capacitorConfig from '../../capacitor.config.json?raw';
+import wranglerConfig from '../../wrangler.jsonc?raw';
+import androidManifest from '../../android/app/src/main/AndroidManifest.xml?raw';
+import androidStrings from '../../android/app/src/main/res/values/strings.xml?raw';
+import androidGradle from '../../android/app/build.gradle?raw';
+import iosInfo from '../../ios/App/App/Info.plist?raw';
+import iosProject from '../../ios/App/App.xcodeproj/project.pbxproj?raw';
 
-const texts = import.meta.glob(['../../web/**/*.{js,mjs,html,css,webmanifest}', '../../src/**/*.js', '../../docs/**/*.md', '../../*.md', '../../scripts/**/*.sh'], { query: '?raw', import: 'default', eager: true });
+const texts = import.meta.glob([
+  '../../web/**/*.{js,mjs,html,css}', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
+  '../../android/app/src/main/java/**/*.java', '../../android/app/src/main/AndroidManifest.xml', '../../android/app/build.gradle',
+  '../../ios/App/App/*.swift', '../../ios/App/App/Info.plist', '../../ios/App/App/PrivacyInfo.xcprivacy',
+], { query: '?raw', import: 'default', eager: true });
+
+/** wrangler.jsonc without its comments (it is JSON with comments). */
+const wrangler = JSON.parse(wranglerConfig.replace(/^\s*\/\/.*$/gm, ''));
 
 describe('settings', () => {
   test('every default is one of its options', () => {
@@ -20,10 +37,25 @@ describe('settings', () => {
     expect(normalizeSetting('nope', 1)).toBeUndefined();
   });
 
-  test('settings with help text have a line for every option', () => {
+  test('every setting but the obvious one explains itself in short lines', () => {
+    expect(SETTINGS.filter((s) => !s.help).map((s) => s.key)).toEqual(['photos']);
     for (const s of SETTINGS.filter((x) => x.help)) {
-      for (const [value] of s.options) expect(s.help[String(value)]).toBeTruthy();
+      expect(s.help.length).toBeGreaterThanOrEqual(2);
+      for (const [which, text] of s.help) {
+        expect(which && text, s.key).toBeTruthy();
+        // Grandma-short: one or two short sentences.
+        expect(text.length, `${s.key}: ${text}`).toBeLessThanOrEqual(60);
+      }
     }
+  });
+
+  test('presets are complete, valid settings, and recognised again', () => {
+    expect(PRESETS[0].settings).toEqual(SETTINGS_DEFAULTS);
+    for (const p of PRESETS) {
+      expect(normalizeSettings(p.settings)).toEqual(p.settings);
+      expect(presetOf({ ...p.settings })).toBe(p);
+    }
+    expect(presetOf({ ...SETTINGS_DEFAULTS, time: 30 })).toBeNull();
   });
 });
 
@@ -39,15 +71,49 @@ test('room codes use only the unambiguous alphabet', () => {
   expect(isRoomCode('ABCDE')).toBe(false);
 });
 
-test('the static files restate the brand name exactly', () => {
-  expect(indexHtml).toContain(`<title>${APP.name}</title>`);
-  expect(indexHtml).toContain(`<meta property="og:title" content="${APP.name}">`);
-  expect(legalHtml).toContain(`${APP.name}</title>`);
-  expect(JSON.parse(manifest).name).toBe(APP.name);
+describe('values restated outside the config', () => {
+  test('the brand name', () => {
+    expect(indexHtml).toContain(`<title>${APP.name}</title>`);
+    expect(indexHtml).toContain(`<meta property="og:title" content="${APP.name}">`);
+    expect(legalHtml).toContain(`${APP.name}</title>`);
+    expect(JSON.parse(capacitorConfig).appName).toBe(APP.name);
+    expect(androidStrings).toContain(`<string name="app_name">${APP.name}</string>`);
+    expect(iosInfo).toMatch(new RegExp(`<key>CFBundleDisplayName</key>\\s*<string>${APP.name.replace('?', '\\?')}</string>`));
+  });
+
+  test('the app id', () => {
+    expect(JSON.parse(capacitorConfig).appId).toBe(APP.id);
+    expect(androidGradle).toContain(`applicationId "${APP.id}"`);
+    expect(androidGradle).toContain(`namespace = "${APP.id}"`);
+    expect(iosProject.match(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)).toEqual([`PRODUCT_BUNDLE_IDENTIFIER = ${APP.id};`, `PRODUCT_BUNDLE_IDENTIFIER = ${APP.id};`]);
+  });
+
+  test('the invite link scheme', () => {
+    expect(androidManifest).toContain(`<data android:scheme="${APP.scheme}" android:host="join" />`);
+    expect(iosInfo).toMatch(new RegExp(`<key>CFBundleURLSchemes</key>\\s*<array>\\s*<string>${APP.scheme}</string>`));
+  });
+
+  test('the server address: the page may talk to it, and wrangler.jsonc serves it', () => {
+    const { host } = new URL(SERVER.origin);
+    expect(indexHtml).toContain(`connect-src 'self' ${SERVER.origin} wss://${host};`);
+    expect(indexHtml).toContain(`img-src 'self' blob: data: ${SERVER.origin};`);
+    if (host.endsWith('.workers.dev')) {
+      expect(wrangler.workers_dev).toBe(true);
+      expect(host.startsWith(`${wrangler.name}.`)).toBe(true);
+    } else {
+      expect(wrangler.routes).toContainEqual({ pattern: host, custom_domain: true });
+    }
+  });
+
+  test('the legal page: its date is the terms version, its age the minimum age', () => {
+    const date = new Date(`${LEGAL.version}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    expect(legalHtml).toContain(`Last updated: ${date}`);
+    expect(legalHtml).toContain(`you must be ${LEGAL.minAge} or older`);
+  });
 });
 
 test('no long dash anywhere in the repo text', () => {
-  expect(Object.keys(texts).length).toBeGreaterThan(20);
+  expect(Object.keys(texts).length).toBeGreaterThan(40);
   for (const [file, text] of Object.entries(texts)) {
     if (file.includes('/vendor/')) continue;
     expect(text.includes('—'), file).toBe(false);
