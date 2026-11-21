@@ -33,7 +33,8 @@ export const APP = {
  */
 export const SHORTCUT = {
   name: 'Who Shot It',
-  installUrl: 'TODO_OPERATOR: iCloud link of the shared shortcut, see docs/ios-shortcut.md',
+  // Apple hosts and signs the shared shortcut; players add it from this page with one tap.
+  installUrl: 'https://www.icloud.com/shortcuts/ad91ab40f2904bb7b13a6502c52859de',
 };
 
 /** Avatars a player can pick (the picker shows them in this order). */

@@ -61,6 +61,13 @@ German, search for the name in brackets.
    ```
    If a line *Receive … input from …* shows at the top, it must accept **Any** (the default)
    or **Text**.
+8. Common slips:
+   - A **red** variable (for example *Repeat Results* inside the repeat) points to the wrong
+     action: tap it → **Clear**, tap the empty field → **Select Variable** → tap the right
+     output (*Repeat Item* for Resize Image, *Resized Image* for Convert Image).
+   - *Shortcut Input* belongs in the **URL** field right after "Get contents of", not in
+     **Method** (which must say **POST**).
+   - The name at the top of the editor must read **Who Shot It** (tap it → **Rename**).
 
 ## Share it
 
