@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  The app's only page. Served for "/" and, through the single-page fallback, for every
+  invite link "/<CODE>". All UI is drawn by /js/main.js into the empty roots below.
+  The title and descriptions restate APP.name for link previews (pinned by a test).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Who Shot It?</title>
+<meta name="description" content="Guess whose photo it is: the party game with the photos on your friends' phones. Free, no app, no account.">
+<meta property="og:title" content="Who Shot It?">
+<meta property="og:description" content="Guess whose photo it is. Join my game!">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#15121f">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/app.css">
+<script type="module" src="/js/main.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet"></div>
+<div id="cover"></div>
+<div id="banner"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<input id="pick-files" type="file" accept="image/*" multiple hidden>
+<input id="pick-folder" type="file" webkitdirectory multiple hidden>
+<noscript><p class="status">Please turn on JavaScript to play.</p></noscript>
+</body>
+</html>

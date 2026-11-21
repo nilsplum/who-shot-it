@@ -1,0 +1,33 @@
+// Cloudflare deployment of Who Shot It?: one Worker (src/worker.js) that serves the static
+// browser app from web/ and hands every room to its own Durable Object (src/room.js).
+// Everything runs on the Workers Free plan (SQLite-backed Durable Objects only).
+// `./scripts/deploy.sh` deploys this file; `./scripts/dev.sh` and the tests run it locally.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "who-shot-it",
+  "main": "src/worker.js",
+  // Newest date the pinned runtime supports; raise it together with wrangler.
+  "compatibility_date": "2026-11-15",
+  "assets": {
+    "directory": "./web",
+    "binding": "ASSETS",
+    // Unknown paths serve index.html, so an invite link https://<domain>/<CODE> opens the game.
+    "not_found_handling": "single-page-application",
+    // Only the API runs the Worker; every other file is served directly by Cloudflare.
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+  },
+  // A Durable Object class is registered once; never edit or remove a deployed migration.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  // The production domain. It must be a zone in the same Cloudflare account (README, Deploy).
+  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }],
+  // One public address only: no *.workers.dev copy and no preview links.
+  "workers_dev": false,
+  "preview_urls": false,
+  // No stored request logs (privacy policy: we keep no logs). `npx wrangler tail` streams live.
+  "observability": { "enabled": false },
+  // No Wrangler usage telemetry from the deploy machine.
+  "send_metrics": false
+}
