@@ -6,7 +6,10 @@
  *
  * Mechanisms: `main.js` paints the countdown into `#cover`, the banner into `#banner` and
  * the held photo into `#look`; the banner appears only after the connection has been
- * down for a moment, so short hiccups never flash it. The held photo is the app's one way
+ * down for a moment, so short hiccups never flash it. The 3-2-1 belongs to the lobby's
+ * phases (a change during it returns to the lobby at once), so it is drawn over the lobby,
+ * on the page's own background (`bg-page`) and fully opaque: nothing of the lobby shows
+ * through, and it looks like a screen of its own. The held photo is the app's one way
  * to see a photo big ("hold to look", `main.js`): the whole photo on dark, like the stage.
  */
 
@@ -16,7 +19,7 @@ export const BANNER_DELAY_MS = 1500;
 
 export function countdownHtml(view, leftMs) {
   if (!view || view.phase !== 'countdown' || leftMs === null) return '';
-  return `<div class="fixed inset-0 z-50 grid place-items-center bg-navy/88 font-display text-9xl font-extrabold text-yellow"><span class="animate-count">${Math.max(1, Math.ceil(leftMs / 1000))}</span></div>`;
+  return `<div class="fixed inset-0 z-50 grid place-items-center bg-page font-display text-9xl font-extrabold text-yellow"><span class="animate-count">${Math.max(1, Math.ceil(leftMs / 1000))}</span></div>`;
 }
 
 export function bannerHtml(session, now) {

@@ -5,8 +5,8 @@
  *
  * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
  * photo (and the next one), tells the room once it is loaded, starts the effect when the
- * `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates on the
- * reveal (`phone.buzz`). The bar is a part of its own: on the reveal it changes from the
+ * `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when the
+ * photo appears and on the reveal (`main.js` `moments`). The bar is a part of its own: on the reveal it changes from the
  * answer time's look to the look time's (`ui.timerBar`). Photo links in the view are server paths; `serverUrl` makes them
  * full addresses. The host can tap a player in the "who has answered" row to remove them
  * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here. While

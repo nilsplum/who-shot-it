@@ -15,7 +15,8 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 | Version (from `package.json`) | `android/app/build.gradle` | passed in by `./scripts/release-apps.sh` |
 | Icons and launch screens | drawn from `web/icons/icon.svg` by `scripts/helpers/app-assets.mjs` | same |
 
-Official plugins: `@capacitor/app` (invite links, Android back button, resume) and
+Official plugins: `@capacitor/app` (invite links, Android back button, resume),
+`@capacitor/haptics` (the app's five vibrations, `buzz` in `web/js/phone.js`) and
 `@capacitor/share` (share sheet). The page reaches every plugin as
 `window.Capacitor.Plugins.<name>` (`web/js/phone.js`). The page's scripts have no build
 step; only its stylesheet is built (`scripts/helpers/styles.sh`), which

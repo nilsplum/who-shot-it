@@ -14,8 +14,11 @@
  * - In a room, `RoomSocket` delivers the player's view; every view replaces
  *   `session.view`, preloads the round's and the next round's photo, acknowledges a
  *   loaded photo (`loaded`), deals photos when the lobby needs a set (`dealIfNeeded`),
- *   vibrates when a round is revealed (one pulse right, two wrong) and repaints. Actions
- *   are sent as small messages; the server decides what happens.
+ *   lets the phone feel the room's moments (`moments`: a new photo, the reveal) and
+ *   repaints. Actions are sent as small messages; the server decides what happens.
+ * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
+ *   (`moments`), each new number of the 3-2-1 (when it is painted), and a swap's flip or
+ *   refusal (action `swap`).
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings.
@@ -116,8 +119,11 @@ function screen() {
   return gameScreen(context(), { picked: myPick(v), late: isLate(v), photo: photo ? photo.state : 'loading', reactions: REACTIONS });
 }
 
+/** Paints `html` into `el` unless it is there already; returns whether it changed. */
 function setHtml(el, html) {
-  if (el.innerHTML !== html) el.innerHTML = html;
+  if (el.innerHTML === html) return false;
+  el.innerHTML = html;
+  return true;
 }
 
 /** Starts the round's effect on a freshly painted photo. */
@@ -172,7 +178,9 @@ function render() {
   if (changed.includes('stage')) startStage();
   if (changed.includes('board')) startBoard();
   paintSheet(sheetScreen(context()));
-  setHtml($('cover'), countdownHtml(session.view, leftNow()));
+  // The 3-2-1 paints a new number each second: each one is felt, a little longer than a tap.
+  const cover = countdownHtml(session.view, leftNow());
+  if (setHtml($('cover'), cover) && cover) buzz('count');
   setHtml($('look'), lookHtml(lookSrc()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
@@ -308,16 +316,26 @@ function onMessage(msg) {
   }
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
-  // The reveal of a round, once: one pulse for a right guess, two for anything else.
-  const revealed = (x) => x && x.phase === 'reveal' && x.round ? x.round.n : null;
-  if (revealed(v) && revealed(previous) !== revealed(v)) {
-    const mine = v.round.results && v.round.results[v.me.id];
-    buzz(mine && mine.pick && mine.pick === v.round.owner ? 'yes' : 'no');
-  }
+  moments(previous, v);
   preload(v);
   acknowledge();
   dealIfNeeded();
   render();
+}
+
+/**
+ * What the phone feels when the room moves on, once per moment and round: a light tap when a
+ * new photo appears for everyone (`show` starts), one pulse for a right guess and two for
+ * anything else when the round is revealed (the room's own results, never the optimistic
+ * pick). Only a change between two views counts, so a repaint never vibrates.
+ */
+function moments(previous, v) {
+  const round = (x, phase) => (x && x.phase === phase && x.round ? x.round.n : null);
+  if (round(v, 'show') && round(previous, 'show') !== round(v, 'show')) buzz('tap');
+  if (round(v, 'reveal') && round(previous, 'reveal') !== round(v, 'reveal')) {
+    const mine = v.round.results && v.round.results[v.me.id];
+    buzz(mine && mine.pick && mine.pick === v.round.owner ? 'yes' : 'no');
+  }
 }
 
 // ---------- Photos ----------
@@ -527,9 +545,10 @@ const ACTIONS = {
     roll(size, filter, render);
   },
   yes: () => readyWith(chosenBlobs),
+  /** A tap on a photo of the choice: it flips to another one (a light tap), or the refusal is felt twice. */
   swap: (index) => {
     if (session.uploading) return;
-    if (!swap(Number(index), render)) buzz('no');
+    buzz(swap(Number(index), render) ? 'tap' : 'no');
   },
   unready: () => send({ type: 'unready' }),
   answer: (id) => {

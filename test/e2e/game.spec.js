@@ -2,7 +2,7 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code,
  * the host removing a player, the photos dealt with "Play with these?", reload, the
- * automatic start, a flagged photo (hidden from the others, Cancel, then Delete), five
+ * automatic start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then Delete), five
  * rounds with their leaderboards (and "Show
  * again" held on one phone, seen on another), the end, "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. Then "Which
@@ -85,6 +85,14 @@ test('friends play a full game and start another one', async ({ browser }) => {
 
   const everyone = [host, ...guests];
   for (const page of everyone) await choosePhotos(page, 4);
+  // Everyone is ready: the 3-2-1 is a screen of its own, nothing of the lobby shows through.
+  const cover = host.locator('#cover > div');
+  await expect(cover).toBeVisible();
+  expect(await cover.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+
+  // What the host felt: each number of the 3-2-1, then a light tap as the first photo appears.
+  await expect(guests[1].getByText('1 / 5', { exact: true })).toBeVisible();
+  await expect.poll(() => host.evaluate(() => window.felt)).toEqual(['120 ms', '120 ms', '120 ms', 'LIGHT']);
 
   // Round 1 is flagged: the others stop seeing the photo and wait, the flagger sees the
   // countdown to its deletion. Cancel brings it back; flagged again, Delete deletes it for
@@ -109,8 +117,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
       await page.locator('[data-act="answer"]').first().click();
     }
     for (const page of everyone) await expect(page.locator('[aria-label$=": their photo"]')).toHaveCount(1);
-    // Everyone answered: the time to look at the answer has the cool look, on the reveal and the leaderboard.
+    // Everyone answered: the time to look at the answer has the cool look, on the reveal and
+    // the leaderboard, and the host felt the verdict (one firm pulse right, two wrong).
     await expect(bar).toHaveAttribute('data-kind', 'look');
+    await expect.poll(() => host.evaluate(() => window.felt.at(-1))).toBe('MEDIUM');
     if (round === 2) {
       // The leaderboard after the reveal: everyone ranked, with this round's pick.
       await expect(host.getByRole('heading', { name: 'Round 2 of 5' })).toBeVisible();
@@ -197,6 +207,8 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   const cross = tiles.nth(0).getByText('✗');
   await expect(cross).toBeVisible();
   expect(await style(0)).toBe(kept);
+  // Felt: a light tap for each flip, two firm pulses for the refusal.
+  await expect.poll(() => phone.evaluate(() => window.felt)).toEqual(['LIGHT', 'LIGHT', 'LIGHT', 'MEDIUM', 'MEDIUM']);
   await expect(cross).toHaveCount(0);
   // Holding a photo shows it big until the finger lifts (anywhere); it swaps nothing.
   const box = await tiles.nth(1).boundingBox();

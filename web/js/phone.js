@@ -106,16 +106,38 @@ export function keepAwake(on) {
 // ---------- Vibration ----------
 
 /**
- * The app's only vibration, with two meanings everywhere: 'yes' is one short pulse (a right
- * guess), 'no' two (a wrong guess, a refused tap). Felt even by someone who cannot see the
- * screen well. Does nothing without the plugin (the website, the browser tests).
+ * The app's vibrations: five, each with one meaning wherever it is felt, so a player learns
+ * them without looking (and someone who cannot see the screen well feels them). Nothing else
+ * vibrates. Each is a list of steps: an impact of a strength the Haptics plugin knows, a
+ * vibration of `ms` (felt longer than an impact), or a pause before the next step.
  */
+const HAPTICS = {
+  /** A light tap: a new photo appears, a photo flips (swap), a tick of the podium's drumroll. */
+  tap: [{ impact: 'LIGHT' }],
+  /** One firm pulse: my guess was right. */
+  yes: [{ impact: 'MEDIUM' }],
+  /** Two firm pulses: my guess was wrong (or I gave none), a swap was refused. */
+  no: [{ impact: 'MEDIUM' }, { pause: 150 }, { impact: 'MEDIUM' }],
+  /** A longer buzz: each number of the 3-2-1. */
+  count: [{ ms: 120 }],
+  /** A heavy thud: a place of the podium is revealed, FINAL ROUND lands. */
+  land: [{ impact: 'HEAVY' }],
+};
+
+/** Plays one of the vibrations (`HAPTICS`); nothing without the plugin (the website, the browser tests). */
 export function buzz(kind) {
   const haptics = plugin('Haptics');
-  if (!haptics) return;
-  const pulse = () => haptics.impact({ style: 'MEDIUM' }).catch(() => {});
-  pulse();
-  if (kind === 'no') setTimeout(pulse, 150);
+  if (!haptics || !HAPTICS[kind]) return;
+  let at = 0;
+  for (const step of HAPTICS[kind]) {
+    if (step.pause) {
+      at += step.pause;
+      continue;
+    }
+    const play = () => (step.impact ? haptics.impact({ style: step.impact }) : haptics.vibrate({ duration: step.ms })).catch(() => {});
+    if (at) setTimeout(play, at);
+    else play();
+  }
 }
 
 // ---------- Sharing, invite links, back button ----------

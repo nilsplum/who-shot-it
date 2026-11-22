@@ -175,10 +175,8 @@
     html { font-size: 125%; }
   }
   body {
+    @apply bg-page;
     min-height: 100dvh;
-    background: radial-gradient(800px 500px at 0% -10%, var(--color-glow-violet), transparent 60%),
-      radial-gradient(700px 450px at 110% 0%, var(--color-glow-blue), transparent 55%), var(--color-navy);
-    background-attachment: fixed;
     color: var(--color-ink);
     font: 600 var(--text-base) / normal var(--font-sans);
   }
@@ -187,6 +185,16 @@
   /* Players' photos are for looking only: a long press on a photo, or on anything held to
      show one (`data-hold`, main.js), opens no "Save to Photos" menu and selects nothing. */
   img, canvas, [data-hold] { -webkit-touch-callout: none; user-select: none; -webkit-user-drag: none; }
+}
+
+/*
+ * The page's background: the dark blue with its two soft lights, defined once. The body
+ * carries it, and so does whatever covers the whole page as a screen of its own (the 3-2-1).
+ */
+@utility bg-page {
+  background: radial-gradient(800px 500px at 0% -10%, var(--color-glow-violet), transparent 60%),
+    radial-gradient(700px 450px at 110% 0%, var(--color-glow-blue), transparent 55%), var(--color-navy);
+  background-attachment: fixed;
 }
 
 /*

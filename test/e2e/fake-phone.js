@@ -2,8 +2,10 @@
  * A stand-in for the store apps' native `Phone` plugin (web/js/phone.js), so the
  * end-to-end tests play the real app UI in a browser. Each test phone gets the fixture
  * photos as its "library"; photo access starts as "ask" and becomes "full" when the app
- * asks, like a player tapping "Allow all" on a real phone. Everything else of the app
- * (screens, sockets, uploads, server) is the real thing.
+ * asks, like a player tapping "Allow all" on a real phone. A stand-in for Capacitor's
+ * Haptics plugin writes down what the phone would feel (`window.felt`: an impact's
+ * strength, or a vibration as "120 ms"). Everything else of the app (screens, sockets,
+ * uploads, server) is the real thing.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +23,7 @@ export const library = [1, 2, 3, 4, 5, 6].map((i) => fs.readFileSync(path.join(F
  */
 export function installFakePhone(photos) {
   let access = 'ask';
+  window.felt = [];
   const library = photos.map((p, i) => ({ id: `photo-${i + 1}`, data: typeof p === 'string' ? p : p.data, screenshot: Boolean(p.screenshot) }));
   window.Capacitor = {
     Plugins: {
@@ -41,6 +44,14 @@ export function installFakePhone(photos) {
         },
         openSettings: async () => {},
         keepAwake: async () => {},
+      },
+      Haptics: {
+        impact: async ({ style }) => {
+          window.felt.push(style);
+        },
+        vibrate: async ({ duration }) => {
+          window.felt.push(`${duration} ms`);
+        },
       },
     },
   };

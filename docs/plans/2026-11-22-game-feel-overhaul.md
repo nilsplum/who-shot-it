@@ -31,6 +31,9 @@ know about. Kept up to date with every commit.
   (your rule), the sheet does not come back.
 - Commit 5: two icons were Emoji 14 (🫥), an empty box on Android 10 to 12; replaced, and a
   test now fails on any emoji newer than Emoji 12.0 in the app.
+- Commit 6: the vibrations can only be felt on a real phone; please check on both phones
+  that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
+  tests check that each one is played at its moment.
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
@@ -733,7 +736,7 @@ Status: done.
   `web/`, `store/`, docs, tests.
 
 ### Commit 6: feel: one haptics vocabulary, the 3-2-1, a pulse for every new photo
-Status: open.
+Status: done.
 
 - `phone.js`: `HAPTICS` table and `buzz(kind)` (section 4), the comment listing each kind's
   meaning and where it is used; nothing without the plugin (browser, tests).
@@ -984,3 +987,7 @@ fonts, and removes any that look alike on one of them.
 | Commit 5: a photo that could not load | The stage says "This photo could not load" and the cards can be used | Finding 4: it spun for the whole round. |
 | Commit 5: Emoji 14 icons | 🫥 replaced (😕 on the stage, 🔍 for "No photos found"); a config test fails on emoji from U+1FA70 to U+1FAFF that are newer than Emoji 12.0 | Android 10 to 12 draw an empty box for them. |
 | Commit 5: the legal page | "Report content" says: tap ⚑, then Delete photo; after 15 s it is deleted anyway. The date stays (22 November 2026 is today and already `LEGAL.version`) | Informational, and true for every app version. |
+| Commit 6: where vibrations are triggered | The room's moments in one function, `moments(previous, view)` (a new photo, the reveal); the 3-2-1 when a new number is painted; the swap from its action | Each trigger sits where its moment is decided: the room's views, the clock-driven paint, the tap. A repaint never vibrates. |
+| Commit 6: the swap's light tap | Added now (the flip itself becomes a real card flip in commit 10) | The vocabulary's meaning "a photo flips" holds from the start. |
+| Commit 6: the page's background | One utility `bg-page` in `styles/app.css`, used by the body and the 3-2-1 | The 3-2-1 covers the lobby fully and looks like a screen of its own, without a second copy of the gradient. |
+| Commit 6: testing vibrations | The fake phone records what the Haptics plugin would play (`window.felt`); the browser tests expect the 3-2-1's three buzzes, the light tap of a new photo, the verdict's pulse, the swap's taps and the refusal's two pulses | Vibrations cannot be felt in a browser, but when they are played can be checked. |
