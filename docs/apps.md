@@ -81,9 +81,10 @@ Requirements). Then `./scripts/release-apps.sh ios --submit` does the rest.
 made on an iPhone with the TestFlight build, from launching the app through a whole game,
 including reporting a photo and removing a player. The answers to its other questions are
 the review notes in `store/listing.md`. To play alone, start computer opponents that join
-your game: `node scripts/helpers/demo-players.mjs <CODE> 3` (drawn photos, they leave at the
-end). Then `node scripts/helpers/app-store.mjs submit --video <file>` attaches the recording
-and sends the version back to App Review.
+your game: `node scripts/helpers/demo-players.mjs <CODE> 3` (drawn photos, ready after half
+a minute so there is time to remove one). Save the video as `store/review-video.mp4`
+(git-ignored); `node scripts/helpers/app-store.mjs submit` attaches it to every submission
+and sends a rejected version back to App Review.
 
 **Google Play:** step by step in [guides/android.md](guides/android.md) (account, forms,
 the first upload by hand, the key for automatic uploads).

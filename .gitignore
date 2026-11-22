@@ -6,3 +6,6 @@ playwright-report/
 .DS_Store
 dist/
 secrets/
+
+# The screen recording for App Review (store/listing.md): it shows a real phone and its photos.
+store/review-video.mp4

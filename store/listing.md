@@ -86,22 +86,38 @@ order. Only the first three show in search results, so they tell the whole idea.
 
     Nils Plum, +49 177 2438912, whoshotit.info@gmail.com
 
-**App Review notes** (they answer App Review's standard questions for new apps, in its order;
-the screen recording is attached to the submission):
+**App Review notes** (Apple's questions for new apps, answered in its order; `submit` adds
+"How to test" below them):
 
-    1. Screen recording: attached. Recorded on an iPhone with the current iOS, from launching the app through a full game, including reporting a photo and removing a player.
+    1. Screen recording: attached. It was made on an iPhone with this build and starts with opening the app. It shows a whole game: creating a game, allowing photo access, removing a player, reporting a photo and the final scores. (The terms screen of the first launch, which everyone accepts before playing, was accepted just before the recording.) Leo, Max and Zoe are our own test players, run on a computer with drawn sample pictures, so one person could record a full game. The video is shortened in a few places (waiting time, iOS pop ups, rounds 6 to 11).
 
-    2. Purpose and audience: Who Shot It? is a party game for friends aged 16 and older who are together in one place. Every player gets a few random photos from their own photo library and decides which set to play with. Then one photo after another appears on every phone, and everyone guesses whose phone it came from. It turns the photos people already have into a funny shared game, without accounts, ads or purchases.
+    2. Purpose and audience: Who Shot It? is a party game for friends aged 16 and older who meet in person. Each player gets a few random photos from their own phone and decides whether to play with them. Then the photos appear one by one on every phone, and everyone guesses whose photo it is. It gives a group something fun to do together with the photos they already have. Free, no account, no ads, no purchases.
 
-    3. How to use it: a game needs two or more devices. Device A: accept the terms, enter a name, tap Create game, keep Classic, tap Start game; a four letter code appears. Device B: accept the terms, enter a name, type the code, tap Join. On both devices tap Continue and allow photo access (each device needs a few photos in its library), then tap No for other random photos or Yes to play with them. When everyone is ready, the game starts by itself: tap the player you think took the photo. No login, no demo account and no sample files are needed.
+    3. Setup and main features: see "How to test" below. No login, demo account or sample files are needed.
 
-    User generated content and its moderation: players share only photos they confirm with Yes, only with the players of their private game. Every photo has a flag button: reporting deletes it for everyone at once. The host removes a player by tapping them; a removed player cannot rejoin that game. Nicknames with offensive words are replaced. Everyone accepts the terms (16+) before playing. Each photo is deleted from our server right after its round. Contact for reports: whoshotit.info@gmail.com
+    4. External services: only our own game server on Cloudflare (Workers and Durable Objects, data stored in the EU). It passes the game and the photos a player confirmed between the phones of one game. No analytics, ads, login, payment or AI services.
 
-    4. External services: our own game server runs on Cloudflare (Workers and Durable Objects, data stored in the EU) and passes the game and the confirmed photos between the players. Nothing else: no analytics, no ads, no login provider, no AI services, no payments.
+    5. Regions: the app works the same in every country where it is offered (all except China mainland).
 
-    5. Regions: the app works the same in all regions where it is offered.
+    6. Regulated industry or protected material: none. Players only use photos from their own library.
 
-    6. No regulated industry and no protected third party material: players only use photos from their own library.
+**How to test** (for App Review and for TestFlight's beta review):
+
+    HOW TO TEST
+    A game needs at least two devices, each with a few photos.
+    Device A: accept the terms, enter a name, tap Create game, keep Classic, tap Start game. A four letter code appears.
+    Device B: accept the terms, enter a name, type the code, tap Join.
+    On both: tap Continue and allow photo access. Tap No for other random photos, or Yes to play with them. When everyone is ready, the game starts by itself. Tap the player you think took the photo.
+
+    PHOTOS AND SAFETY
+    Only photos a player confirms with Yes leave the phone, and only to the players of that one game. Each photo is deleted from our server right after its round.
+    Report: the flag on a photo deletes it for everyone at once.
+    Remove: the host taps a player to remove them. They cannot rejoin that game.
+    Offensive nicknames are replaced. Everyone accepts the terms (16+) before playing.
+    Questions and reports: whoshotit.info@gmail.com
+
+**Screen recording for App Review:** `store/review-video.mp4`, attached by `submit` (not in
+git: it shows a real phone and its photos). How to make one: docs/apps.md, First release.
 
 **Settings made by `scripts/helpers/app-store.mjs`** (`node scripts/helpers/app-store.mjs submit`):
 categories (above), content rights (players share their own photos), age rating (user

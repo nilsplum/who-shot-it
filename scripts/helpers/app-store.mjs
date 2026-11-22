@@ -1,15 +1,14 @@
 /**
  * Talks to App Store Connect through its API, so a release needs no clicking:
  *   node scripts/helpers/app-store.mjs status   builds, TestFlight beta check, public link, versions
- *   node scripts/helpers/app-store.mjs submit [--video <file>]   fills the App Store page and
- *     sends it to App Review; `--video` attaches a screen recording for App Review (asked for
- *     new apps, docs/apps.md), replacing an earlier one
+ *   node scripts/helpers/app-store.mjs submit   fills the App Store page and sends it to App Review
  *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
  * `submit` takes every text (name, subtitle, description, keywords, URLs, copyright, review
  * contact and notes) from `store/listing.md`, the screenshots from `store/images/app-store/`,
- * and the version from `package.json`; it attaches the uploaded build with that version and
+ * the screen recording for App Review from `store/review-video.mp4` (git-ignored; skipped if
+ * missing), and the version from `package.json`; it attaches the uploaded build with that version and
  * sets categories, content rights, age rating, price (free) and countries. Running it again
  * updates the same version until Apple reviews it; after a rejection it sends the same
  * submission back, with the rejection marked as answered. Two settings have no API and are made by
@@ -31,8 +30,8 @@ const VERSION = JSON.parse(read('package.json')).version;
 const BUILD = String(VERSION.split('.').map(Number).reduce((n, part, i) => n + part * [10000, 100, 1][i], 0));
 /** `--wait`: the build was just uploaded, so wait until Apple has processed it. */
 const WAIT = process.argv.includes('--wait');
-/** `--video <file>`: a screen recording for App Review (git-ignored, it shows a real phone). */
-const VIDEO = process.argv.includes('--video') ? path.resolve(process.argv[process.argv.indexOf('--video') + 1]) : null;
+/** The screen recording App Review asks new apps for (git-ignored: it shows a real phone). */
+const REVIEW_VIDEO = path.join(ROOT, 'store/review-video.mp4');
 
 // ---------- The API ----------
 
@@ -176,13 +175,15 @@ async function setVersion(app) {
 async function setReviewDetails(version) {
   const [name, phone, email] = field('App Review contact').split(', ');
   const [first, ...last] = name.split(' ');
-  const attributes = { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('App Review notes:') };
+  // Apple's questions answered first, then the same test steps TestFlight's beta review gets.
+  const notes = `${field('App Review notes')}\n\n${field('How to test')}`;
+  const attributes = { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes };
   const existing = (await get(`/v1/appStoreVersions/${version.id}/appStoreReviewDetail`)).data;
   const detail = existing
     ? (await patch('appStoreReviewDetails', existing.id, attributes)).data
     : (await api('POST', '/v1/appStoreReviewDetails', { data: { type: 'appStoreReviewDetails', attributes, relationships: { appStoreVersion: ref('appStoreVersions', version.id) } } })).data;
   console.log('✓ App Review contact and notes');
-  if (VIDEO) await setReviewVideo(detail);
+  await setReviewVideo(detail);
 }
 
 /** Apple's file upload: create the file, send its parts where Apple says, then confirm it. */
@@ -196,11 +197,25 @@ async function upload(type, attributes, relationships, bytes) {
   await patch(type, file.id, { uploaded: true, sourceFileChecksum: crypto.createHash('md5').update(bytes).digest('hex') });
 }
 
-/** The screen recording App Review asks new apps for, as the review's only attachment. */
+/**
+ * The screen recording as the review's only attachment. Each version has its own review
+ * details, so a new version gets it again; a run that finds the same file already attached
+ * (same checksum) leaves it.
+ */
 async function setReviewVideo(detail) {
-  for (const old of (await get(`/v1/appStoreReviewDetails/${detail.id}/appStoreReviewAttachments`)).data) await api('DELETE', `/v1/appStoreReviewAttachments/${old.id}`);
-  const bytes = fs.readFileSync(VIDEO);
-  await upload('appStoreReviewAttachments', { fileName: path.basename(VIDEO) }, { appStoreReviewDetail: ref('appStoreReviewDetails', detail.id) }, bytes);
+  if (!fs.existsSync(REVIEW_VIDEO)) {
+    console.log('… no store/review-video.mp4, so no screen recording attached (docs/apps.md, First release)');
+    return;
+  }
+  const bytes = fs.readFileSync(REVIEW_VIDEO);
+  const checksum = crypto.createHash('md5').update(bytes).digest('hex');
+  const attached = (await get(`/v1/appStoreReviewDetails/${detail.id}/appStoreReviewAttachments`)).data;
+  if (attached.length === 1 && attached[0].attributes.sourceFileChecksum === checksum) {
+    console.log('✓ screen recording for App Review (already attached)');
+    return;
+  }
+  for (const old of attached) await api('DELETE', `/v1/appStoreReviewAttachments/${old.id}`);
+  await upload('appStoreReviewAttachments', { fileName: path.basename(REVIEW_VIDEO) }, { appStoreReviewDetail: ref('appStoreReviewDetails', detail.id) }, bytes);
   console.log(`✓ screen recording for App Review (${Math.round(bytes.length / 1e6)} MB)`);
 }
 
@@ -241,14 +256,14 @@ async function setPriceAndCountries(app) {
 
 /**
  * TestFlight's test information, which Apple's beta check reads: what the app is, where
- * feedback goes, the privacy policy, and the same contact and notes as the App Review
- * (a reviewer needs to know that a game takes two phones).
+ * feedback goes, the privacy policy, the same contact as the App Review, and its test steps
+ * as notes (a reviewer needs to know that a game takes two phones).
  */
 async function setTestFlightInfo(app) {
   const [name, phone, email] = field('App Review contact').split(', ');
   const [first, ...last] = name.split(' ');
   const detail = (await get(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
-  await patch('betaAppReviewDetails', detail.id, { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('App Review notes:') });
+  await patch('betaAppReviewDetails', detail.id, { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('How to test') });
   const description = `${field('Subtitle')}: ${field('Promotional text')}`;
   const attributes = { description, feedbackEmail: email, privacyPolicyUrl: url('Privacy Policy URL'), marketingUrl: url('Marketing URL') };
   const loc = (await get(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === 'en-US');
