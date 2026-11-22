@@ -13,12 +13,17 @@
  * - After every event, `settle` runs all due timers and derived transitions until the room
  *   is stable, so no state can wait for a timer that already passed. Consequently
  *   `nextWake` never returns a time in the past for a room `apply` returned.
- * - Host-only events (settings, resolve, next, again, kick) are ignored from anyone else.
+ * - Host-only events (settings, resolve, next, kick) are ignored from anyone else.
+ * - "Show again" (`peek`) holds expire by themselves (`peeks`, TIMING.peekHoldMs after the
+ *   last renewal), and while any is active the board's clock stands still (`paused` keeps
+ *   the remaining time), so a lost connection can never stop a game.
  * - Any player may report the photo on screen: it is removed for everyone at once (the
  *   app store and EU content rules ask for a report and a block mechanism; the host's
  *   "Remove" is the block, and a removed player's key cannot rejoin the room).
- * - Phases: lobby -> countdown -> (load -> show -> reveal) per round -> end -> lobby.
- *   A countdown falls back to the lobby whenever "everyone is ready" stops being true.
+ * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
+ *   lobby. The reveal is always timed; the board (the leaderboard between the photos) is
+ *   timed when "Next round" is automatic and waits for the host's "Next" otherwise. A
+ *   countdown falls back to the lobby whenever "everyone is ready" stops being true.
  */
 
 import { EFFECTS, LIMITS, TIMING, normalizeSetting } from '../../web/shared/config.js';
@@ -30,6 +35,8 @@ import {
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
+/** The round's photo is no longer being guessed (its reveal or its leaderboard). */
+const afterGuessing = (room) => room.phase === 'reveal' || room.phase === 'board';
 const isHost = (room, playerId) => Boolean(playerId) && room.hostId === playerId;
 
 // ---------- Phase transitions ----------
@@ -64,7 +71,7 @@ function startGame(room, now, rng) {
   }
   room.game = {
     plan, round: 0, mode: null, zoom: null, options: [], answers: {}, loaded: [], shownAt: null, results: null,
-    stats: { fastest: null, fooled: {} },
+    peeks: {}, paused: null, stats: { fastest: null, fooled: {} },
   };
   startRound(room, 1, now, rng);
 }
@@ -95,6 +102,8 @@ function startRound(room, n, now, rng) {
   g.loaded = [];
   g.shownAt = null;
   g.results = null;
+  g.peeks = {};
+  g.paused = null;
   room.phase = 'load';
   room.deadline = now + TIMING.loadMaxMs;
 }
@@ -133,7 +142,26 @@ function reveal(room, now) {
   g.stats.fooled[owner] = (g.stats.fooled[owner] || 0) + wrong;
   g.results = results;
   room.phase = 'reveal';
-  room.deadline = s.auto ? now + TIMING.revealMs : null;
+  room.deadline = now + TIMING.revealMs;
+}
+
+/** The leaderboard between the photos; the round's photo stays for "Show again". */
+function board(room, now) {
+  room.phase = 'board';
+  room.deadline = room.settings.auto ? now + TIMING.boardMs : null;
+}
+
+/** Ends expired "Show again" holds; when none is left, a paused board's clock runs on. */
+function settlePeeks(room, now) {
+  const g = room.game;
+  if (!g || !g.peeks) return;
+  for (const [id, until] of Object.entries(g.peeks)) {
+    if (until <= now || !playerById(room, id)) delete g.peeks[id];
+  }
+  if (g.paused !== null && !Object.keys(g.peeks).length) {
+    if (room.phase === 'board') room.deadline = now + g.paused;
+    g.paused = null;
+  }
 }
 
 function nextRound(room, now, rng) {
@@ -161,7 +189,7 @@ function removePlayer(room, playerId, now, rng) {
   g.loaded = g.loaded.filter((id) => id !== playerId);
   if (entry && entry.owner === playerId) {
     entry.photo = null;
-    if (room.phase !== 'reveal') nextRound(room, now, rng);
+    if (!afterGuessing(room)) nextRound(room, now, rng);
   }
 }
 
@@ -254,7 +282,26 @@ const HANDLERS = {
   },
 
   next(room, { playerId }, now, rng) {
-    if (isHost(room, playerId) && room.phase === 'reveal') nextRound(room, now, rng);
+    if (isHost(room, playerId) && room.phase === 'board') nextRound(room, now, rng);
+  },
+
+  /**
+   * "Show again" on the leaderboard: while any player holds it (their app renews the hold
+   * every TIMING.peekRenewMs), everyone sees the round's photo and the clock stands still.
+   */
+  peek(room, { playerId, on }, now) {
+    const g = room.game;
+    const entry = currentEntry(room);
+    if (room.phase !== 'board' || !playerById(room, playerId) || !entry || !entry.photo) return;
+    if (!on) {
+      delete g.peeks[playerId];
+      return;
+    }
+    g.peeks[playerId] = now + TIMING.peekHoldMs;
+    if (room.deadline !== null && g.paused === null) {
+      g.paused = Math.max(0, room.deadline - now);
+      room.deadline = null;
+    }
   },
 
   again(room, { playerId }, now) {
@@ -264,13 +311,14 @@ const HANDLERS = {
   /**
    * A player reports the photo on screen. It is deleted at once, for everyone: while it is
    * still being guessed the game moves on to the next photo (nobody scores), during the
-   * reveal it just disappears.
+   * reveal and the leaderboard it just disappears (and with it any "Show again").
    */
   report(room, { playerId }, now, rng) {
     const entry = currentEntry(room);
     if (!playerById(room, playerId) || !entry || !entry.photo) return;
     entry.photo = null;
-    if (room.phase !== 'reveal') nextRound(room, now, rng);
+    room.game.peeks = {};
+    if (!afterGuessing(room)) nextRound(room, now, rng);
   },
 
   /** The host removes a player (and all their photos) and keeps them out of this room. */
@@ -328,6 +376,12 @@ function transition(room, now, rng) {
       return false;
     case 'reveal':
       if (due) {
+        board(room, now);
+        return true;
+      }
+      return false;
+    case 'board':
+      if (due) {
         nextRound(room, now, rng);
         return true;
       }
@@ -365,6 +419,7 @@ function settle(room, now, rng) {
   if (!host) room.hostId = (firstConnected || room.players[0] || {}).id || null;
   else if (!inLobby(room) && !host.connected && firstConnected && now >= host.goneAt + TIMING.hostGraceMs) room.hostId = firstConnected.id;
 
+  settlePeeks(room, now);
   for (let i = 0; i < 100 && transition(room, now, rng); i++);
 }
 
@@ -389,6 +444,7 @@ export function nextWake(room) {
   if (!room || room.closed) return null;
   const times = [room.touchedAt + TIMING.roomIdleMs];
   if (room.deadline !== null) times.push(room.deadline);
+  if (room.game && room.game.peeks) times.push(...Object.values(room.game.peeks));
   const someoneHere = connectedPlayers(room).length > 0;
   for (const p of room.players) {
     if (p.connected || p.goneAt === null) continue;

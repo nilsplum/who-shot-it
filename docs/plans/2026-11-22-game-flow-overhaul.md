@@ -371,7 +371,7 @@ Status: done.
   reaction the server accepts is in the app's row (they are the same constant).
 
 ### Commit 6: the leaderboard and Show again
-Status: open.
+Status: done.
 
 - `rules.js`: `reveal` sets `room.deadline = now + TIMING.revealMs` always; when due, the
   new phase `board` starts with `deadline = auto ? now + TIMING.boardMs : null`; `next`
@@ -544,3 +544,9 @@ Status: open.
 | Commit 5: players not among the options | No longer listed below the cards on the reveal | They were there only to show every score; scores move to the board. |
 | Commit 5: the reaction test | An integration test that the room passes on a listed reaction and drops an old app's emoji, instead of a unit test comparing the constant with itself | The app and the server read the same constant; what can break is the server's filter. |
 | Commit 5: when to vibrate | On the first view of a round's reveal (also after reconnecting during one), from the room's own results | The room's results are the truth; an optimistic pick could differ. |
+| Commit 6: removing a player on the board | Not added; the host removes players in the lobby and in the "who has answered" row while guessing | The operator kept that row, so the block stays reachable in every round; a second place would add a detail nobody asked for (deviation from this plan's commit 6 text). |
+| Commit 6: the slide | Rows stand in their new order and start shifted to their old places (`--shift`), then slide to zero | The list keeps its natural height (also when someone leaves during the board), and no absolute positions are needed. |
+| Commit 6: Show again on the holder's phone | Shown at once on the phone that holds it; the other phones follow the room's `peek` | No round trip before the holder sees anything. |
+| Commit 6: renewal limit | The room ignores a renewal less than 500 ms after the last one from the same socket | Renewals come once a second; anything faster is waste, and every renewal is broadcast. |
+| Commit 6: the timer while paused | The view says `paused`, and the apps stop counting down | Otherwise the bar would keep shrinking on the phones while the room's clock stands still. |
+| Commit 6: "Next ›" on the reveal | Gone; the host's "Next" lives on the board in "Host taps" mode | The reveal is 3.5 s; one waiting point is enough. |

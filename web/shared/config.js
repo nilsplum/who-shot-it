@@ -188,8 +188,14 @@ export const TIMING = {
   loadMaxMs: 6000,
   /** Extra time after the answer timer, for answers still on the wire. */
   answerGraceMs: 1500,
-  /** How long the reveal stays when "Next round" is automatic. */
-  revealMs: 6500,
+  /** How long the reveal (green and red cards) stays before the leaderboard. */
+  revealMs: 3500,
+  /** How long the leaderboard stays when "Next round" is automatic (paused while someone holds "Show again"). */
+  boardMs: 5000,
+  /** A "Show again" hold ends by itself this long after the app last renewed it (a lost connection). */
+  peekHoldMs: 2500,
+  /** How often an app renews a "Show again" hold while the finger stays down. */
+  peekRenewMs: 1000,
   /** Speed points with an unlimited timer are measured against this time. */
   untimedReferenceMs: 20000,
   /** How long effects run with an unlimited timer. */

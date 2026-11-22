@@ -15,7 +15,7 @@
  *   without any `await` in between; the room is never changed across a wait.
  * - Sockets use the Hibernation API: between messages the object may be evicted from
  *   memory, so everything needed later is in storage or in the socket's attachment
- *   (`{ playerId, openedAt, lastReact }`). App pings are answered by the runtime
+ *   (`{ playerId, openedAt, lastReact, lastPeek }`). App pings are answered by the runtime
  *   without waking the object.
  * - Deleting is declarative: blobs are kept only while `referencedPhotoIds` names them,
  *   so every rule that drops a photo from the state (round over, game over, unready,
@@ -43,6 +43,7 @@ const CLIENT_EVENTS = {
   again: () => ({}),
   report: () => ({}),
   kick: (m) => ({ target: m.target }),
+  peek: (m) => ({ on: m.on === true }),
 };
 
 const attachment = (ws) => {
@@ -240,6 +241,12 @@ export class Room extends DurableObject {
     }
     const build = CLIENT_EVENTS[msg.type];
     if (!build) return;
+    // A held "Show again" is renewed once a second; faster renewals add nothing but work.
+    if (msg.type === 'peek' && msg.on === true) {
+      const now = Date.now();
+      if (now - (att.lastPeek || 0) < 500) return;
+      ws.serializeAttachment({ ...att, lastPeek: now });
+    }
     // A leaving socket is detached first, so it ends as "left" (no reconnect), not "stale".
     if (msg.type === 'leave') ws.serializeAttachment({ ...att, playerId: null });
     this.dispatch({ type: msg.type, playerId: att.playerId, ...build(msg) });

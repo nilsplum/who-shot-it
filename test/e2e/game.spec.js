@@ -2,7 +2,8 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code,
  * the host removing a player, the photos dealt with "Play with these?", reload, the
- * automatic start, a reported photo, five rounds, the end and "Play again". Then "Which
+ * automatic start, a reported photo, five rounds with their leaderboards (and "Show
+ * again" held on one phone, seen on another), the end and "Play again". Then "Which
  * photos" on a phone with screenshots and a chat full of text. Plus the website (the same
  * page in a plain browser): invite page and legal page.
  */
@@ -89,6 +90,20 @@ test('friends play a full game and start another one', async ({ browser }) => {
       await page.locator('button.opt').first().click();
     }
     for (const page of everyone) await expect(page.locator('.opt.ok')).toHaveCount(1);
+    if (round === 2) {
+      // The leaderboard after the reveal: everyone ranked, with this round's pick.
+      await expect(host.locator('.lbt')).toHaveText('Round 2 of 5');
+      await expect(host.locator('.lb .row')).toHaveCount(3);
+      await expect(host.locator('.lb .pk').first()).toHaveText(/^[✓✗] /);
+      // Holding "Show again" on one phone shows the photo on every phone.
+      const button = guests[0].getByRole('button', { name: 'Show the photo again' });
+      const box = await button.boundingBox();
+      await guests[0].mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await guests[0].mouse.down();
+      await expect(host.locator('#look img')).toBeVisible();
+      await guests[0].mouse.up();
+      await expect(host.locator('#look img')).toHaveCount(0);
+    }
   }
 
   for (const page of everyone) await expect(page.locator('.podium .pod')).toHaveCount(3);

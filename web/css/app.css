@@ -235,6 +235,24 @@ div.opt:active { transform: none; }
 .float { position: fixed; font-size: 40px; line-height: 1; pointer-events: none; z-index: 60; animation: up 2.4s ease-out forwards; }
 @keyframes up { 0% { transform: translate(-50%, 0) scale(.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
 
+/* The leaderboard between the photos: big rows (64 points plus an 8 point gap, which the
+   slide uses as one step), my own row marked yellow on the left. */
+.lbt { font: 800 26px var(--display); text-align: center; margin: 4px 0 0; }
+.lb { margin-top: 4px; }
+.lb .row { --shift: 0; display: flex; align-items: center; gap: 12px; height: 64px; margin-bottom: 8px; padding: 0 14px 0 12px; border-radius: 16px; background: var(--card); border-left: 6px solid transparent; transform: translateY(calc(var(--shift) * 72px)); transition: transform .6s cubic-bezier(.3, 1.2, .5, 1); }
+.lb .row.me { border-left-color: var(--y); }
+.lb .rk { width: 26px; text-align: center; font: 800 22px var(--display); }
+.lb .av { width: 40px; height: 40px; font-size: 22px; }
+.lb .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lb .who b { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb .pk { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb .pk.ok { color: var(--g); }
+.lb .pk.no { color: var(--r); }
+.lb .tot { font: 800 22px var(--display); color: var(--y); font-variant-numeric: tabular-nums; }
+.btn.again-look { margin-top: 12px; background: var(--card2); font-size: 19px; padding: 18px; }
+.btn.again-look:active { background: var(--sel-bg); }
+[data-part="next"] .btn { margin-top: 12px; }
+
 /* End */
 .podium { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin: 28px 0 14px; }
 .pod { flex: 1; max-width: 120px; text-align: center; }
@@ -254,6 +272,7 @@ div.opt:active { transform: none; }
 /* Reduce Motion: the new swap animations become instant changes. */
 @media (prefers-reduced-motion: reduce) {
   .tile.in, .tile.flip, .tile.no .x, .opt.ok, .opt.win { animation: none; }
+  .lb .row { transition: none; }
   .cf { display: none; }
 }
 

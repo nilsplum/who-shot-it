@@ -84,10 +84,8 @@ function dots(view, host) {
     ${host ? '<button class="link" data-act="resolve">Reveal now</button>' : ''}`;
 }
 
-function after(view, host, reactions) {
-  if (view.phase !== 'reveal') return '';
-  const next = host ? (view.settings.auto ? '<button class="link" data-act="next">Next ›</button>' : '<button class="btn main" data-act="next">Next</button>') : '';
-  return `${reactionsRow(reactions)}${next}`;
+function after(view, reactions) {
+  return view.phase === 'reveal' ? reactionsRow(reactions) : '';
 }
 
 /**
@@ -112,7 +110,7 @@ export function gameScreen(c, state) {
       stage: stage(view, state.loaded),
       opts: cards(view, state),
       dots: dots(view, host),
-      after: after(view, host, state.reactions),
+      after: after(view, state.reactions),
     },
   };
 }

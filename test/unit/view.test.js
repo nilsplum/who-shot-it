@@ -45,6 +45,19 @@ test('the owner and the picks stay hidden until the reveal', () => {
   expect(revealed.round.results[ann].pick).toBe(owner);
 });
 
+test('the leaderboard: everyone sees who holds "Show again" as a shared flag, and the frozen time', () => {
+  let room = inShow();
+  const now = T0 + TIMING.countdownMs;
+  room = apply(room, { type: 'resolve', playerId: idOf(room, 'Ann') }, now, rng);
+  room = apply(room, { type: 'tick' }, now + TIMING.revealMs, rng);
+  room = apply(room, { type: 'peek', playerId: idOf(room, 'Ben'), on: true }, now + TIMING.revealMs + 2000, rng);
+  const view = viewFor(room, idOf(room, 'Cleo'), now + TIMING.revealMs + 9000);
+  expect(view).toMatchObject({ phase: 'board', paused: true, left: TIMING.boardMs - 2000 });
+  expect(view.round.peek).toBe(true);
+  expect(view.round.results).toBeTruthy();
+  expect(JSON.stringify(view)).not.toContain('peeks');
+});
+
 test('timers are relative and photo links point at the current and next photo', () => {
   const room = inShow();
   const shownAt = T0 + TIMING.countdownMs;

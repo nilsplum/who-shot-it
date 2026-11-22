@@ -19,13 +19,16 @@
  * Room shape:
  *   { code, createdAt, touchedAt, closed, hadPlayers, hostId, settings, phase, deadline,
  *     players: [Player], banned: [key], game: Game | null }
- *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'end'
+ *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, photos: [id],
  *             score, streak }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
  *             results: { [id]: { pick, points } } | null,
+ *             peeks: { [id]: until }, paused: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
+ *   (`peeks`: who holds "Show again" and until when; `paused`: the board's remaining time
+ *   while held)
  */
 
 import { BLOCKED_WORDS, EMOJIS, LIMITS, normalizeSettings } from '../../web/shared/config.js';
@@ -112,7 +115,8 @@ export const playerById = (room, id) => room.players.find((p) => p.id === id) ||
 export const playerByKey = (room, key) => room.players.find((p) => p.key === key) || null;
 export const connectedPlayers = (room) => room.players.filter((p) => p.connected);
 
-export const inGame = (room) => room.phase === 'load' || room.phase === 'show' || room.phase === 'reveal';
+/** A round is on (its photo is stored and may be shown): guessing, the reveal, or the leaderboard after it. */
+export const inGame = (room) => ['load', 'show', 'reveal', 'board'].includes(room.phase);
 
 /** The plan entry of the round on screen, or null. */
 export function currentEntry(room) {

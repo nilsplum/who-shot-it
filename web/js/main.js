@@ -51,6 +51,7 @@ import { homeScreen } from './views/home.js';
 import { landingScreen } from './views/landing.js';
 import { lobbyScreen } from './views/lobby.js';
 import { newGameScreen } from './views/newgame.js';
+import { boardScreen } from './views/board.js';
 import { awayScreen, bannerHtml, countdownHtml, joiningScreen, lookHtml } from './views/overlays.js';
 import { inviteLink, sheetScreen } from './views/sheets.js';
 import { welcomeScreen } from './views/welcome.js';
@@ -67,15 +68,16 @@ let checkingAccess = false;
 const images = new Map();
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
-const inRound = (v) => v.phase === 'load' || v.phase === 'show' || v.phase === 'reveal';
+const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
 const canReadPhotos = () => session.access === 'full' || session.access === 'limited';
 
 // ---------- Time ----------
 
-/** Milliseconds left on the room's current timer, counted down locally. */
+/** Milliseconds left on the room's current timer, counted down locally (not while the room paused it). */
 function leftNow() {
   const { at, left } = session.clock;
-  return left === null ? null : Math.max(0, left - (performance.now() - at));
+  if (left === null) return null;
+  return session.view && session.view.paused ? left : Math.max(0, left - (performance.now() - at));
 }
 
 const isLate = (v) => v.phase === 'show' && Boolean(v.settings.time) && leftNow() === 0;
@@ -99,6 +101,7 @@ function screen() {
   if (!v || !v.me) return joiningScreen;
   if (inLobby(v)) return lobbyScreen(context());
   if (v.phase === 'end') return endScreen(context(), REACTIONS);
+  if (v.phase === 'board') return boardScreen(context(), { reactions: REACTIONS });
   const photo = images.get(v.round.photo);
   return gameScreen(context(), { picked: myPick(v), late: isLate(v), loaded: Boolean(photo && photo.state === 'ok'), reactions: REACTIONS });
 }
@@ -120,12 +123,47 @@ function startStage() {
   startEffect(stage, { mode: v.round.mode, zoom: v.round.zoom, src: serverUrl(v.round.photo), duration: total - elapsed });
 }
 
+/**
+ * The leaderboard's entrance, once its rows are painted: a moment in the old order with the
+ * old totals, then the rows slide to their places and the totals count up (at once with
+ * Reduce Motion).
+ */
+function startBoard() {
+  const rows = [...document.querySelectorAll('.lb .row')];
+  const quick = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => {
+    for (const row of rows) {
+      if (!row.isConnected) return;
+      row.style.setProperty('--shift', 0);
+      row.querySelector('.rk').textContent = row.dataset.rank;
+      const total = row.querySelector('.tot');
+      const from = Number(total.dataset.from);
+      const to = Number(total.dataset.to);
+      const begin = performance.now();
+      const step = (t) => {
+        const k = quick ? 1 : Math.min(1, (t - begin) / 600);
+        total.textContent = Math.round(from + (to - from) * k);
+        if (k < 1 && total.isConnected) requestAnimationFrame(step);
+      };
+      if (from !== to) requestAnimationFrame(step);
+    }
+  }, quick ? 0 : 400);
+}
+
+/** The photo shown big: one this phone holds, or the round's photo while anyone holds "Show again". */
+function lookSrc() {
+  const v = session.view;
+  if (session.look) return session.look;
+  return v && v.phase === 'board' && v.round.peek && v.round.photo ? serverUrl(v.round.photo) : null;
+}
+
 function render() {
   const changed = paintApp(screen());
   if (changed.includes('stage')) startStage();
+  if (changed.includes('board')) startBoard();
   paintSheet(sheetScreen(context()));
   setHtml($('cover'), countdownHtml(session.view, leftNow()));
-  setHtml($('look'), lookHtml(session.look));
+  setHtml($('look'), lookHtml(lookSrc()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
 
@@ -135,7 +173,8 @@ function frame() {
   if (bar && v) {
     let total = null;
     if (v.phase === 'show' && v.settings.time) total = v.settings.time * 1000;
-    else if (v.phase === 'reveal' && v.settings.auto) total = TIMING.revealMs;
+    else if (v.phase === 'reveal') total = TIMING.revealMs;
+    else if (v.phase === 'board' && v.settings.auto) total = TIMING.boardMs;
     const left = leftNow();
     $('timer').classList.toggle('off', total === null || left === null);
     if (total && left !== null) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / total))})`;
@@ -514,7 +553,28 @@ function back() {
  * cancels the hold (the page may scroll), and lifting the finger from the held element
  * is not also a tap on it (its click is swallowed; taps elsewhere still count).
  */
+let peekTimer = 0;
+
 const HOLDS = {
+  /**
+   * "Show again" on the leaderboard: this phone shows the photo at once, the room shows it
+   * to everyone while the hold is renewed, and lets go when the finger lifts.
+   */
+  peek: {
+    delay: 0,
+    start: () => {
+      const v = session.view;
+      if (!v || v.phase !== 'board' || !v.round.photo) return;
+      session.look = serverUrl(v.round.photo);
+      send({ type: 'peek', on: true });
+      peekTimer = setInterval(() => send({ type: 'peek', on: true }), TIMING.peekRenewMs);
+    },
+    end: () => {
+      clearInterval(peekTimer);
+      session.look = null;
+      send({ type: 'peek', on: false });
+    },
+  },
   /** A photo of the choice in the lobby: the sharp upload version once it is there. */
   tile: {
     delay: 350,

@@ -197,6 +197,10 @@ describe('a full game', () => {
       const reveal = await ann.until((v) => v.phase === 'reveal' && v.round.n === round);
       expect(reveal.round.owner).toBeTruthy();
       expect(Object.keys(reveal.round.results)).toHaveLength(2);
+      // The leaderboard: the photo can still be shown again until the host moves on.
+      await advance(code, TIMING.revealMs);
+      await ann.until((v) => v.phase === 'board' && v.round.n === round);
+      expect((await call(reveal.round.photo)).status).toBe(200);
       ann.send({ type: 'next' });
       if (round < 3) {
         await ann.until((v) => v.phase === 'load' && v.round.n === round + 1);
@@ -229,6 +233,15 @@ describe('a full game', () => {
     const reveal = await ann.until((v) => v.phase === 'reveal');
     expect(Object.values(reveal.round.results).every((r) => r.pick === null)).toBe(true);
     await advance(code, TIMING.revealMs);
+    await ann.until((v) => v.phase === 'board');
+    // Holding "Show again" stops the clock: the board stays, for everyone.
+    ben.send({ type: 'peek', on: true });
+    await ann.until((v) => v.phase === 'board' && v.round.peek && v.paused);
+    await advance(code, TIMING.boardMs);
+    expect(ann.view().phase).toBe('board');
+    ben.send({ type: 'peek', on: false });
+    await ann.until((v) => v.phase === 'board' && !v.round.peek && !v.paused);
+    await advance(code, TIMING.boardMs);
     await ann.until((v) => v.phase === 'load' && v.round.n === 2);
   });
 });
