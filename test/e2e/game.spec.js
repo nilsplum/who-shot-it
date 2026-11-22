@@ -101,7 +101,7 @@ test('friends play a full game and start another one', async ({ browser }) => {
   // Everyone is ready: the 3-2-1 is a screen of its own, nothing of the lobby shows through.
   const cover = host.locator('#cover > div');
   await expect(cover).toBeVisible();
-  expect(await cover.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+  expect(await styleOf(host, '#cover > div', 'backgroundColor')).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
 
   // What the host felt: each number of the 3-2-1, then a light tap as the first photo appears.
   await expect(guests[1].getByText('1 / 5', { exact: true })).toBeVisible();
@@ -273,6 +273,14 @@ const gridEdges = (page) => page.evaluate(() => {
   return [Math.round(Math.min(...tiles.map((t) => t.left)) - no.left), Math.round(Math.max(...tiles.map((t) => t.right)) - yes.right)];
 });
 
+/**
+ * A computed style of the `index`th element matching `selector`, found and read in one step
+ * inside the page. A part that is repainted while the test looks (someone answered, the
+ * 3-2-1's next number) can replace an element between a locator finding it and a second
+ * call reading it, and a replaced element reads as an empty style.
+ */
+const styleOf = (page, selector, property, index = 0) => page.evaluate(([s, p, i]) => getComputedStyle(document.querySelectorAll(s)[i])[p], [selector, property, index]);
+
 /** A colour of the theme (styles/app.css) as the browser reports it. */
 function themeColour(name) {
   const css = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'styles', 'app.css'), 'utf8');
@@ -317,7 +325,8 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
         // Guessing: 16 cards, the photo and "who has answered" all on screen. Ben's own dot
         // has the dashed ring until he answers.
         for (const page of phones) await fits(page);
-        const ring = (page, i) => page.locator('[data-part="dots"] > * > *').nth(i).evaluate((el) => getComputedStyle(el).borderTopStyle);
+        // The bots answer meanwhile, and every answer repaints the row (`styleOf`).
+        const ring = (page, i) => styleOf(page, '[data-part="dots"] > * > *', 'borderTopStyle', i);
         expect(await ring(guests[0], 1)).toBe('dashed');
         await guests[0].locator('[data-act="answer"]').first().click();
         await expect.poll(() => ring(guests[0], 1)).toBe('solid');
