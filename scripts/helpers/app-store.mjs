@@ -1,7 +1,9 @@
 /**
  * Talks to App Store Connect through its API, so a release needs no clicking:
  *   node scripts/helpers/app-store.mjs status   builds, TestFlight beta check, public link, versions
- *   node scripts/helpers/app-store.mjs submit   fills the App Store page and sends it to App Review
+ *   node scripts/helpers/app-store.mjs submit [--video <file>]   fills the App Store page and
+ *     sends it to App Review; `--video` attaches a screen recording for App Review (asked for
+ *     new apps, docs/apps.md), replacing an earlier one
  *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
@@ -9,7 +11,8 @@
  * contact and notes) from `store/listing.md`, the screenshots from `store/images/app-store/`,
  * and the version from `package.json`; it attaches the uploaded build with that version and
  * sets categories, content rights, age rating, price (free) and countries. Running it again
- * updates the same version until Apple reviews it. Two settings have no API and are made by
+ * updates the same version until Apple reviews it; after a rejection it sends the same
+ * submission back, with the rejection marked as answered. Two settings have no API and are made by
  * hand once (store/listing.md): App Privacy and the EU trader status; until then Apple
  * refuses the submission and this script prints Apple's reason.
  *
@@ -28,6 +31,8 @@ const VERSION = JSON.parse(read('package.json')).version;
 const BUILD = String(VERSION.split('.').map(Number).reduce((n, part, i) => n + part * [10000, 100, 1][i], 0));
 /** `--wait`: the build was just uploaded, so wait until Apple has processed it. */
 const WAIT = process.argv.includes('--wait');
+/** `--video <file>`: a screen recording for App Review (git-ignored, it shows a real phone). */
+const VIDEO = process.argv.includes('--video') ? path.resolve(process.argv[process.argv.indexOf('--video') + 1]) : null;
 
 // ---------- The API ----------
 
@@ -173,9 +178,30 @@ async function setReviewDetails(version) {
   const [first, ...last] = name.split(' ');
   const attributes = { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('App Review notes:') };
   const existing = (await get(`/v1/appStoreVersions/${version.id}/appStoreReviewDetail`)).data;
-  if (existing) await patch('appStoreReviewDetails', existing.id, attributes);
-  else await api('POST', '/v1/appStoreReviewDetails', { data: { type: 'appStoreReviewDetails', attributes, relationships: { appStoreVersion: ref('appStoreVersions', version.id) } } });
+  const detail = existing
+    ? (await patch('appStoreReviewDetails', existing.id, attributes)).data
+    : (await api('POST', '/v1/appStoreReviewDetails', { data: { type: 'appStoreReviewDetails', attributes, relationships: { appStoreVersion: ref('appStoreVersions', version.id) } } })).data;
   console.log('✓ App Review contact and notes');
+  if (VIDEO) await setReviewVideo(detail);
+}
+
+/** Apple's file upload: create the file, send its parts where Apple says, then confirm it. */
+async function upload(type, attributes, relationships, bytes) {
+  const file = (await api('POST', `/v1/${type}`, { data: { type, attributes: { ...attributes, fileSize: bytes.length }, relationships } })).data;
+  for (const op of file.attributes.uploadOperations) {
+    const headers = Object.fromEntries((op.requestHeaders || []).map((h) => [h.name, h.value]));
+    const res = await fetch(op.url, { method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length) });
+    if (!res.ok) throw new Error(`Uploading ${attributes.fileName} failed (${res.status})`);
+  }
+  await patch(type, file.id, { uploaded: true, sourceFileChecksum: crypto.createHash('md5').update(bytes).digest('hex') });
+}
+
+/** The screen recording App Review asks new apps for, as the review's only attachment. */
+async function setReviewVideo(detail) {
+  for (const old of (await get(`/v1/appStoreReviewDetails/${detail.id}/appStoreReviewAttachments`)).data) await api('DELETE', `/v1/appStoreReviewAttachments/${old.id}`);
+  const bytes = fs.readFileSync(VIDEO);
+  await upload('appStoreReviewAttachments', { fileName: path.basename(VIDEO) }, { appStoreReviewDetail: ref('appStoreReviewDetails', detail.id) }, bytes);
+  console.log(`✓ screen recording for App Review (${Math.round(bytes.length / 1e6)} MB)`);
 }
 
 async function setScreenshots(loc) {
@@ -186,14 +212,7 @@ async function setScreenshots(loc) {
   if (!set) set = (await api('POST', '/v1/appScreenshotSets', { data: { type: 'appScreenshotSets', attributes: { screenshotDisplayType: type }, relationships: { appStoreVersionLocalization: ref('appStoreVersionLocalizations', loc.id) } } })).data;
   for (const old of (await get(`/v1/appScreenshotSets/${set.id}/appScreenshots`)).data) await api('DELETE', `/v1/appScreenshots/${old.id}`);
   for (const file of files) {
-    const bytes = fs.readFileSync(path.join(dir, file));
-    const shot = (await api('POST', '/v1/appScreenshots', { data: { type: 'appScreenshots', attributes: { fileName: file, fileSize: bytes.length }, relationships: { appScreenshotSet: ref('appScreenshotSets', set.id) } } })).data;
-    for (const op of shot.attributes.uploadOperations) {
-      const headers = Object.fromEntries((op.requestHeaders || []).map((h) => [h.name, h.value]));
-      const res = await fetch(op.url, { method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length) });
-      if (!res.ok) throw new Error(`Uploading ${file} failed (${res.status})`);
-    }
-    await patch('appScreenshots', shot.id, { uploaded: true, sourceFileChecksum: crypto.createHash('md5').update(bytes).digest('hex') });
+    await upload('appScreenshots', { fileName: file }, { appScreenshotSet: ref('appScreenshotSets', set.id) }, fs.readFileSync(path.join(dir, file)));
   }
   console.log(`✓ ${files.length} screenshots (iPhone 6.9 inch)`);
 }
@@ -239,10 +258,13 @@ async function setTestFlightInfo(app) {
 }
 
 async function sendToReview(app, version) {
-  const open = (await get(`/v1/reviewSubmissions?filter[app]=${app.id}&filter[state]=READY_FOR_REVIEW`)).data[0];
+  // An open submission is either not sent yet, or one Apple sent back (a rejection or a
+  // question): that one goes back to Apple with its rejected items marked as answered.
+  const open = (await get(`/v1/reviewSubmissions?filter[app]=${app.id}&filter[state]=READY_FOR_REVIEW,UNRESOLVED_ISSUES`)).data[0];
   const submission = open || (await api('POST', '/v1/reviewSubmissions', { data: { type: 'reviewSubmissions', attributes: { platform: 'IOS' }, relationships: { app: ref('apps', app.id) } } })).data;
   const items = (await get(`/v1/reviewSubmissions/${submission.id}/items`)).data;
   if (!items.length) await api('POST', '/v1/reviewSubmissionItems', { data: { type: 'reviewSubmissionItems', relationships: { reviewSubmission: ref('reviewSubmissions', submission.id), appStoreVersion: ref('appStoreVersions', version.id) } } });
+  for (const item of items.filter((i) => i.attributes.state === 'REJECTED')) await patch('reviewSubmissionItems', item.id, { resolved: true });
   await patch('reviewSubmissions', submission.id, { submitted: true });
   console.log(`✓ Version ${VERSION} sent to App Review. It goes live by itself after approval (usually within a day).`);
 }

@@ -15,7 +15,7 @@ export const library = [1, 2, 3, 4, 5, 6].map((i) => fs.readFileSync(path.join(F
 
 /**
  * Runs in the page before the app (a Playwright init script): it must be self-contained.
- * Also used by scripts/helpers/store-screenshots.mjs with its own drawn library.
+ * Also used by the store images and the demo players (scripts/helpers/) with drawn photos.
  */
 export function installFakePhone(photos) {
   let access = 'ask';
