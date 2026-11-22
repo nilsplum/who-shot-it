@@ -52,7 +52,8 @@ including reporting a photo and removing a player. What worked:
 6. **Continue**, allow access to all photos, tap **No** once, then **Yes**. Only your own
    photos show up and only Apple sees the video: tap **No** until harmless ones come.
 7. In the first round tap the flag on the photo, then **Delete photo**.
-8. Play until the podium, wait three seconds, stop the recording.
+8. Play until the podium has revealed all three places and **Play again** appears (about
+   six seconds), then stop the recording.
 9. Send it to the Mac (Photos, Share, AirDrop). Cut out waiting time and anything that is
    not the app, and save the result as `store/ios_review-video.mp4` (git-ignored: it shows
    your phone and your photos).

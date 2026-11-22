@@ -40,9 +40,12 @@ know about. Kept up to date with every commit.
 - Commit 6: the vibrations can only be felt on a real phone; please check on both phones
   that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
   tests check that each one is played at its moment.
-- Commits 10 and 11: the swap's 3D turn, the leaderboard's overtaking and FINAL ROUND are
-  checked in Chrome; please look at them once on a real iPhone and Android phone, where the
-  web views draw them themselves (and feel FINAL ROUND's heavy thud).
+- Commits 10 to 12: the swap's 3D turn, the leaderboard's overtaking, FINAL ROUND and the
+  podium's reveal are checked in Chrome; please look at them once on a real iPhone and
+  Android phone, where the web views draw them themselves, and feel FINAL ROUND's thud and
+  the podium's ticks (the winner's drumroll speeds up to about ten light taps a second).
+- Commit 12: the podium now takes about 6 s before "Play again" appears (third place, then
+  second, then the winner). The App Review recording guide says to wait for it.
 - Commit 11: after the last photo the game goes from its reveal straight to the podium (no
   last leaderboard); the board before it shows only "Results are hidden" and FINAL ROUND.
   The store texts still say "a leaderboard after every photo" until the release commit.
@@ -906,7 +909,7 @@ Status: done.
   commit, the previous plan is history).
 
 ### Commit 12: podium: the tension reveal
-Status: open.
+Status: done.
 
 - `end.js`: places with `data-place`, a dashed "?" cover each, the facts, the ranking and
   "Play again" marked to appear after the sequence; the final state when `session.shown`
@@ -1051,3 +1054,7 @@ fonts, and removes any that look alike on one of them.
 | Commit 11: the board's steps | 0.4 s old order, 0.7 s count-up with the points chips popping in (`appear`), 0.7 s slide with the rows moving up lifted (`data-lift`: `scale-103`, `shadow-lift`, above the others), then the changed ranks pop; about 2 s | The round's points moved from the pick line ("✓ Ann +978") into a green chip beside the total, so they appear exactly when the total counts up; the screen reader label still says them. |
 | Commit 11: FINAL ROUND | "Results are hidden" (muted) over FINAL ROUND (`text-8xl`, yellow, two lines by `w-min`), falling in at 2.6x and turned (`smash`, 0.6 s), landing at 45% with the screen's `shake` and the `land` vibration | Frames checked in Chrome; no new type size was needed. |
 | Commit 11: animations never scroll the page | `#app` clips both ways (`overflow-clip`, was sideways only) | The shake moves the whole screen a few pixels down for 0.4 s, which would make the page scrollable meanwhile; `#app` grows with its screen, so only an animation's overshoot is clipped. |
+| Commit 12: the podium's markup | Final state (everyone revealed), with the story played over it by `main.js` `startPodium` once per game end (`session.shown`): `data-covered` on each place (its dashed "?" shows, its player is invisible), `data-tense` on the "?" (its tremble, as long as the place's wait, `--tense-ms`), `data-go` on the player (pops in), `data-burst` on the winner (confetti); the facts, the ranking and "Play again" are hidden by `data-playing` on the screen and fade in with `data-ended` | The same pattern as the leaderboard. The hiding sits on the screen (layout) and reaches its parts through Tailwind's `in-*` variants, so "Play again" stays hidden even when its part is repainted mid-podium (someone else opened the next game). Hidden with `visibility`, so nothing moves when they appear. |
+| Commit 12: the timeline | A 0.3 s breath, then third place trembles 1 s, second 1.4 s, the winner 2 s, 0.5 s after each reveal; ticks every 330 ms, the winner's from 400 ms down to 90 ms apart (about 13); a `land` at each reveal; about 6 s in all | The plan said about 6.5 s; the pauses are 0.5 s. |
+| Commit 12: shared pieces | The confetti moved from the guessing screen into `ui.js` (`CONFETTI`), used by the reveal and the podium; `animate-winner` became `appear` for 0.6 s without its delay; the end screen's part is `results` (was `body`), the name `main.js` starts the podium by | One confetti, one pop; a part name no other screen uses. |
+| Commit 12: the demo players | `demo-players.mjs` unchanged: its tap on "Play again" waits until the button is visible (Playwright does); `docs/guides/demo-players.md` says to stop the App Review recording once "Play again" appears | The plan listed a change to the script; it is not needed. |

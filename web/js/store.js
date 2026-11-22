@@ -104,8 +104,9 @@ export const session = {
    */
   look: null,
   /**
-   * The entrances this phone already played (a leaderboard's, FINAL ROUND's, by the screen's
-   * key): a repaint or a reconnect then shows their end state (`main.js` `startBoard`).
+   * The entrances this phone already played (a leaderboard's, FINAL ROUND's, the podium's,
+   * by the screen's key): a repaint or a reconnect then shows their end state (`main.js`
+   * `startBoard`, `startPodium`).
    * Forgotten when this phone is back in a lobby, so the next game plays them again.
    */
   shown: new Set(),

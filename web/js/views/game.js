@@ -33,7 +33,7 @@
  * a right pick also makes the owner's card pop and throw a little confetti.
  */
 
-import { LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
+import { CONFETTI, LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -115,12 +115,6 @@ function pickCard(view, d, id, { picked, late, hidden, wait }) {
   const look = picked ? (picked === id ? LOOK.chosen : LOOK.out) : late || wait ? LOOK.out : LOOK.open;
   return `<button class="${CARD} ${d.card} ${look}" data-act="answer" data-v="${esc(id)}" ${picked || late || hidden || wait ? 'disabled' : ''}>${inside(p, d)}</button>`;
 }
-
-/** Ten confetti pieces flying out of a card, each its own direction and colour. */
-const CONFETTI = Array.from({ length: 10 }, (_, i) => {
-  const angle = (i / 10) * 2 * Math.PI;
-  return `<i class="pointer-events-none absolute top-1/2 left-1/2 size-2.25 animate-burst rounded-xs bg-player motion-reduce:hidden" style="--x:${Math.round(Math.cos(angle) * 90)}px;--y:${Math.round(Math.sin(angle) * 60)}px;--player:var(--color-p${i})"></i>`;
-}).join('');
 
 function revealCard(view, d, id) {
   const p = player(view, id);

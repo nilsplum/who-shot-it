@@ -4,15 +4,16 @@
  * host removing a player, the photos dealt with "Play with these?", reload, the automatic
  * start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
  * Delete), five rounds with their leaderboards (one ending in the new order, "Show again"
- * held on one phone and seen on another, FINAL ROUND before the last photo), the end,
- * "Play again" from a guest while the others still look at their results, and leaving with
- * the code remembered. A leaderboard that waits for a phone still
- * loading the next photos. A full table of 16 (three phones of the smallest sizes and light
- * bots, `bots.js`) on every screen of a game: nothing scrolls the page, the lobby's photos
- * are as wide as No and Yes, and the reaction row shows whole buttons. Then "Which photos"
- * on a phone with screenshots and a chat full of text, the swaps (the count, the turn, a
- * refused tap) and the hold in the photo choice, the terms after an update, and the website
- * (the same page in a plain browser): invite page and legal page.
+ * held on one phone and seen on another, FINAL ROUND before the last photo), the podium's
+ * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
+ * others still look at their results, and leaving with the code remembered. A leaderboard
+ * that waits for a phone still loading the next photos. A full table of 16 (three phones of
+ * the smallest sizes and light bots, `bots.js`) on every screen of a game: nothing scrolls
+ * the page, the lobby's photos are as wide as No and Yes, and the reaction row shows whole
+ * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
+ * swaps (the count, the turn, a refused tap) and the hold in the photo choice, the terms
+ * after an update, and the website (the same page in a plain browser): invite page and
+ * legal page.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -122,6 +123,15 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await guests[1].getByRole('button', { name: 'Delete photo' }).click();
   const bar = host.locator('#tbar');
   for (let round = 2; round <= 5; round++) {
+    if (round === 5) {
+      // From the last photo on, the host's phone notes each podium place as it loses its "?".
+      await host.evaluate(() => {
+        window.revealed = [];
+        new MutationObserver((changes) => {
+          for (const c of changes) if (!c.target.hasAttribute('data-covered')) window.revealed.push(c.target.dataset.place);
+        }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-covered'] });
+      });
+    }
     for (const page of everyone) {
       await expect(page.getByText(`${round} / 5`, { exact: true })).toBeVisible();
       // The time to answer has the warm look.
@@ -167,6 +177,11 @@ test('friends play a full game and start another one', async ({ browser }) => {
 
   const podium = (page) => page.getByRole('list', { name: 'Podium' }).getByRole('listitem');
   for (const page of everyone) await expect(podium(page)).toHaveCount(3);
+  // The podium's tension: third place is revealed, then second, then the winner (each with a
+  // heavy thud), and only then does "Play again" appear.
+  await expect(host.getByRole('button', { name: 'Play again' })).toBeVisible();
+  expect(await host.evaluate(() => window.revealed)).toEqual(['3', '2', '1']);
+  expect(await host.evaluate(() => window.felt.at(-1))).toBe('HEAVY');
   // Play again is everyone's: a guest opens the next game, the others keep their results
   // until they join it, and the lobby quietly says who it is waiting on.
   await guests[0].getByRole('button', { name: 'Play again' }).click();

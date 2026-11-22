@@ -19,10 +19,12 @@
  *   repaints. Actions are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
  *   (`moments`), each new number of the 3-2-1 (when it is painted), a swap's flip or
- *   refusal (action `swap`), and FINAL ROUND landing (`startBoard`).
+ *   refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the podium's ticks and
+ *   reveals (`startPodium`).
  * - Entrances: a screen that tells a story when it appears (the leaderboard: who overtakes
- *   whom; FINAL ROUND) is painted in its final state, and `startBoard` plays the story over
- *   it once (`session.shown`), so a repaint or a reconnect never plays it again or cuts it.
+ *   whom; FINAL ROUND; the podium's tension) is painted in its final state, and
+ *   `startBoard` or `startPodium` plays the story over it once (`session.shown`), so a
+ *   repaint or a reconnect never plays it again or cuts it.
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
@@ -243,6 +245,73 @@ function startBoard() {
 }
 
 /**
+ * The podium's tension (`startPodium`), in ms: a breath before the first place, how long
+ * each place's "?" trembles before its player pops in (third, second, first: the longer, the
+ * higher), the pause after each reveal, and the gap between the light ticks (the winner's
+ * start wider and speed up). About 6 s in all.
+ */
+const PODIUM = { start: 300, tense: { 3: 1000, 2: 1400, 1: 2000 }, pause: 500, tick: 330 };
+
+/** When the ticks of a place's tension come, in ms from its start: evenly, or (the winner) faster and faster. */
+function podiumTicks(length, speedUp) {
+  const at = [];
+  let gap = speedUp ? 400 : PODIUM.tick;
+  for (let t = 0; t < length - 60; t += gap) {
+    at.push(t);
+    if (speedUp) gap = Math.max(90, gap * 0.78);
+  }
+  return at;
+}
+
+/**
+ * The podium's reveal, once per game end (`session.shown`). The painted markup is the final
+ * state (`views/end.js`); this covers every place with its "?" (`data-covered`) and hides
+ * what follows the podium (`data-playing` on the screen) in the same task as the paint.
+ * Then third place, second, the winner: each "?" trembles (`data-tense`, as long as
+ * `PODIUM.tense` says) with light ticks (`tap`), then the player pops in with a thud
+ * (`land`), the winner with confetti (`data-burst`). Last the facts, the ranking and "Play
+ * again" fade in (`data-ended`). With fewer than three players it reveals the places there
+ * are. Reduce Motion, or an end screen already shown, keeps the final state. Every step
+ * checks that the screen is still the same one (Play again or Leave replaces it).
+ */
+function startPodium() {
+  const v = session.view;
+  const key = `end|${v.code}`;
+  const screenEl = $('app').firstElementChild;
+  if (!screenEl || session.shown.has(key)) return;
+  session.shown.add(key);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const places = [3, 2, 1].map((n) => screenEl.querySelector(`[data-place="${n}"]`)).filter(Boolean);
+  if (!places.length) return;
+  const later = (ms, run) => setTimeout(() => screenEl.isConnected && run(), ms);
+  screenEl.toggleAttribute('data-playing', true);
+  for (const el of places) el.toggleAttribute('data-covered', true);
+  let at = PODIUM.start;
+  for (const el of places) {
+    const n = Number(el.dataset.place);
+    const length = PODIUM.tense[n];
+    const cover = el.querySelector('[data-cell="cover"]');
+    later(at, () => {
+      cover.style.setProperty('--tense-ms', `${length}ms`);
+      cover.toggleAttribute('data-tense', true);
+    });
+    for (const t of podiumTicks(length, n === 1)) later(at + t, () => buzz('tap'));
+    at += length;
+    later(at, () => {
+      el.toggleAttribute('data-covered', false);
+      el.querySelector('[data-cell="who"]').toggleAttribute('data-go', true);
+      el.toggleAttribute('data-burst', n === 1);
+      buzz('land');
+    });
+    at += PODIUM.pause;
+  }
+  later(at, () => {
+    screenEl.toggleAttribute('data-playing', false);
+    screenEl.toggleAttribute('data-ended', true);
+  });
+}
+
+/**
  * The photo shown big, as layers for `overlays.lookHtml`: a photo of the choice this phone
  * holds (its preview, then its sharp version above it), the round's photo this phone holds
  * with "Show again", or the one another phone holds (`round.peek`); else none.
@@ -260,6 +329,7 @@ function render() {
   const changed = paintApp(screen());
   if (changed.includes('stage')) startStage();
   if (changed.includes('board')) startBoard();
+  if (changed.includes('results')) startPodium();
   paintSheet(sheetScreen(context()));
   // The 3-2-1 paints a new number each second: each one is felt, a little longer than a tap.
   const cover = countdownHtml(session.view, leftNow());
