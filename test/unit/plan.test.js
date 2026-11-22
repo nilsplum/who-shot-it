@@ -1,9 +1,20 @@
 /**
- * The round plan (src/game/plan.js): how many rounds, whose photos, in which order.
+ * The round plan (src/game/plan.js): how many rounds, whose photos, in which order; and the
+ * one shuffle it deals with (web/shared/random.js).
  */
 import { describe, expect, test } from 'vitest';
 import { arrange, buildPlan } from '../../src/game/plan.js';
+import { shuffle } from '../../web/shared/random.js';
 import { seededRandom } from '../helpers.js';
+
+test('shuffle reaches every order and never changes what it is given', () => {
+  const items = [1, 2, 3];
+  const orders = new Set();
+  const rng = seededRandom(9);
+  for (let i = 0; i < 200; i++) orders.add(shuffle(items, rng).join(''));
+  expect(orders.size).toBe(6);
+  expect(items).toEqual([1, 2, 3]);
+});
 
 const players = (counts) => Object.entries(counts).map(([id, n]) => ({ id, photos: Array.from({ length: n }, (_, i) => `${id}${i}`) }));
 const settings = (s) => ({ rounds: 0, fair: true, ...s });

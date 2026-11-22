@@ -38,6 +38,7 @@
 
 import { CLOSE } from '../shared/api.js';
 import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
+import { shuffle } from '../shared/random.js';
 import { createRoom, serverUrl, uploadPhotos } from './api.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
@@ -91,7 +92,7 @@ function myPick(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view, emojis: EMOJIS };
+  return { device, session, view: session.view };
 }
 
 function screen() {
@@ -400,7 +401,11 @@ const ACTIONS = {
     render();
   },
   help: () => openSheet('help'),
-  avatar: () => openSheet('avatar'),
+  /** The avatar sheet shows every avatar in a new random order each time it opens, so a group spreads over all of them. */
+  avatar: () => {
+    session.avatarOrder = shuffle(EMOJIS);
+    openSheet('avatar');
+  },
   pickavatar: (value) => {
     if (!EMOJIS.includes(value)) return;
     device.avatar = value;

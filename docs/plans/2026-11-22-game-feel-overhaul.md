@@ -583,7 +583,7 @@ Status: open.
 This document.
 
 ### Commit 2: players: up to 16, about 140 avatars in a new order every time, reactions every phone shows
-Status: open.
+Status: done.
 
 - `config.js`: `LIMITS.maxPlayers` 16 (its comment: why 16, the avatars and the guessing
   screen are made for it). `EMOJIS` becomes the curated list (about 140; the list itself in
@@ -937,3 +937,7 @@ fonts, and removes any that look alike on one of them.
 | Own photo | New setting, default 80% of the points; also 0% and 100% | Operator: own-photo points by default, slightly less, explained by "?". |
 | 3-2-1 | Opaque overlay with the page's background | Operator's suggestion; the overlay itself is the right structure. |
 | Reactions on Android 10 to 12 | 🫣 and 🫠 replaced by 😳 and 🤭 | Emoji 14 does not exist there. |
+| Commit 2: one shuffle | `shuffle` moved from `src/game/plan.js` to `web/shared/random.js`, used by the game logic and the avatar sheet | The app cannot import from `src/`; a second shuffle in the app would be a second copy of the same rule. |
+| Commit 2: the avatar sheet | Six columns, and the same shape as the settings sheet (the list scrolls, "Done" stays in reach), one helper `withFooter` for both | 137 avatars are three screens tall; five columns would be four. |
+| Commit 2: the avatar list | 137 (🦑 left out: it looks like 🐙) | Section 11's list, checked: every one a single emoji of Emoji 12.0 or older (a unit test checks the single character). |
+| Commit 2: "2 to 16 players" | Changed in the README and the shared store description now, not in the release commit | The listing's rule: every store sentence is true for the app as it is, so it changes with the feature. |

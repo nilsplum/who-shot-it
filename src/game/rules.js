@@ -34,7 +34,8 @@
  */
 
 import { EFFECTS, LIMITS, TIMING, normalizeSetting } from '../../web/shared/config.js';
-import { buildPlan, shuffle } from './plan.js';
+import { shuffle } from '../../web/shared/random.js';
+import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
 import {
   answerTimeMs, canStart, cleanName, connectedPlayers, currentEntry, freeAvatar, inGame, makeId,

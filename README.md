@@ -9,7 +9,7 @@ one photo after another pops up on every screen, and everybody races to tap *who
 came from*. Was the blurry 2 a.m. kebab Ana's? Is the 400th cat picture Ben's? Right and
 fast scores the most, and every reveal is a story.
 
-- **Free, no account.** Install, pick an emoji, play. 2 to 12 players.
+- **Free, no account.** Install, pick an emoji, play. 2 to 16 players.
 - **Your photos, your call.** Don't like what you were dealt? Tap **No** for new ones.
   Nothing leaves a phone before its owner taps **Yes**, and each photo is deleted right after
   its round.
@@ -69,7 +69,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `styles/app.css` | The design: Tailwind's theme (every colour, with the dark blue and the yellow as main colours; the type scale, fonts, animations) and the shared `screen`, `btn` and `link`. Built into `web/css/app.css` (git-ignored) by `wrangler dev`/`deploy` and the app release. |
 | `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
-| `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. Read for every script by `scripts/helpers/listing.mjs`. |
+| `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. `scripts/helpers/listing.mjs` is the one reader: the iOS upload, the image scripts and the preview (`./scripts/dev.sh store`) all use it, so the preview shows what both stores get. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin). |
 

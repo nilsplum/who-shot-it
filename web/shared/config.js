@@ -88,14 +88,32 @@ export const STORES = {
   ios: null,
 };
 
-/** Avatars a player can pick (the picker shows them in this order). */
-export const EMOJIS = ['😎', '🦊', '🐸', '🐼', '🦄', '🐙', '👻', '🤖', '🐯', '🍕', '🌵', '🔥', '🐳', '🦖', '🍩', '👽', '🐧', '🦁', '🍉', '⚡'];
+/**
+ * Avatars a player can pick: a curated set, so every group finds different ones (the picker
+ * shows them in a new random order each time it opens, `views/sheets.js`). Every one is a
+ * single emoji character of Unicode Emoji 12.0 or older, the newest that Android 10 (the
+ * oldest Android the app supports) can draw; iOS 15.4 draws up to 14.0. Each looks clearly
+ * different from the others. Left out on purpose: people and hands (skin tones, genders),
+ * flags, anything religious, political, sexual, violent, alcohol or drug related, and the
+ * emojis that already mean something in the app (the REACTIONS, 👑 the host, 📷 Show
+ * again). The order sets each avatar's colour (`colourOf` in `web/js/ui.js`).
+ */
+export const EMOJIS = [
+  '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦆', '🦅',
+  '🦉', '🦇', '🐺', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦞', '🦀', '🐠', '🐬',
+  '🐳', '🦈', '🐊', '🦓', '🦍', '🐘', '🦛', '🦏', '🦒', '🦘', '🦙', '🦚', '🦜', '🦢', '🦩', '🦝', '🦦', '🦥', '🦔', '🐲',
+  '👻', '👽', '👾', '🤖', '🎃', '😎', '🤓', '🤠', '🥳', '🍕', '🍔', '🍟', '🌭', '🌮', '🍩', '🍪', '🧁', '🍦', '🍭', '🍿',
+  '🥨', '🥐', '🥑', '🍉', '🍓', '🍒', '🍍', '🥥', '🍄', '🧀', '🧇', '🍣', '🌵', '🌴', '🌲', '🌻', '🌸', '🍀', '🌈', '⭐',
+  '🌙', '🌞', '⚡', '🌊', '🪐', '🌋', '⛄', '🎸', '🎺', '🥁', '🎹', '🎧', '🎮', '🎲', '🧩', '🎯', '⚽', '🏀', '🎾', '🏓',
+  '🛹', '🚀', '🛸', '🚗', '⛵', '🎈', '🎁', '🏆', '💎', '🔮', '🎨', '💡', '🧲', '🪁', '🧸', '🧊', '🎪',
+];
 
 /**
  * Reactions everyone can send on the reveal, the leaderboard and the end screen, most used
- * first (the row scrolls to the rest). The room passes on only these.
+ * first (the row pages to the rest). The room passes on only these. Like the avatars, each
+ * is a single emoji of Emoji 12.0 or older, so every supported phone can draw it.
  */
-export const REACTIONS = ['😂', '🙈', '🔥', '🤯', '👀', '🫣', '😩', '🫠', '🧐', '🎉'];
+export const REACTIONS = ['😂', '🙈', '🔥', '🤯', '👀', '😳', '😩', '🤭', '🧐', '🎉'];
 
 /** The photo effects a round can use; "mix" draws one of these per round. */
 export const EFFECTS = ['classic', 'blur', 'zoom', 'pixel'];
@@ -165,7 +183,13 @@ export const SETTINGS = [
 
 export const LIMITS = {
   minPlayers: 2,
-  maxPlayers: 12,
+  /**
+   * The most players a game takes; the room refuses anyone beyond (`CLOSE.full`). The
+   * guessing screen's cards, the lobby's pills and the leaderboard are laid out for up to
+   * this many on a 360 px phone, and a full room's photos stay small for the free plan's
+   * storage. The store texts say "2 to 16 players".
+   */
+  maxPlayers: 16,
   nameMax: 16,
   codeLength: 4,
   /** Room code characters: no 0/O, 1/I/L, so a code read aloud is never ambiguous. */

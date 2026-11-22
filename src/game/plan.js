@@ -12,15 +12,7 @@
  *   streak of one person's photos never gives the answer away.
  */
 
-/** Fisher-Yates shuffle into a new array. */
-export function shuffle(items, rng) {
-  const a = items.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+import { shuffle } from '../../web/shared/random.js';
 
 /** Takes `count` photos in turns: always from an owner with the fewest picks so far. */
 function pickFair(byOwner, count, rng) {

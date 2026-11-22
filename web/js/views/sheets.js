@@ -6,8 +6,9 @@
  * Mechanisms: `main.js` keeps the open sheet's name in `session.sheet` and paints the
  * result of `sheetScreen` into `#sheet` with the same part mechanism as the screens, so a
  * sheet slides in once and then only its content updates. Tapping the dimmed background
- * or a "Done"-type button closes it. The settings sheet scrolls under a footer that keeps
- * its green "Done" in reach (the sheet is a column that does not scroll itself).
+ * or a "Done"-type button closes it. The two long sheets (settings, avatars) are a column
+ * whose list scrolls under a footer that keeps "Done" in reach (`LONG`, `withFooter`); every
+ * other sheet scrolls as a whole.
  *
  * Invariants: these sheets are the app's only confirmations and dialogs (no native
  * `alert`/`confirm`). The settings sheet edits the room's settings in a game (only the
@@ -33,6 +34,13 @@ const text = (html) => `<p class="mb-3.5 text-center leading-snug text-muted">${
 const buttons = (...html) => `<div class="flex flex-col gap-2.5">${html.join('')}</div>`;
 const SAFE_BOTTOM = 'pb-[calc(--spacing(5.5)+env(safe-area-inset-bottom))]';
 
+/** The sheets whose content is longer than a screen: a scrolling list above a fixed footer. */
+const LONG = ['settings', 'avatar'];
+
+/** A long sheet's body: `list` scrolls, `footer` (its "Done") stays below it, in reach. */
+const withFooter = (list, footer) => `<div class="-mx-4 min-h-0 flex-1 overflow-auto px-4 pb-2">${list}</div>
+    <div class="pt-3 shadow-[0_-14px_14px_-10px_var(--color-sheet)] ${SAFE_BOTTOM}">${footer}</div>`;
+
 function settingsBody(c) {
   const inRoom = Boolean(c.view && c.view.me);
   const editable = !inRoom || c.view.hostId === c.view.me.id;
@@ -45,8 +53,7 @@ function settingsBody(c) {
     const help = open ? `<ul class="mt-2 space-y-1 rounded-xl bg-card px-3 py-2.5 text-xs leading-snug font-medium text-muted">${d.help.map(([which, line]) => `<li><b class="font-bold text-ink">${esc(which)}:</b> ${esc(line)}</li>`).join('')}</ul>` : '';
     return `<div class="mb-3.5"><div class="mb-1.5 flex items-center gap-2 text-xs text-muted">${esc(d.label)}${ask}</div><div class="flex gap-1.5">${options}</div>${help}</div>`;
   }).join('');
-  return `<div class="-mx-4 min-h-0 flex-1 overflow-auto px-4 pb-2">${rows}</div>
-    <div class="pt-3 shadow-[0_-14px_14px_-10px_var(--color-sheet)] ${SAFE_BOTTOM}"><button class="btn bg-green text-navy" data-act="close">Done</button></div>`;
+  return withFooter(rows, '<button class="btn bg-green text-navy" data-act="close">Done</button>');
 }
 
 function helpBody() {
@@ -62,9 +69,10 @@ function helpBody() {
   <div class="link underline">${legalLink()}</div>`;
 }
 
-function avatarBody({ device, emojis }) {
-  return `<div class="mb-3.5 grid grid-cols-5 gap-2">${emojis.map((e) => `<button class="aspect-square rounded-2xl border-2 border-transparent bg-raised text-4xl aria-pressed:border-yellow aria-pressed:bg-picked" data-act="pickavatar" data-v="${e}" aria-pressed="${e === device.avatar}" aria-label="Avatar ${e}">${e}</button>`).join('')}</div>
-    <button class="btn" data-act="close">Done</button>`;
+/** Every avatar, in the order shuffled when the sheet opened (`session.avatarOrder`); the chosen one is marked. */
+function avatarBody({ device, session }) {
+  const grid = `<div class="grid grid-cols-6 gap-1.5">${session.avatarOrder.map((e) => `<button class="aspect-square rounded-2xl border-2 border-transparent bg-raised text-3xl aria-pressed:border-yellow aria-pressed:bg-picked" data-act="pickavatar" data-v="${e}" aria-pressed="${e === device.avatar}" aria-label="Avatar ${e}">${e}</button>`).join('')}</div>`;
+  return withFooter(grid, '<button class="btn" data-act="close">Done</button>');
 }
 
 /** The invite link opens the website's invite page (app install, or "Open in the app"). */
@@ -107,8 +115,8 @@ export function sheetScreen(c) {
   };
   const body = bodies[name] ? bodies[name]() : '';
   if (!body) return null;
-  // The settings sheet is a column whose list scrolls above its footer; every other sheet scrolls as a whole.
-  const shape = name === 'settings' ? 'flex flex-col' : `overflow-auto ${SAFE_BOTTOM}`;
+  // A long sheet is a column whose list scrolls above its footer; every other sheet scrolls as a whole.
+  const shape = LONG.includes(name) ? 'flex flex-col' : `overflow-auto ${SAFE_BOTTOM}`;
   return {
     key: `sheet|${name}`,
     layout: `<div class="fixed inset-0 z-40 animate-fade bg-stage/70" data-act="close"></div>

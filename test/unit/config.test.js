@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import {
-  APP, EMOJIS, LEGAL, LIMITS, PRESETS, SERVER, SETTINGS, SETTINGS_DEFAULTS, isRoomCode, normalizeSetting, normalizeSettings, presetOf,
+  APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SERVER, SETTINGS, SETTINGS_DEFAULTS, isRoomCode, normalizeSetting, normalizeSettings, presetOf,
 } from '../../web/shared/config.js';
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
@@ -67,9 +67,21 @@ describe('settings', () => {
   });
 });
 
-test('there are more avatars than players, so every player can have their own', () => {
-  expect(new Set(EMOJIS).size).toBe(EMOJIS.length);
-  expect(LIMITS.maxPlayers).toBeLessThan(EMOJIS.length);
+describe('avatars and reactions', () => {
+  /** One character with its own emoji look: every supported phone draws it the same way, no text fallback. */
+  const singleEmoji = /^\p{Emoji_Presentation}$/u;
+
+  test('there are far more avatars than players, so a full game still has a choice', () => {
+    expect(new Set(EMOJIS).size).toBe(EMOJIS.length);
+    expect(EMOJIS.length).toBeGreaterThan(2 * LIMITS.maxPlayers);
+  });
+
+  test('every avatar and reaction is a single emoji, and none means two things', () => {
+    for (const e of [...EMOJIS, ...REACTIONS]) expect(e, e).toMatch(singleEmoji);
+    expect(new Set(REACTIONS).size).toBe(REACTIONS.length);
+    // A reaction rising up the screen must never look like a player; 👑 marks the host, 📷 is Show again.
+    for (const e of [...REACTIONS, '👑', '📷']) expect(EMOJIS, e).not.toContain(e);
+  });
 });
 
 test('room codes use only the unambiguous alphabet', () => {

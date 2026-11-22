@@ -38,6 +38,11 @@ const saved = read();
 
 export const device = {
   name: typeof saved.name === 'string' ? saved.name.slice(0, LIMITS.nameMax) : '',
+  /**
+   * A new phone starts with a random avatar, saved right away like the name (`saveDevice`
+   * below), so it stays the same on every start; an avatar the app no longer offers becomes
+   * a random one too.
+   */
   avatar: EMOJIS.includes(saved.avatar) ? saved.avatar : EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
   settings: normalizeSettings(saved.settings),
   /** The terms token (`termsToken()`: legal date and app version) this phone accepted, or null. */
@@ -83,6 +88,8 @@ export const session = {
   downSince: 0,
   /** The open sheet: 'settings' | 'help' | 'avatar' | 'invite' | 'leave' | 'report' | 'remove' | null. */
   sheet: null,
+  /** The avatars in the order the open avatar sheet shows them (shuffled when it opens, `main.js`). */
+  avatarOrder: [],
   /** The setting whose "?" explanation is open in the settings sheet, or null. */
   helpKey: null,
   /** The player the host is about to remove ('remove' sheet). */

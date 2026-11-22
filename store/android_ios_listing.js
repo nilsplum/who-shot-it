@@ -37,7 +37,7 @@ const description = `Your camera roll is full of stories. Time to play them.
 
 Who Shot It? turns the photos on your phones into the funniest guessing game at the table. Everyone gets a few random photos from their own phone. Then one photo after another pops up on every screen, and you race to tap whose phone it came from.
 
-Was that blurry pizza at 2 a.m. Lena’s? Is the 400th cat picture Ben’s? Guess fast, guess right, and the points are yours. The reveal is where the laughs begin.
+Was that blurry pizza at 2 a.m. Lena’s? Is the 400th cat picture Ben’s? Guess fast, guess right, and the points are yours. Then the reveal. Friendships have survived worse. Probably.
 
 HOW IT WORKS
 1. One person creates a game. Friends join with a four letter code.
@@ -45,7 +45,7 @@ HOW IT WORKS
 3. The photos pop up one by one. Tap who took it. Fast and right scores the most.
 
 MADE FOR PARTIES
-• 2 to 12 players, best together in one room
+• 2 to 16 players, best together in one room
 • Classic, or Tricky: photos start blurry, zoomed in or pixelated
 • Pick rounds, time and points, each option explained in one sentence
 • A leaderboard after every photo, reactions and a podium at the end
