@@ -122,14 +122,14 @@ describe('lobby and countdown', () => {
     // A valid change restarts the countdown from the top.
     d.wait(2000).by('Ann', 'setting', { key: 'time', value: 30 });
     expect(d.room).toMatchObject({ phase: 'countdown', deadline: d.now + TIMING.countdownMs });
-    d.by('Ann', 'setting', { key: 'photos', value: 3 });
+    d.by('Ann', 'setting', { key: 'photos', value: 4 });
     expect(d.room.phase).toBe('lobby');
     expect(d.room.players.every((p) => !p.ready && p.photos.length === 0)).toBe(true);
   });
 
   test('a ready player keeps at most "Photos per player" photos', () => {
-    const d = driver(roomWith(['Ann'], { settings: { photos: 3 } })).by('Ann', 'ready', { photos: ['1', '2', '3', '4', 5] });
-    expect(d.room.players[0].photos).toEqual(['1', '2', '3']);
+    const d = driver(roomWith(['Ann'], { settings: { photos: 4 } })).by('Ann', 'ready', { photos: ['1', '2', '3', '4', '5', 6] });
+    expect(d.room.players[0].photos).toEqual(['1', '2', '3', '4']);
   });
 });
 

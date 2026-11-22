@@ -109,10 +109,10 @@ describe('who may call the API', () => {
 
 describe('rooms and players', () => {
   test('a new room greets its first player as host, with the creator\'s settings', async () => {
-    const code = await createRoom({ photos: 3, mode: 'pixel', evil: 1 });
+    const code = await createRoom({ photos: 4, mode: 'pixel', evil: 1 });
     const ann = await connect(code, 'Ann');
     const view = await ann.until((v) => v.me);
-    expect(view).toMatchObject({ code, phase: 'lobby', hostId: view.me.id, settings: { photos: 3, mode: 'pixel' } });
+    expect(view).toMatchObject({ code, phase: 'lobby', hostId: view.me.id, settings: { photos: 4, mode: 'pixel' } });
     expect(view.settings.evil).toBeUndefined();
   });
 
@@ -150,12 +150,12 @@ describe('rooms and players', () => {
 
 describe('uploads', () => {
   test('only JPEGs from a known player, at most "Photos per player"', async () => {
-    const code = await createRoom({ photos: 3 });
+    const code = await createRoom({ photos: 4 });
     const ann = await connect(code, 'Ann');
     await ann.until((v) => v.me);
     expect((await upload(code, keyFor('Nobody'), [JPEGS[0]])).status).toBe(401);
     expect((await upload(code, ann.key, [new TextEncoder().encode('not a photo')])).status).toBe(415);
-    expect((await upload(code, ann.key, [JPEGS[0], JPEGS[1], JPEGS[0], JPEGS[1]])).status).toBe(400);
+    expect((await upload(code, ann.key, [JPEGS[0], JPEGS[1], JPEGS[0], JPEGS[1], JPEGS[0]])).status).toBe(400);
     expect(await countRows(code, 'photos')).toBe(0);
     expect((await upload(code, ann.key, JPEGS)).status).toBe(204);
     await ann.until((v) => v.me.ready && v.me.photoCount === 2);
@@ -169,7 +169,7 @@ describe('uploads', () => {
 
 describe('a full game', () => {
   test('countdown, rounds, photo access, reveal, end, and every photo deleted', async () => {
-    const code = await createRoom({ photos: 3, auto: false });
+    const code = await createRoom({ photos: 4, auto: false });
     const ann = await connect(code, 'Ann');
     const ben = await connect(code, 'Ben');
     await ann.until((v) => v.players.length === 2);
@@ -214,7 +214,7 @@ describe('a full game', () => {
   });
 
   test('the alarm runs the timers: answer time and automatic next round', async () => {
-    const code = await createRoom({ photos: 3, time: 5 });
+    const code = await createRoom({ photos: 4, time: 5 });
     const ann = await connect(code, 'Ann');
     const ben = await connect(code, 'Ben');
     await ann.until((v) => v.players.length === 2);
@@ -264,7 +264,7 @@ describe('leaving and closing', () => {
 
 describe('reports and removed players', () => {
   test('a reported photo is deleted from storage at once; a removed player cannot come back', async () => {
-    const code = await createRoom({ photos: 3 });
+    const code = await createRoom({ photos: 4 });
     const ann = await connect(code, 'Ann');
     const ben = await connect(code, 'Ben');
     await ann.until((v) => v.players.length === 2);

@@ -287,7 +287,7 @@ documentation map in `AGENTS.md` gets the two folders: plans (history: correctio
 added as dated notes) and prompts.
 
 ### Commit 2: settings, defaults and the "New game" step
-Status: open.
+Status: done.
 
 - `config.js`: `photos` options `[[4,'4'],[9,'9'],[16,'16'],[25,'25']]`, default 16;
   `rounds` default 15; `points` option labels "Speed bonus" / "Fixed", help "Speed bonus:
@@ -531,3 +531,6 @@ Status: open.
 | Terms gate | `LEGAL.version + APP.version` | Every install and update asks, and a test keeps the version honest. |
 | iCloud previews | Fallback download with 4 s limit | Every photo can come up; one slow photo never blocks. |
 | Prompts location | `docs/prompts/` | This repo's docs folder; adapted to its files and test runner. |
+| Commit 2: the settings sheet's own layout | The sheet root carries its name as a class (`sheet-settings`); that sheet is a flex column whose settings scroll and whose footer holds "Done" | Sticky positioning inside a padded scroll box is unreliable, and `:has()` is missing on iOS 15.0 to 15.3 (the app supports 15.0). |
+| Commit 2: Done's green | The same style as "Yes" (`.btn.yes, .btn.done`) | One green action style in the app. |
+| Commit 2: Custom card | Lives in the presets row and is highlighted when no preset matches | The three cards read as one choice; it replaces the old summary line, which the lobby still shows. |

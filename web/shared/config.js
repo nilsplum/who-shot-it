@@ -92,7 +92,8 @@ export const EFFECTS = ['classic', 'blur', 'zoom', 'pixel'];
  * [which options, what they mean in practice], in words a grandma understands.
  */
 export const SETTINGS = [
-  { key: 'photos', label: 'Photos per player', default: 5, options: [[3, '3'], [5, '5'], [10, '10']] },
+  // Square numbers only: the photo choice shows them as a square grid (2 x 2 to 5 x 5).
+  { key: 'photos', label: 'Photos per player', default: 16, options: [[4, '4'], [9, '9'], [16, '16'], [25, '25']] },
   {
     // Applied on each player's phone while it picks (`web/js/photos.js`); the server only
     // keeps the value. "Full of text" is LIMITS.textLines lines or more (`web/js/textcheck.js`).
@@ -105,7 +106,7 @@ export const SETTINGS = [
     ],
   },
   {
-    key: 'rounds', label: 'Rounds', default: 0,
+    key: 'rounds', label: 'Rounds', default: 15,
     options: [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30'], [0, 'All']],
     help: [['5 to 30', 'The game ends after this many photos.'], ['All', 'Every photo in the game is shown once.']],
   },
@@ -126,8 +127,8 @@ export const SETTINGS = [
     ],
   },
   {
-    key: 'points', label: 'Points', default: 'speed', options: [['speed', 'Speed counts'], ['fixed', 'Fixed']],
-    help: [['Speed counts', 'Right and fast gets the most points.'], ['Fixed', 'Every right answer gets the same points.']],
+    key: 'points', label: 'Points', default: 'speed', options: [['speed', 'Speed bonus'], ['fixed', 'Fixed']],
+    help: [['Speed bonus', 'Right and fast gets the most points.'], ['Fixed', 'Every right answer gets the same points.']],
   },
   {
     key: 'answers', label: 'Answers', default: 0, options: [[0, 'All players'], [4, 'Only 4']],

@@ -38,19 +38,20 @@ test('friends play a full game and start another one', async ({ browser }) => {
   const host = await openApp(browser, 'Ann');
   await host.getByRole('button', { name: 'Create game' }).click();
 
-  // New game: a preset, then fine-tuning in the settings, with a "?" explanation.
+  // New game: a preset, then fine-tuning under "Custom", with a "?" explanation; the
+  // green "Done" stays in reach below the settings.
   await host.getByRole('button', { name: /Tricky/ }).click();
   await expect(host.locator('.preset.on')).toContainText('Tricky');
-  await host.getByRole('button', { name: /Game settings/ }).click();
+  await host.getByRole('button', { name: 'Custom' }).click();
   await host.getByRole('button', { name: 'What does Streak bonus mean?' }).click();
   await expect(host.locator('.help')).toContainText('You get extra points.');
-  await host.locator('[data-k="photos"][data-v="3"]').click();
+  await host.locator('[data-k="photos"][data-v="4"]').click();
   await host.locator('[data-k="rounds"][data-v="5"]').click();
+  await expect(host.getByRole('button', { name: 'Done' })).toBeInViewport();
   await host.getByRole('button', { name: 'Done' }).click();
-  await expect(host.locator('.preset.on')).toHaveCount(0);
-  await expect(host.locator('.cfgbtn')).toContainText('Custom · 3 photos · 5 rounds · 15 s · Mix');
+  await expect(host.locator('.preset.on')).toHaveText('⚙️Custom');
   await host.getByRole('button', { name: 'Start game' }).click();
-  await expect(host.locator('.cfg')).toContainText('3 photos · 5 rounds');
+  await expect(host.locator('.cfg')).toContainText('4 photos · 5 rounds · 15 s · Mix');
   const code = (await host.locator('.code').innerText()).replace(/\s/g, '');
 
   const guests = [];
@@ -76,7 +77,7 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await expect(host.locator('.chip')).toHaveCount(3);
 
   const everyone = [host, ...guests];
-  for (const page of everyone) await choosePhotos(page, 3);
+  for (const page of everyone) await choosePhotos(page, 4);
 
   // Round 1 is reported: the photo goes for everyone and the game moves on.
   await expect(guests[1].locator('.rnd')).toHaveText('1 / 5');
@@ -95,7 +96,7 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await host.getByRole('button', { name: 'Play again' }).click();
   for (const page of everyone) {
     await expect(page.locator('.q')).toHaveText('Play with these?');
-    await expect(page.locator('.grid div[style]')).toHaveCount(3);
+    await expect(page.locator('.grid div[style]')).toHaveCount(4);
   }
 });
 

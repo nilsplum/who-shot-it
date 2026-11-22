@@ -6,7 +6,8 @@
  * Mechanisms: `main.js` keeps the open sheet's name in `session.sheet` and paints the
  * result of `sheetScreen` into `#sheet` with the same part mechanism as the screens, so a
  * sheet slides in once and then only its content updates. Tapping the dimmed background
- * or a "Done"-type button closes it.
+ * or a "Done"-type button closes it. The settings sheet scrolls under a footer that keeps
+ * its green "Done" in reach (the sheet carries its name as a class, `sheet-settings`).
  *
  * Invariants: these sheets are the app's only confirmations and dialogs (no native
  * `alert`/`confirm`). The settings sheet edits the room's settings in a game (only the
@@ -37,7 +38,7 @@ function settingsBody(c) {
     const help = open ? `<ul class="help">${d.help.map(([which, text]) => `<li><b>${esc(which)}:</b> ${esc(text)}</li>`).join('')}</ul>` : '';
     return `<div class="set"><div class="sl">${esc(d.label)}${ask}</div><div class="seg">${buttons}</div>${help}</div>`;
   }).join('');
-  return `${rows}<button class="btn main" data-act="close">Done</button>`;
+  return `<div class="sheet-scroll">${rows}</div><div class="sheet-foot"><button class="btn done" data-act="close">Done</button></div>`;
 }
 
 function helpBody() {
@@ -103,7 +104,7 @@ export function sheetScreen(c) {
   if (!body) return null;
   return {
     key: `sheet|${name}`,
-    layout: `<div class="dim" data-act="close"></div><div class="sheet" role="dialog" aria-label="${esc(APP.name)}" data-part="body"></div>`,
+    layout: `<div class="dim" data-act="close"></div><div class="sheet sheet-${name}" role="dialog" aria-label="${esc(APP.name)}" data-part="body"></div>`,
     parts: { body },
   };
 }

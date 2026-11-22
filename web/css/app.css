@@ -34,7 +34,7 @@ a { color: inherit; }
 .btn { appearance: none; border: 0; border-radius: 16px; padding: 16px; font-size: 17px; font-weight: 700; background: var(--card2); width: 100%; display: block; text-align: center; text-decoration: none; }
 .btn:active { transform: scale(.98); }
 .btn.main { background: var(--a); color: var(--white); }
-.btn.yes { background: var(--g); color: var(--dark-ink); }
+.btn.yes, .btn.done { background: var(--g); color: var(--dark-ink); }
 .btn.join { background: var(--y); color: var(--dark-ink); }
 .btn:disabled, .btn.busy { opacity: .35; transform: none; }
 .icon { background: none; border: 0; color: var(--mut); font-size: 22px; padding: 4px 8px; line-height: 1; min-width: 40px; min-height: 36px; }
@@ -80,9 +80,9 @@ input::placeholder { color: var(--hint); }
 .preset .ic { grid-row: span 2; font-size: 34px; }
 .preset b { font: 800 20px var(--display); }
 .preset small { color: var(--mut); font-size: 14px; font-weight: 500; }
+.preset b:only-of-type:last-child { grid-row: span 2; }
 .preset.on { border-color: var(--y); background: var(--sel-bg); }
 .preset:active { transform: scale(.98); }
-.cfgbtn small { display: block; color: var(--mut); font-size: 13px; font-weight: 500; margin-top: 4px; }
 
 /* Website: invite page */
 .invite { text-align: center; background: var(--card); border-radius: 20px; padding: 18px 16px; }
@@ -132,6 +132,10 @@ button.chip { border: 0; color: inherit; }
 .sheet h2 { font: 800 22px var(--display); margin: 2px 0 14px; text-align: center; }
 .sheet p { color: var(--mut); line-height: 1.45; margin: 0 0 14px; }
 .sheet .btn + .btn { margin-top: 10px; }
+/* The settings sheet: the settings scroll, "Done" stays in reach below them. */
+.sheet-settings { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.sheet-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 -16px; padding: 0 16px 8px; }
+.sheet-foot { padding: 12px 0 calc(22px + env(safe-area-inset-bottom)); box-shadow: 0 -14px 14px -10px var(--sheet); }
 .set { margin: 0 0 14px; }
 .sl { font-size: 13px; color: var(--mut); margin-bottom: 6px; }
 .seg { display: flex; gap: 6px; }

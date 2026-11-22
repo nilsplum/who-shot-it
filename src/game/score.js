@@ -5,7 +5,7 @@
  * when a round is revealed.
  *
  * Invariants: a right answer earns SCORING.min..max, falling linearly with the answer
- * time ("Speed counts") or SCORING.fixed ("Fixed"). With an unlimited timer, speed is
+ * time ("Speed bonus") or SCORING.fixed ("Fixed"). With an unlimited timer, speed is
  * measured against TIMING.untimedReferenceMs. The streak bonus adds streakStep for each
  * right answer in a row beyond the first, capped at streakMax. Wrong or no answer: 0.
  */
