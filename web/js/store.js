@@ -98,12 +98,17 @@ export const session = {
   flagged: null,
   /** Photo access as the phone last reported it ('full' | 'limited' | 'denied' | 'ask'), or null before asking. */
   access: null,
-  /** The photo shown big while a finger holds it (`main.js`, hold to look), or null. */
+  /**
+   * What a finger holds to see big (`main.js`, hold to look): `{ tile }` (a photo of the
+   * choice, by its place) or `{ photo }` (the round's photo, "Show again"); else null.
+   */
   look: null,
   /** The answer just tapped, shown before the room confirms it: { photo, id }. */
   pick: null,
   /** performance.now() when each photo was first shown, for effects without a timer. */
   shownAt: {},
   uploading: false,
+  /** While "Yes" works: how far it is (`share`, 0 to 1) and at what (`label`), shown in place of No and Yes; else null. */
+  progress: null,
   creating: false,
 };

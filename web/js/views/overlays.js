@@ -9,8 +9,10 @@
  * down for a moment, so short hiccups never flash it. The 3-2-1 belongs to the lobby's
  * phases (a change during it returns to the lobby at once), so it is drawn over the lobby,
  * on the page's own background (`bg-page`) and fully opaque: nothing of the lobby shows
- * through, and it looks like a screen of its own. The held photo is the app's one way
- * to see a photo big ("hold to look", `main.js`): the whole photo on dark, like the stage.
+ * through, and it looks like a screen of its own. The held photo is the app's one way to
+ * see a photo big ("hold to look", `main.js`): the whole photo on dark, like the stage,
+ * drawn in layers with the best last. A photo of the choice shows its preview at once and
+ * its big version above it the moment it is there, so it gets sharper and is never empty.
  */
 
 import { SPINNER, esc } from '../ui.js';
@@ -27,9 +29,11 @@ export function bannerHtml(session, now) {
   return down ? '<div class="fixed inset-x-0 top-0 z-70 animate-fade bg-warning px-3 pt-[calc(--spacing(2)+env(safe-area-inset-top))] pb-2 text-center text-sm text-warning-ink" role="status">Reconnecting…</div>' : '';
 }
 
-/** The photo at `src` over everything while a finger holds it, or nothing. */
-export function lookHtml(src) {
-  return src ? `<div class="fixed inset-0 z-65 grid animate-fade place-items-center bg-stage pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"><img class="size-full object-contain" alt="Photo" src="${esc(src)}"></div>` : '';
+/** The photo over everything while a finger holds it (its layers, bottom first), or nothing. */
+export function lookHtml(layers) {
+  if (!layers.length) return '';
+  const imgs = layers.map((src, i) => `<img class="col-start-1 row-start-1 size-full object-contain" alt="${i === layers.length - 1 ? 'Photo' : ''}" src="${esc(src)}">`).join('');
+  return `<div class="fixed inset-0 z-65 grid animate-fade place-items-center bg-stage pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">${imgs}</div>`;
 }
 
 export const joiningScreen = {

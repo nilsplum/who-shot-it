@@ -13,7 +13,9 @@
 //   photos) fetches its small preview from iCloud, at most `cloudMs` per photo and twice
 //   that per batch, so one slow download never holds a batch for long. A photo that does
 //   not arrive in time is only skipped in this batch. A chosen photo may download its
-//   original for the upload.
+//   original for the upload; asked with `download: false` (the app's big versions ahead of
+//   time), `photo` takes only what the phone stores and answers "unreadable" otherwise, so
+//   preparing ahead never costs mobile data.
 // - Hidden photos are never picked. Screenshots are marked, so the game can leave them out.
 // - Without photo access nothing touches the library: that would make iOS ask on its own,
 //   outside the app's "Continue" step.
@@ -105,7 +107,8 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// The photo `id` for upload: `{ id, data }` (base64 JPEG at most `maxSide`), downloading
-    /// its original from iCloud if needed. Rejects when it cannot be read.
+    /// its original from iCloud if needed (`download`, default true; false takes only what
+    /// the phone stores). Rejects when it cannot be read.
     @objc func photo(_ call: CAPPluginCall) {
         guard readable, let id = call.getString("id") else {
             call.reject("unreadable")
@@ -113,9 +116,10 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let maxSide = CGFloat(call.getInt("maxSide") ?? 1080)
         let quality = CGFloat(call.getDouble("quality") ?? 0.75)
+        let download = call.getBool("download") ?? true
         work.async {
             guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
-                  let data = Self.jpeg(asset, side: maxSide, quality: quality, download: true) else {
+                  let data = Self.jpeg(asset, side: maxSide, quality: quality, download: download) else {
                 call.reject("unreadable")
                 return
             }

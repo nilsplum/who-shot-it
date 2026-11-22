@@ -12,8 +12,12 @@ know about. Kept up to date with every commit.
 **To do by hand**
 - Deploy the server before releasing the apps (`./scripts/deploy.sh`, a critical command;
   section 6): the new server keeps the installed apps working.
-- After commit 8: try the photo choice on a real iPhone and a real Android phone
-  (`./scripts/dev.sh ios` and `android`): the native `photo` call changed (AGENTS.md §5).
+- Try the photo choice on a real iPhone and a real Android phone (`./scripts/dev.sh ios`
+  and `android`): the native `photo` call got `download` in commit 8 (AGENTS.md §5). The
+  iPhone app compiles with it (simulator build); what only a real phone shows: with
+  "Optimize iPhone Storage" on, photos kept only in iCloud get their big version when they
+  are on screen (watch that "Yes" still uploads them), and the bucket's first minute of
+  work after the app starts should not make the phone warm or slow.
 - At the release (commit 13): upload the apps (`./scripts/release-apps.sh --submit`), and
   enter the changed Android store texts in the Play Console by hand (`./scripts/dev.sh
   store` shows them).
@@ -799,7 +803,7 @@ Status: done.
   e2e (a full game still runs; the board shows the loading bar when one phone is slowed).
 
 ### Commit 8: photo buckets: 250 previews and 100 big versions always ready, Yes with progress
-Status: open.
+Status: done.
 
 - `config.js`: `LIMITS.bucketPreviews` 250 and `LIMITS.bucketFulls` 100 (comments: memory,
   why big versions ahead come only from photos on the phone); `LIMITS.setsAhead` goes.
@@ -1006,3 +1010,13 @@ fonts, and removes any that look alike on one of them.
 | Commit 7: one job queue for photos | `web/js/loader.js`: one job at a time, the next one picked afresh after each (`pick`); the game's photos use it now, the photo buckets will in commit 8 | Priority is never stored, so nothing goes stale in a queue. |
 | Commit 7: a failed photo | A second try, then it counts as done (never holds up the room); a 404 (deleted meanwhile) is not tried again | A network blip at the start does not cost a photo; a deleted photo is not fetched twice. |
 | Commit 7: the loading bar | `ui.progress(share, label)`, as tall as the timer bar's slot; the board swaps one for the other, the stage shows it during `load` | No jump when a leaderboard starts waiting. The share is the other phones' readiness plus this phone's own exact progress. |
+| Commit 8: what the bucket holds | Only previews that fit the current "Which photos", each with its check stored (lines of text, screenshot); a new filter re-sorts the bucket from the stored checks | Keeping previews that do not fit would let a phone full of chats fill all 250 places with them and dealing would stall. |
+| Commit 8: the bucket's filter and the set's | Two facts: the filter the bucket gathers for (`gathering`, the room's or this phone's own) and the one the set on screen was dealt for (`photos.filter`, compared to deal anew) | One field for both made a new "Which photos" never deal a new set (caught by the browser test). |
+| Commit 8: the set and the bucket | A dealt photo is the bucket's own entry, so a big version still being fetched for it lands in the set | A copy would fetch the same big version twice. |
+| Commit 8: the two lanes | The ahead lane starts a job whenever the now lane has nothing more queued (its last job may still run) | Waiting for the now lane's last job to end too needed a second wake-up that never came: the ahead lane stalled for good (caught by the browser test). |
+| Commit 8: a big version not stored on the phone | Ahead of time it is marked `ahead` and left; once its photo is on screen the now lane fetches it with the download | No mobile data for photos that may never be shown; the photos on screen are always complete. |
+| Commit 8: the lobby's parts | Split now (title, pick, note, actions, links) instead of in commit 10 | The Yes progress repaints many times a second and must not repaint the grid. Each state places its content as before (cards and "✓ Ready" without photos at the top). |
+| Commit 8: the upload | `XMLHttpRequest` with the same timeout and header; the label turns to "Sending photos 0%" as soon as the upload starts | `fetch` cannot report upload progress; the first progress event can come late. |
+| Commit 8: when the bucket starts | Once the terms are accepted and the app may read photos (never with a question: asking stays with "Continue"); it survives leaving a room, access changes drop it | Reading photos before the terms are accepted would be wrong, and a new access may mean other photos. |
+| Commit 8: the photo held big | Layers: the preview, and the big version above it once there (`heldLayers`, `lookHtml`); the tests find it as the image named "Photo" | It is never empty and gets sharp in place, without inline handlers (the CSP forbids them). |
+| Commit 8: a name clash | The export is `holdPhoto` | `main.js` has its own `hold` (the hold-to-look state); the clash stopped the whole page from loading, which is why the first test run hung. |

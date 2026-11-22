@@ -14,12 +14,17 @@
  * between the players and the buttons allows; on a short screen (`short:`) the code and
  * the gaps above it are smaller to leave it more. Tapping a photo swaps it (`photos.swap`,
  * counted under the grid), holding one shows it big (`main.js`, hold to look); a refused
- * swap shows a cross on that photo, nothing else.
+ * swap shows a cross on that photo, nothing else. While "Yes" works, a bar takes the place
+ * of No and Yes and says how far it is (`session.progress`: the big versions getting
+ * ready, then sending).
+ *
+ * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so what
+ * changes often (the progress, the swap counter) never repaints the grid and its photos.
  */
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
 import { photos } from '../photos.js';
-import { HELP_BUTTON, LEAVE_BUTTON, SPINNER, avatar, esc, topBar } from '../ui.js';
+import { HELP_BUTTON, LEAVE_BUTTON, SPINNER, avatar, esc, progress, topBar } from '../ui.js';
 
 const label = (key, value) => {
   const setting = SETTINGS.find((s) => s.key === key);
@@ -78,29 +83,43 @@ function card(icon, title, text, button) {
 
 const mainButton = (act, text) => `<button class="btn mt-4 bg-coral text-white" data-act="${act}">${text}</button>`;
 
+/** No and Yes, or while "Yes" works the bar in their place (as tall as the buttons, so nothing moves). */
+function actions(session) {
+  if (session.progress) return `<div class="mt-3.5 flex h-14 items-center">${progress(session.progress.share, session.progress.label)}</div>`;
+  const off = session.uploading || photos.rolling ? 'disabled' : '';
+  return `<div class="mt-3.5 grid grid-cols-2 gap-2.5"><button class="btn" data-act="no" ${off}>No</button><button class="btn bg-green text-navy" data-act="yes" ${off}>Yes</button></div>`;
+}
+
+/** The player's photo area as its five parts: `{ title, pick, note, actions, links }` (empty ones are ''). */
 function mine({ view, session }) {
   const me = view.me;
+  const parts = { title: '', pick: '', note: '', actions: '', links: '' };
+  const ready = '<div class="mt-4 text-center"><b class="text-green">✓ Ready</b></div><button class="link" data-act="unready">Change</button>';
   if (me.ready) {
+    if (!me.photoCount) return { ...parts, pick: ready };
     // Without the local previews (the app was closed meanwhile), neutral tiles stand in.
     const tiles = photos.chosen.length === me.photoCount && photos.chosen.every((c) => c.url)
       ? chosenTiles(true)
       : Array.from({ length: me.photoCount }, () => `<div class="${TILE}">📷</div>`);
-    return `${me.photoCount ? grid(tiles, view.settings.photos) : ''}<div class="mt-4 text-center"><b class="text-green">✓ Ready</b></div><button class="link" data-act="unready">Change</button>`;
+    return { ...parts, pick: grid(tiles, view.settings.photos), note: ready };
   }
   if (photos.chosen.length) {
-    const busy = session.uploading;
     const limited = session.access === 'limited'
       ? '<button class="link" data-act="opensettings">Only some photos are shared. Share all ›</button>'
       : '';
-    return `<h2 class="mb-3 text-center font-display text-2xl font-extrabold">Play with these?</h2>${grid(chosenTiles(false), view.settings.photos)}${swapsLine()}
-      <div class="mt-3.5 grid grid-cols-2 gap-2.5"><button class="btn" data-act="no" ${busy || photos.rolling ? 'disabled' : ''}>No</button><button class="btn bg-green text-navy" data-act="yes" ${photos.rolling || busy ? 'disabled' : ''}>Yes</button></div>
-      ${limited}${withoutPhotos}`;
+    return {
+      title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold">Play with these?</h2>',
+      pick: grid(chosenTiles(false), view.settings.photos),
+      note: swapsLine(),
+      actions: actions(session),
+      links: `${limited}${withoutPhotos}`,
+    };
   }
   if (session.access === 'ask') {
-    return card('🖼️', 'Your photos', 'The game picks a few random photos from your phone. You see them first.', mainButton('allow', 'Continue'));
+    return { ...parts, pick: card('🖼️', 'Your photos', 'The game picks a few random photos from your phone. You see them first.', mainButton('allow', 'Continue')) };
   }
   if (session.access === 'denied') {
-    return card('🔒', 'Photos are turned off', 'Allow photos for this app in your phone’s settings.', mainButton('opensettings', 'Open settings'));
+    return { ...parts, pick: card('🔒', 'Photos are turned off', 'Allow photos for this app in your phone’s settings.', mainButton('opensettings', 'Open settings')) };
   }
   if (photos.empty) {
     const limited = session.access === 'limited';
@@ -108,9 +127,9 @@ function mine({ view, session }) {
     const why = limited ? 'Share more photos with this app in your phone’s settings.'
       : filtered ? 'None of the photos here fit “Which photos” in the game settings.'
         : 'This phone has no photos the game can use.';
-    return card('🔍', 'No photos found', why, limited ? mainButton('opensettings', 'Open settings') : '');
+    return { ...parts, pick: card('🔍', 'No photos found', why, limited ? mainButton('opensettings', 'Open settings') : '') };
   }
-  return `<div class="${PICK}">${SPINNER}</div>`;
+  return { ...parts, pick: `<div class="${PICK}">${SPINNER}</div>` };
 }
 
 /**
@@ -146,13 +165,19 @@ export function lobbyScreen(c) {
       <button class="mx-auto mt-1.5 mb-2 flex justify-center gap-2 active:scale-97" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span class="grid h-16 w-13.5 place-items-center rounded-2xl bg-yellow font-display text-6xl font-extrabold text-navy short:h-12 short:w-10.5 short:text-4xl">${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>
       <div class="mt-4.5 mb-1.5 flex flex-wrap justify-center gap-2 short:mt-2.5" data-part="chips"></div>
-      <div class="mt-4.5 flex flex-1 flex-col short:mt-2.5" data-part="mine"></div>
+      <div class="mt-4.5 flex min-h-0 flex-1 flex-col short:mt-2.5">
+        <div data-part="title"></div>
+        <div class="flex min-h-0 flex-1 flex-col" data-part="pick"></div>
+        <div data-part="note"></div>
+        <div data-part="actions"></div>
+        <div data-part="links"></div>
+      </div>
       <div data-part="status"></div>
     </div>`,
     parts: {
       cfg: `<button class="mx-auto block rounded-full border border-line bg-card px-3.5 py-1.75 text-xs ${host ? 'text-ink' : 'text-muted'}" data-act="settings">${esc(settingsSummary(view.settings))}${host ? ' ⚙︎' : ''}</button>`,
       chips: view.players.map((p) => chip(view, p, host)).join(''),
-      mine: mine(c),
+      ...mine(c),
       status: status(c),
     },
   };

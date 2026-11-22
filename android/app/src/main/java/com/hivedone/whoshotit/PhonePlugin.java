@@ -11,8 +11,9 @@
  * - Previews are the phone's own thumbnails (quick, already upright), scaled to fit exactly
  *   like on the iPhone, because the text check is tuned to that size. Every photo in the
  *   phone's media store has the same chance; `cloudMs` (the iPhone's limit for previews
- *   kept only in iCloud) is accepted and unused, since the media store holds only photos
- *   on the phone (a cloud backup such as Google Photos is not readable by other apps).
+ *   kept only in iCloud) and `photo`'s `download` (the iPhone's switch for iCloud
+ *   originals) are accepted and unused, since the media store holds only photos on the
+ *   phone (a cloud backup such as Google Photos is not readable by other apps).
  * - Screenshots (anything in a Screenshots folder) are marked, so the game can leave them out.
  * - Access is "limited" when the player shared only some photos (Android 14 and newer,
  *   READ_MEDIA_VISUAL_USER_SELECTED); the game then draws from those.
@@ -178,7 +179,10 @@ public class PhonePlugin extends Plugin {
         return result;
     }
 
-    /** The photo `id` for upload: `{ id, data }` (base64 JPEG at most `maxSide`). Rejects when it cannot be read. */
+    /**
+     * The photo `id` for upload: `{ id, data }` (base64 JPEG at most `maxSide`). Rejects when
+     * it cannot be read. `download` is the iPhone's (every photo here is on the phone).
+     */
     @PluginMethod
     public void photo(PluginCall call) {
         String id = call.getString("id");

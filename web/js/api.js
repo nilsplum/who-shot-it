@@ -9,7 +9,9 @@
  *
  * Invariants: the player's key travels only in the `Authorization` header, never in a
  * URL. Every call has a timeout, and a failed call throws, so the caller can show one
- * short message and let the player try again.
+ * short message and let the player try again. The upload goes through `XMLHttpRequest`,
+ * the one way a page learns how much of a body is sent (`fetch` cannot tell), so "Yes"
+ * shows a real percentage.
  */
 
 import { API } from '../shared/api.js';
@@ -35,9 +37,24 @@ export async function createRoom(settings) {
   return (await res.json()).code;
 }
 
-/** "Yes": the chosen JPEGs become the player's set and the player is ready (none = just guess). */
-export async function uploadPhotos(code, key, blobs) {
+/**
+ * "Yes": the chosen JPEGs become the player's set and the player is ready (none = just
+ * guess). `onProgress` hears how much is sent, 0 to 1.
+ */
+export function uploadPhotos(code, key, blobs, onProgress = () => {}) {
   const form = new FormData();
   blobs.forEach((blob, i) => form.append('photo', blob, `${i + 1}.jpg`));
-  await request(API.photos(code), { method: 'PUT', headers: auth(key), body: form }, 90000);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', serverUrl(API.photos(code)));
+    xhr.setRequestHeader('Authorization', auth(key).Authorization);
+    xhr.timeout = 90000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error('network'));
+    xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.send(form);
+  });
 }

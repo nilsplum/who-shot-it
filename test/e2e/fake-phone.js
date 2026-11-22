@@ -4,8 +4,9 @@
  * photos as its "library"; photo access starts as "ask" and becomes "full" when the app
  * asks, like a player tapping "Allow all" on a real phone. A stand-in for Capacitor's
  * Haptics plugin writes down what the phone would feel (`window.felt`: an impact's
- * strength, or a vibration as "120 ms"). Everything else of the app (screens, sockets,
- * uploads, server) is the real thing.
+ * strength, or a vibration as "120 ms"), and every big version the app asks for
+ * (`window.pulled`, with its `download` switch). Everything else of the app (screens,
+ * sockets, uploads, server) is the real thing.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,8 @@ export const library = [1, 2, 3, 4, 5, 6].map((i) => fs.readFileSync(path.join(F
 export function installFakePhone(photos) {
   let access = 'ask';
   window.felt = [];
+  /** Every big version the app asked for, and whether it allowed a download: { id, download }. */
+  window.pulled = [];
   const library = photos.map((p, i) => ({ id: `photo-${i + 1}`, data: typeof p === 'string' ? p : p.data, screenshot: Boolean(p.screenshot) }));
   window.Capacitor = {
     Plugins: {
@@ -37,7 +40,8 @@ export function installFakePhone(photos) {
           const free = library.filter((p) => !exclude.includes(p.id)).sort(() => Math.random() - 0.5);
           return { photos: access === 'ask' ? [] : free.slice(0, count) };
         },
-        photo: async ({ id }) => {
+        photo: async ({ id, download }) => {
+          window.pulled.push({ id, download });
           const found = library.find((p) => p.id === id);
           if (!found) throw new Error('unreadable');
           return { id, data: found.data };

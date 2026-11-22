@@ -218,8 +218,17 @@ export const LIMITS = {
   previewQuality: 0.7,
   /** A photo with this many lines of text or more counts as full of text ("Which photos"). */
   textLines: 6,
-  /** How many sets of photos the app keeps ready beyond the one on screen, so "No" never waits. */
-  setsAhead: 2,
+  /**
+   * The phone's bucket of checked previews, filled whenever the app may read photos, so a
+   * set, "No" and a swap never wait (`web/js/photos.js`): about 10 MB of small JPEGs.
+   */
+  bucketPreviews: 250,
+  /**
+   * The first this many previews of the bucket also get their big version (the upload size)
+   * ahead, from photos stored on the phone only, so holding a photo is sharp and "Yes"
+   * uploads at once: about 25 MB.
+   */
+  bucketFulls: 100,
   /**
    * "Photo mix: Balanced": each player's photos come up between 60% and 140% of an equal
    * share of the rounds (rounded; 15 rounds and 4 players: 2 to 5 each), so counting whose

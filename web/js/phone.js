@@ -84,10 +84,12 @@ export async function randomPhotos(count, exclude) {
 /**
  * The photo `id` as it is uploaded: a JPEG Blob at most LIMITS.photoMaxSide. Throws if the
  * phone cannot read it or needs longer than TIMING.photoPickMs (an iCloud original that
- * does not download).
+ * does not download). `download: false` takes only what the phone stores: a photo kept
+ * only in iCloud then throws at once instead of costing mobile data (the bucket's big
+ * versions ahead of time); Android keeps no cloud-only photos and ignores it.
  */
-export async function photo(id) {
-  const answer = await within(TIMING.photoPickMs, plugin('Phone').photo({ id, maxSide: LIMITS.photoMaxSide, quality: LIMITS.photoQuality }));
+export async function photo(id, { download = true } = {}) {
+  const answer = await within(TIMING.photoPickMs, plugin('Phone').photo({ id, maxSide: LIMITS.photoMaxSide, quality: LIMITS.photoQuality, download }));
   if (!answer || !answer.data) throw new Error('unreadable');
   return jpegBlob(answer.data);
 }

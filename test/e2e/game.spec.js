@@ -133,7 +133,7 @@ test('friends play a full game and start another one', async ({ browser }) => {
       const box = await button.boundingBox();
       await guests[0].mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await guests[0].mouse.down();
-      await expect(host.locator('#look img')).toBeVisible();
+      await expect(host.locator('#look').getByRole('img', { name: 'Photo' })).toBeVisible();
       await guests[0].mouse.up();
       await expect(host.locator('#look img')).toHaveCount(0);
     }
@@ -223,6 +223,9 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   await phone.getByRole('button', { name: 'Continue' }).click();
   const tiles = phone.locator('[data-act="swap"]');
   await expect(tiles).toHaveCount(4);
+  // Big versions are prepared ahead for photos still waiting in the bucket, only from what
+  // the phone stores (no download); the set on screen may download.
+  await expect.poll(() => phone.evaluate(() => window.pulled.some((p) => p.download === false))).toBe(true);
   const swaps = phone.getByText(/^↻ /);
   await expect(swaps).toHaveText('↻ Tap a photo to swap it: 3 left');
   const style = async (i) => tiles.nth(i).getAttribute('style');
@@ -248,9 +251,12 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   const box = await tiles.nth(1).boundingBox();
   await phone.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await phone.mouse.down();
-  await expect(phone.locator('#look img')).toBeVisible();
+  // The photo shows at once and turns sharp in place: its big version above the preview.
+  const held = phone.locator('#look').getByRole('img', { name: 'Photo' });
+  await expect(held).toBeVisible();
+  await expect(phone.locator('#look img')).toHaveCount(2);
   await phone.mouse.move(5, 5);
-  await expect(phone.locator('#look img')).toBeVisible();
+  await expect(held).toBeVisible();
   await phone.mouse.up();
   await expect(phone.locator('#look img')).toHaveCount(0);
   expect(await style(1)).toBe(second);
