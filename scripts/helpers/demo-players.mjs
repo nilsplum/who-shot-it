@@ -7,10 +7,12 @@
  *
  * Each player is the real app page in a headless browser with the end-to-end tests' fake
  * photo plugin (`test/e2e/fake-phone.js`) and drawn stand-in photos (`demo-photos.mjs`),
- * so they upload nobody's real photos. They accept the terms, join, say Yes to their
- * photos, guess a random player a moment after each photo appears, and leave at the end
- * of the game (run them again for the next one), or when the game is gone or the host
- * removed them. Ctrl+C ends them all.
+ * so they upload nobody's real photos. They accept the terms, join, wait half a minute
+ * before they say Yes to their photos (the game starts by itself once everyone is ready, so
+ * the host has time to show the lobby, for example removing a player), guess a random
+ * player a moment after each photo appears, and stay on the end screen for two minutes
+ * (playing along if the host taps "Play again") before they leave. They also stop when the
+ * game is gone or the host removed them. Ctrl+C ends them all.
  */
 import { chromium } from '@playwright/test';
 import { SERVER } from '../../web/shared/config.js';
@@ -23,6 +25,8 @@ if (!/^[A-Z0-9]{4}$/.test(code || '')) {
   process.exit(1);
 }
 const NAMES = [['Leo', '🐼'], ['Zoe', '🦄'], ['Max', '🐸'], ['Ida', '🐙']];
+const READY_AFTER_MS = 30_000;
+const END_STAY_MS = 120_000;
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function player(browser, library, [name, avatar]) {
@@ -38,20 +42,31 @@ async function player(browser, library, [name, avatar]) {
   await page.fill('#code', code);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   console.log(`${avatar} ${name} joined ${code}`);
+  const joined = Date.now();
   let lastRound = null;
-  // Plays along until the end screen (then leaves the room properly, so "Play again" does
-  // not wait for it) or until the page is back on the start screen (room gone, removed).
+  let ended = null;
+  // Plays along until the page is back on the start screen (room gone, removed), or until
+  // the end screen has shown for a while: then it leaves the room properly, so a later
+  // "Play again" does not wait for it.
+  let reason = '';
   for (;;) {
     await pause(400 + Math.random() * 400);
-    if (await page.locator('#code').count()) break;
-    if (await page.locator('.podium').count()) {
-      await page.getByRole('button', { name: 'Leave' }).click();
+    if (await page.locator('#code').count()) {
+      reason = (await page.locator('#toast').textContent()) || 'the game is gone';
       break;
     }
-    const proceed = page.getByRole('button', { name: 'Continue' });
-    if (await proceed.count()) await proceed.click();
-    const yes = page.getByRole('button', { name: 'Yes' });
-    if (await yes.count() && await yes.isEnabled()) await yes.click();
+    ended = (await page.locator('.podium').count()) ? ended || Date.now() : null;
+    if (ended && Date.now() - ended > END_STAY_MS) {
+      await page.getByRole('button', { name: 'Leave' }).click();
+      reason = 'after the game';
+      break;
+    }
+    if (Date.now() - joined > READY_AFTER_MS) {
+      const proceed = page.getByRole('button', { name: 'Continue' });
+      if (await proceed.count()) await proceed.click();
+      const yes = page.getByRole('button', { name: 'Yes' });
+      if (await yes.count() && await yes.isEnabled()) await yes.click();
+    }
     const round = await page.locator('.rnd').textContent().catch(() => null);
     const options = page.locator('button.opt:not([disabled])');
     if (round && round !== lastRound && await options.count()) {
@@ -61,7 +76,7 @@ async function player(browser, library, [name, avatar]) {
       lastRound = round;
     }
   }
-  console.log(`${avatar} ${name} left (${(await page.locator('#toast').textContent()) || 'game over'})`);
+  console.log(`${avatar} ${name} left (${reason})`);
   await context.close();
 }
 
