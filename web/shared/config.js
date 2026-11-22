@@ -226,6 +226,18 @@ export const LIMITS = {
    * photos were shown never tells whose comes next (`src/game/plan.js`).
    */
   balancedSpread: 0.4,
+  /**
+   * Once a game is dealt (its 3-2-1), every phone loads its photos in play order: the one on
+   * screen and this many after it first, then the rest one by one (`web/js/upcoming.js`).
+   */
+  loadAhead: 3,
+  /**
+   * A phone is ready for a round once it holds that round's photo and this many after it
+   * (or all that are left). The room shows round 1 only when every phone is ready for it,
+   * and ends a leaderboard only when every phone is ready for the next round, so a round
+   * never waits for a photo mid-way (`src/game/rules.js`).
+   */
+  readyAhead: 2,
   /** How many single photos a player may swap in one set (tap a photo); a new set starts over. */
   swapsPerSet: 3,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */
@@ -238,7 +250,11 @@ export const LIMITS = {
 export const TIMING = {
   /** 3-2-1 before the first round once everyone is ready. */
   countdownMs: 3000,
-  /** Longest wait for every app to have the round's photo before the timer starts. */
+  /**
+   * Longest wait for every phone to be ready for a round (LIMITS.readyAhead): before round 1
+   * shows, and after a leaderboard's time is up. A phone that is still loading then catches
+   * up while the others play.
+   */
   loadMaxMs: 6000,
   /** Extra time after the answer timer, for answers still on the wire. */
   answerGraceMs: 1500,
@@ -284,6 +300,8 @@ export const TIMING = {
   socketStaleMs: 45000,
   /** While sockets are open, the room checks for stale ones this often. */
   sweepMs: 30000,
+  /** Longest wait for one game photo from the server, before the phone counts it as failed. */
+  photoFetchMs: 20000,
   /** Longest wait for the phone to hand over one photo (an iCloud original may download). */
   photoPickMs: 20000,
   /**

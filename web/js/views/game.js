@@ -3,12 +3,14 @@
  * card per player to pick from (everyone answers, the owner included, and anyone may pick
  * themselves), who has answered, and the reveal.
  *
- * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
- * photo (and the next one), tells the room once it is loaded, starts the effect when the
- * `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when the
- * photo appears and on the reveal (`main.js` `moments`). The bar is a part of its own: on the reveal it changes from the
- * answer time's look to the look time's (`ui.timerBar`). Photo links in the view are server paths; `serverUrl` makes them
- * full addresses. The host can tap a player in the "who has answered" row to remove them
+ * Mechanisms: shown in the `load`, `show` and `reveal` phases. The game's photos are
+ * loaded ahead into memory (`upcoming.js`): the stage paints the round's photo from there
+ * (`state.src`), and while the room waits for the phones to be ready for the round (`load`)
+ * it shows how far the whole table is (`ui.progress`). `main.js` starts the effect when
+ * the `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when
+ * the photo appears and on the reveal (`main.js` `moments`). The bar is a part of its own:
+ * on the reveal it changes from the answer time's look to the look time's
+ * (`ui.timerBar`). The host can tap a player in the "who has answered" row to remove them
  * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here. While
  * someone else flagged the photo (`round.flag`, not mine), the stage says so instead of
  * showing it and the cards wait; the flagger keeps the photo under the report sheet.
@@ -26,8 +28,7 @@
  * a right pick also makes the owner's card pop and throw a little confetti.
  */
 
-import { serverUrl } from '../api.js';
-import { LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, reactionsRow, timerBar, topBar } from '../ui.js';
+import { LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -40,18 +41,21 @@ const notice = (icon, title, line = '') =>
   `<div class="${CENTRED} px-6 text-center"><div><div class="text-6xl leading-none">${icon}</div><b class="mt-3 block text-xl">${title}</b>${line ? `<span class="mt-1 block text-muted">${line}</span>` : ''}</div></div>`;
 
 /**
- * The photo, or a spinner until it is loaded. Pixel mode draws on a canvas. A photo gone
- * during the reveal (reported, or its owner left) leaves a plain sign behind; one flagged by
- * someone else is hidden while they decide; one that could not load says so.
- * @param photo this phone's copy of the photo: 'loading' | 'ok' | 'error'
+ * The photo, or what the phone waits for. Pixel mode draws on a canvas. A photo gone during
+ * the reveal (reported, or its owner left) leaves a plain sign behind; one flagged by
+ * someone else is hidden while they decide; one that could not load says so. While the room
+ * waits for the phones (`load`), the bar shows how far the whole table is.
+ * @param state this phone's copy of the photo (`photo`: 'loading' | 'ok' | 'error', `src`:
+ *              its object URL) and the table's loading share (`loading`, or null)
  */
-function stage(view, photo) {
+function stage(view, { photo, src: url, loading }) {
   const r = view.round;
   if (view.phase === 'reveal' && !r.photo) return `<div class="${CENTRED} text-8xl opacity-50">🚫</div>`;
   if (r.flag && !r.flag.mine) return notice('⚑', 'Someone flagged this photo', 'Waiting…');
   if (r.photo && photo === 'error') return notice('😕', 'This photo could not load');
+  if (view.phase === 'load' && loading !== null) return `<div class="${CENTRED} px-10">${progress(loading, 'Loading photos')}</div>`;
   if (view.phase === 'load' || !r.photo || photo !== 'ok') return `<div class="${CENTRED}">${SPINNER}</div>`;
-  const src = esc(serverUrl(r.photo));
+  const src = esc(url);
   const media = view.phase === 'show' && r.mode === 'pixel' ? '<canvas class="size-full object-contain"></canvas>' : `<img class="size-full object-contain" alt="" src="${src}">`;
   // Phase and round in the markup make the reveal repaint the plain photo, ending any effect.
   return `<div class="absolute inset-0 overflow-hidden" data-round="${r.n}" data-phase="${view.phase}">${media}</div>
@@ -124,7 +128,9 @@ function after(view, reactions) {
 
 /**
  * @param state { picked: my pick or null, late: time is up, photo: this phone's copy of the
- *                photo ('loading' | 'ok' | 'error'), reactions: the reaction emojis }
+ *                photo ('loading' | 'ok' | 'error'), src: its object URL, loading: how far
+ *                the table is while the room waits for the photos (0 to 1) or null,
+ *                reactions: the reaction emojis }
  */
 export function gameScreen(c, state) {
   const { view } = c;
@@ -141,7 +147,7 @@ export function gameScreen(c, state) {
     parts: {
       bar: bar(view),
       timer: timerBar(view.phase === 'reveal' ? 'look' : 'answer'),
-      stage: stage(view, state.photo),
+      stage: stage(view, state),
       opts: cards(view, state),
       dots: dots(view, host),
       after: after(view, state.reactions),

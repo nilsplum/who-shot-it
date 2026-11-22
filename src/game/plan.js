@@ -2,7 +2,7 @@
  * Builds a game's round plan: which photo comes up in which round.
  *
  * Mechanisms: part of the pure game logic; `rules.js` calls `buildPlan` once when the
- * countdown ends, with every ready player's uploaded photos.
+ * 3-2-1 starts (the game is dealt then), with every ready player's uploaded photos.
  *
  * Invariants:
  * - Rounds = all photos, or the "Rounds" setting if that is smaller.

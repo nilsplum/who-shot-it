@@ -32,8 +32,11 @@ const ROOM_ROUTES = [
  * elsewhere: stop and offer "Play here"), full, gone (no room with this code), left
  * (after Leave) and removed (the host removed this player).
  *
- * Messages on the socket are JSON. App to room: `{ type: 'hello', key, name, avatar }`
- * first, then `leave`, `unready`, `setting {key, value}`, `loaded {round}`, `answer {pick}`,
+ * Messages on the socket are JSON. App to room: `{ type: 'hello', key, name, avatar, ahead }`
+ * first (`ahead`: this app loads the game's photos ahead), then `leave`, `unready`,
+ * `setting {key, value}`, `loaded {round}` (the round this phone is ready for: it holds
+ * that round's photo and the next LIMITS.readyAhead; apps without `ahead` send the round
+ * whose photo is on screen), `answer {pick}`,
  * `next`, `again`, `flag {round, on}` (⚑ on the photo of that round, or Cancel),
  * `report {round}` (Delete on it; apps before the flag send no round), `kick {target}`,
  * `peek {on}` ("Show again" held or let go; renewed while held), `react {emoji}`, plus the

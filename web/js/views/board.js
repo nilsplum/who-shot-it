@@ -11,7 +11,9 @@
  * `data-cell="rank"`) and counts the totals up (`data-from` to `data-to`, cell
  * `data-cell="total"`). Holding "Show again" (`data-hold="peek"`, `main.js`) shows the
  * round's photo to every player while the finger stays down, and the room's clock stands
- * still meanwhile. The list scrolls by itself when there are more players than fit, so
+ * still meanwhile. When the board's time is up but not every phone holds the next round's
+ * photos yet, it stays and its timer turns into the table's loading bar (`loading`, the
+ * same size, so nothing moves). The list scrolls by itself when there are more players than fit, so
  * the reactions and the buttons always stay on screen.
  *
  * Invariants: nothing here changes while the board is on screen (the timer bar is drawn
@@ -19,7 +21,7 @@
  * keep join order. Every row says the same in words for screen readers.
  */
 
-import { LEAVE_BUTTON, avatar, esc, reactionsRow, timerBar, topBar } from '../ui.js';
+import { LEAVE_BUTTON, avatar, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
 
 /** Players ranked by `score(p)`, ties in join order: [{ p, rank, index }]. */
 function ranking(players, score) {
@@ -58,7 +60,8 @@ function rows(view) {
   }).join('');
 }
 
-export function boardScreen({ view }, { reactions }) {
+/** @param state { reactions: the reaction emojis, loading: how far the table is while the board waits for photos (0 to 1) or null } */
+export function boardScreen({ view }, { reactions, loading }) {
   const host = view.hostId === view.me.id;
   const r = view.round;
   return {
@@ -66,13 +69,14 @@ export function boardScreen({ view }, { reactions }) {
     layout: `<div class="screen h-dvh">
       ${topBar(LEAVE_BUTTON)}
       <h2 class="mt-1 text-center font-display text-4xl font-extrabold">Round ${r.n} of ${r.total}</h2>
-      ${timerBar('look')}
+      <div data-part="timer"></div>
       <div class="mt-1 min-h-0 flex-1 overflow-y-auto" data-part="board"></div>
       ${reactionsRow(reactions)}
       <div data-part="next"></div>
       <div data-part="look"></div>
     </div>`,
     parts: {
+      timer: loading === null ? timerBar('look') : progress(loading, 'Loading photos'),
       board: rows(view),
       next: host && !view.settings.auto ? '<button class="btn mt-3 bg-coral text-white" data-act="next">Next</button>' : '',
       // A reported photo is gone: then there is nothing to show again.

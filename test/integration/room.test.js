@@ -175,19 +175,23 @@ describe('a full game', () => {
     await ann.until((v) => v.players.length === 2);
     expect((await upload(code, ann.key, JPEGS)).status).toBe(204);
     expect((await upload(code, ben.key, [JPEGS[0]])).status).toBe(204);
-    await ann.until((v) => v.phase === 'countdown');
+    // The 3-2-1 deals the game: from now on every phone may load all of its photos, and
+    // nothing on the way may store them.
+    const dealt = await ann.until((v) => v.phase === 'countdown');
+    expect(dealt.upcoming).toHaveLength(3);
+    for (const link of dealt.upcoming) {
+      const res = await call(link);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toBe('image/jpeg');
+      expect(res.headers.get('Cache-Control')).toBe('no-store');
+    }
+    expect((await call(API.photo(code, 'nosuchphoto'))).status).toBe(404);
 
     await advance(code, TIMING.countdownMs);
     const load = await ann.until((v) => v.phase === 'load');
     expect(load.round).toMatchObject({ n: 1, total: 3, owner: null });
+    expect(load.upcoming).toEqual(dealt.upcoming);
     expect(await countRows(code, 'photos')).toBe(3);
-
-    // The photo on screen and the next one can be fetched, nothing else.
-    const current = await call(load.round.photo);
-    expect(current.status).toBe(200);
-    expect(current.headers.get('Content-Type')).toBe('image/jpeg');
-    expect((await call(load.round.next)).status).toBe(200);
-    expect((await call(API.photo(code, 'nosuchphoto'))).status).toBe(404);
 
     for (let round = 1; round <= 3; round++) {
       for (const p of [ann, ben]) p.send({ type: 'loaded', round });

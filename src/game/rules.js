@@ -37,8 +37,15 @@
  * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
  *   lobby ("Play again"). The reveal is always timed; the board (the leaderboard between
  *   the photos) is timed when "Next round" is automatic and waits for the host's "Next"
- *   otherwise. A countdown falls back to the lobby whenever "everyone is ready" stops
- *   being true.
+ *   otherwise.
+ * - The game is dealt when the 3-2-1 starts (`deal`: which photos, in which order), so the
+ *   phones load its photos during the countdown. The countdown runs only while its deal
+ *   holds: everyone is ready and every dealt photo is still in its owner's hands
+ *   (`dealHolds`); anything else (someone unreadies, leaves, is removed, a setting changes)
+ *   returns to the lobby, and the next 3-2-1 deals afresh.
+ * - The photos never make a round wait mid-way: round 1 shows once every connected phone is
+ *   ready for it, and a leaderboard whose time is up waits (`game.waiting`) until every
+ *   connected phone is ready for the next round; both at most TIMING.loadMaxMs.
  */
 
 import { EFFECTS, LIMITS, TIMING, normalizeSetting, normalizeSettings } from '../../web/shared/config.js';
@@ -47,7 +54,7 @@ import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
 import {
   answerTimeMs, canStart, cleanName, connectedPlayers, currentEntry, freeAvatar, inGame, makeId,
-  newPlayer, playerById, playerByKey, timerMs,
+  newGame, newPlayer, phonesReady, playerById, playerByKey, timerMs,
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
@@ -66,6 +73,32 @@ const timerEnd = (room, now, extra = 0) => {
 
 // ---------- Phase transitions ----------
 
+/** Back to the lobby with everyone's readiness kept (a 3-2-1 that stops); its deal is dropped. */
+function backToLobby(room) {
+  room.phase = 'lobby';
+  room.deadline = null;
+  room.game = null;
+}
+
+/**
+ * Everyone is ready: the game is dealt now (which photos come up, in which random order)
+ * and the 3-2-1 starts, so every phone loads the photos during the countdown. The players
+ * keep their photos until it ends (`startGame`).
+ */
+function deal(room, now, rng) {
+  room.game = newGame(buildPlan(room.players, room.settings, rng));
+  room.phase = 'countdown';
+  room.deadline = timerEnd(room, now);
+}
+
+/** The 3-2-1's deal still holds: every dealt photo is still in its owner's hands. */
+function dealHolds(room) {
+  return room.game.plan.every((e) => {
+    const owner = playerById(room, e.owner);
+    return Boolean(owner && owner.photos.includes(e.photo));
+  });
+}
+
 function toLobby(room, now) {
   room.phase = 'lobby';
   room.deadline = null;
@@ -80,24 +113,14 @@ function toLobby(room, now) {
   }
 }
 
+/** The 3-2-1 is over: the dealt photos now belong to the game, and readiness is spent for it. */
 function startGame(room, now, rng) {
-  const plan = buildPlan(room.players, room.settings, rng);
-  if (!plan.length) {
-    room.phase = 'lobby';
-    room.deadline = null;
-    return;
-  }
-  // The chosen photos now belong to the plan; readiness is spent for this game.
   for (const p of room.players) {
     p.ready = false;
     p.photos = [];
     p.score = 0;
     p.streak = 0;
   }
-  room.game = {
-    plan, round: 0, mode: null, zoom: null, options: [], answers: {}, loaded: [], shownAt: null, results: null,
-    peeks: {}, flag: null, pausedAt: null, stats: { fastest: null, fooled: {} },
-  };
   startRound(room, 1, now, rng);
 }
 
@@ -124,7 +147,7 @@ function startRound(room, n, now, rng) {
   g.zoom = { x: 20 + Math.round(rng() * 60), y: 20 + Math.round(rng() * 60) };
   g.options = answerOptions(room, entry.owner, rng);
   g.answers = {};
-  g.loaded = [];
+  g.waiting = false;
   g.shownAt = null;
   g.results = null;
   g.peeks = {};
@@ -209,6 +232,26 @@ function settleFlag(room, now, rng) {
 }
 
 /**
+ * A game saved by the previous server version gets today's shape once: a held board's
+ * remaining time (`paused`, with no deadline) becomes a clock that stopped now with that
+ * much left; the list of phones that had the photo on screen (`loaded`) becomes their mark
+ * for that round; a missing `waiting` means none.
+ */
+function upgradeGame(room, now) {
+  const g = room.game;
+  if (!g) return;
+  if (g.paused !== undefined) {
+    if (g.paused !== null) {
+      room.deadline = now + g.paused;
+      g.pausedAt = now;
+    }
+    delete g.paused;
+  }
+  if (Array.isArray(g.loaded)) g.loaded = Object.fromEntries(g.loaded.map((id) => [id, g.round]));
+  if (g.waiting === undefined) g.waiting = false;
+}
+
+/**
  * The round's clock follows whether the round is held: it stops when someone takes hold
  * (`pausedAt` notes when) and, once everyone has let go, runs on from where it stood: the
  * deadline and the moment the photo was shown move by the time it stood still, so the answer
@@ -217,15 +260,6 @@ function settleFlag(room, now, rng) {
 function settleClock(room, now) {
   const g = room.game;
   if (!g) return;
-  // A game saved by the previous server version kept a held board's remaining time in
-  // `paused` (and no deadline): it becomes a clock that stopped now with that much left.
-  if (g.paused !== undefined) {
-    if (g.paused !== null) {
-      room.deadline = now + g.paused;
-      g.pausedAt = now;
-    }
-    delete g.paused;
-  }
   const hold = held(g) && inGame(room);
   if (hold && !stopped(g)) g.pausedAt = now;
   else if (!hold && stopped(g)) {
@@ -253,7 +287,10 @@ function endGame(room) {
 
 /**
  * Removes a player for good: their photos go at once (the round on screen moves on if it
- * was theirs and still being guessed), and so do their answers.
+ * was theirs and still being guessed), and so do their answers. Their later rounds leave the
+ * plan, which renumbers the rounds after the current one, so the phones' readiness marks
+ * start over (the apps report again, `view.me.loaded`). During the 3-2-1 the deal no longer
+ * holds and the countdown starts over (`dealHolds`).
  */
 function removePlayer(room, playerId, now, rng) {
   if (!playerById(room, playerId)) return;
@@ -262,9 +299,11 @@ function removePlayer(room, playerId, now, rng) {
   if (!g || !inGame(room)) return;
   const current = g.round - 1;
   const entry = g.plan[current];
+  const before = g.plan.length;
   g.plan = g.plan.filter((e, i) => i <= current || e.owner !== playerId);
+  if (g.plan.length !== before) g.loaded = {};
   delete g.answers[playerId];
-  g.loaded = g.loaded.filter((id) => id !== playerId);
+  delete g.loaded[playerId];
   if (entry && entry.owner === playerId) {
     entry.photo = null;
     if (!afterGuessing(room)) nextRound(room, now, rng);
@@ -274,14 +313,19 @@ function removePlayer(room, playerId, now, rng) {
 // ---------- Events ----------
 
 const HANDLERS = {
-  /** First message of every socket: joins the room, or resumes the player with this key. */
-  join(room, { key, name, avatar }, now, rng) {
+  /**
+   * First message of every socket: joins the room, or resumes the player with this key.
+   * `ahead` says the app loads the game's photos ahead (`holdsRound`); an app that was
+   * updated meanwhile says so on its next connection.
+   */
+  join(room, { key, name, avatar, ahead }, now, rng) {
     const clean = cleanName(name);
     if (!clean || typeof key !== 'string' || !key || room.banned.includes(key)) return;
     const existing = playerByKey(room, key);
     if (existing) {
       existing.connected = true;
       existing.goneAt = null;
+      existing.ahead = ahead === true;
       // Name and avatar only change in the lobby, so nobody is renamed mid-game.
       if (inLobby(room)) {
         existing.name = clean;
@@ -291,7 +335,7 @@ const HANDLERS = {
     }
     if (room.players.length >= LIMITS.maxPlayers) return;
     const id = makeId(rng);
-    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now }));
+    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now, ahead: ahead === true }));
     if (!room.hostId) room.hostId = id;
   },
 
@@ -333,17 +377,18 @@ const HANDLERS = {
         p.photos = [];
       }
     }
-    // Any change restarts a running countdown, so nobody starts with settings they missed.
-    if (room.phase === 'countdown') {
-      room.phase = 'lobby';
-      room.deadline = null;
-    }
+    // Any change restarts a running countdown (and its deal), so nobody starts with settings they missed.
+    if (room.phase === 'countdown') backToLobby(room);
   },
 
+  /**
+   * A phone is ready for `round` (it holds that round's photo and the next
+   * LIMITS.readyAhead). Marks only grow; from the 3-2-1 on, for any round of the plan.
+   */
   loaded(room, { playerId, round }) {
     const g = room.game;
-    if (room.phase !== 'load' || !g || round !== g.round || !playerById(room, playerId) || g.loaded.includes(playerId)) return;
-    g.loaded.push(playerId);
+    if (!g || !(room.phase === 'countdown' || inGame(room)) || !playerById(room, playerId) || !Number.isInteger(round) || round < 1) return;
+    g.loaded[playerId] = Math.max(g.loaded[playerId] || 0, Math.min(round, g.plan.length));
   },
 
   /** An answer counts with the time it took; while the round's clock stands still, as of the moment it stopped. */
@@ -436,15 +481,13 @@ function transition(room, now, rng) {
   switch (room.phase) {
     case 'lobby':
       if (canStart(room)) {
-        room.phase = 'countdown';
-        room.deadline = timerEnd(room, now);
+        deal(room, now, rng);
         return true;
       }
       return false;
     case 'countdown':
-      if (!canStart(room)) {
-        room.phase = 'lobby';
-        room.deadline = null;
+      if (!canStart(room) || !dealHolds(room)) {
+        backToLobby(room);
         return true;
       }
       if (due) {
@@ -453,7 +496,7 @@ function transition(room, now, rng) {
       }
       return false;
     case 'load':
-      if (due || (connected.length > 0 && connected.every((p) => g.loaded.includes(p.id)))) {
+      if (due || everyoneHolds(room, g.round)) {
         show(room, now);
         return true;
       }
@@ -471,8 +514,15 @@ function transition(room, now, rng) {
       }
       return false;
     case 'board':
-      if (due) {
+      // Its time is up: the next round comes once every phone is ready for it; meanwhile the
+      // board waits, at most TIMING.loadMaxMs (a phone still loading then catches up).
+      if (g.waiting ? due || everyoneHolds(room, g.round + 1) : due && everyoneHolds(room, g.round + 1)) {
         nextRound(room, now, rng);
+        return true;
+      }
+      if (due) {
+        g.waiting = true;
+        room.deadline = now + TIMING.loadMaxMs;
         return true;
       }
       return false;
@@ -481,12 +531,19 @@ function transition(room, now, rng) {
   }
 }
 
+/** Every connected phone holds what round `r` needs (`phonesReady`); with nobody connected, the wait's own limit decides. */
+function everyoneHolds(room, r) {
+  const { ready, of } = phonesReady(room, r);
+  return of > 0 && ready === of;
+}
+
 /** Applies every due timer and transition until the room is stable. */
 function settle(room, now, rng) {
   if (now >= room.touchedAt + TIMING.roomIdleMs) {
     room.closed = true;
     return;
   }
+  upgradeGame(room, now);
   if (inLobby(room)) {
     for (const p of room.players.slice()) {
       if (!p.connected && p.goneAt !== null && now >= p.goneAt + TIMING.lobbyDropMs) removePlayer(room, p.id, now, rng);

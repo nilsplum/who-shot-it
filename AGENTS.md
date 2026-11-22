@@ -41,7 +41,7 @@ Every game room is one Durable Object, and a Durable Object handles one event at
 - **Nothing is held across a wait:** an `await` lets the room's next event in, so a handler reads its request body first and then reads the room, applies and commits without any `await` in between; the room state is never read before a wait and written after it (`src/room.js`, its docstring). Uploads re-check the room after reading the body.
 - **Few round trips:** the room state is one row; photos are deleted declaratively in one statement (`referencedPhotoIds`); an app gets one full snapshot per change, never a stream of diffs.
 - **Bounded waits, no polling:** every timer is the room's one alarm (`rules.nextWake`, never in the past), apps are pushed what changed over the socket, every app call has a timeout and every reconnect backs off (`web/js/connection.js`). Never poll.
-- **Send only what is shown:** an app receives only its view (`src/game/view.js`), and a photo only while it is on screen or next.
+- **Send only what is shown:** an app receives only its view (`src/game/view.js`), and a photo only while its game is dealt and its round not over (from the 3-2-1 on, the photos that are actually played, `upcomingEntries`); the phones keep them in memory only.
 - **The UI is a loop too:** one painter (`web/js/render.js`) repaints only the parts that changed, so effects, animations and inputs are never reset by an unrelated update.
 
 A change that adds a wait or a loop over players or photos states in its docstring what it holds while it waits.
@@ -98,7 +98,7 @@ Keep the README up to date, but never inflate it with unnecessary information. I
 
 1. **Never write secrets** (Cloudflare API tokens, player keys, the Android upload key and its password) to any file outside `secrets/`, or to any log message, URL, structured output field, or artifact field. A player key travels only in the socket's `hello` and the `Authorization` header; it never appears in a view (`src/game/view.js` builds views from an explicit list of fields).
 
-2. **Always build it securely**: Make sure everything is built in a secure and standard way, complying with the industry standards across the board. This game has real players whose photos must be treated as production-grade sensitive data: they are read only on the phone, leave it only after "Yes" (shrunk, without location data), are reachable only by unguessable links while on screen or next, and are deleted as soon as they are not needed. Only the apps (and the server's own pages) may call the API (`src/http.js`).
+2. **Always build it securely**: Make sure everything is built in a secure and standard way, complying with the industry standards across the board. This game has real players whose photos must be treated as production-grade sensitive data: they are read only on the phone, leave it only after "Yes" (shrunk, without location data), are reachable only by unguessable links from their game's 3-2-1 until their round is over (only the photos that are played, never stored on the phones), and are deleted as soon as they are not needed. Only the apps (and the server's own pages) may call the API (`src/http.js`).
 
 3. Critically think about the instructions/plans. Analyse the rest of the codebase and dont just blindly implement insecure logic. Everything should be well handled and secure.
 

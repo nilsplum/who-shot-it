@@ -1,7 +1,8 @@
 /**
  * Shared UI building blocks: HTML escaping, avatars, the top bar and its buttons, the logo
- * with the big title, the spinner, the list of rules or steps, the one toast, and the
- * reaction row with its floating emojis.
+ * with the big title, the two ways to show a wait (the spinner and the progress bar), the
+ * timer bar, the list of rules or steps, the one toast, and the reaction row with its
+ * floating emojis.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -70,7 +71,20 @@ export const hero = (title, { small = false, more = '' } = {}) =>
   `<div class="text-center ${small ? 'mb-4.5' : 'mb-7'}"><img class="mx-auto animate-bob rounded-[22%] shadow-lift motion-reduce:animate-none ${small ? 'size-16' : 'size-21'}" src="/icons/icon.svg" alt="">
     <h1 class="mt-3.5 font-display text-7xl font-extrabold tracking-tight">${title}</h1>${more}</div>`;
 
+/** A wait of unknown length (the photo being picked, joining); for a known amount, `progress`. */
 export const SPINNER = '<div class="mx-auto size-10 animate-spin rounded-full border-4 border-line border-t-yellow"></div>';
+
+/**
+ * A wait whose amount is known: what it waits for, how far it is (`share`, 0 to 1, as a
+ * percentage) and a bar filling up. It takes the timer bar's slot exactly (same height), so a
+ * leaderboard that starts waiting for photos swaps one for the other without anything moving.
+ */
+export function progress(share, label) {
+  const pct = Math.round(Math.max(0, Math.min(1, share)) * 100);
+  return `<div class="flex h-7 w-full flex-col justify-center gap-1" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+    <div class="flex justify-between text-xs leading-none text-muted"><span>${esc(label)}</span><span class="tabular-nums">${pct}%</span></div>
+    <div class="h-1.5 overflow-hidden rounded-full bg-raised"><i class="block h-full w-(--share) rounded-full bg-yellow" style="--share:${pct}%"></i></div></div>`;
+}
 
 /**
  * The timer bar's two looks, by what the time is for: `answer`, warm (coral to green), the
@@ -83,12 +97,12 @@ const TIMER_LOOKS = {
 };
 
 /**
- * The timer bar under the top bar (game and leaderboard), in one of its looks; `data-kind`
- * names it for the tests. `main.js` shrinks `#tbar` every frame and sets `data-off` on it
- * while no timer runs (the empty track stays).
+ * The timer bar under the top bar (game and leaderboard), in one of its looks, centred in a
+ * slot as tall as `progress`; `data-kind` names it for the tests. `main.js` shrinks `#tbar`
+ * every frame and sets `data-off` on it while no timer runs (the empty track stays).
  */
 export const timerBar = (kind) =>
-  `<div class="mt-2.5 mb-3 h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb ${TIMER_LOOKS[kind]} data-off:opacity-0" data-kind="${kind}"></i></div>`;
+  `<div class="flex h-7 flex-col justify-center"><div class="h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb ${TIMER_LOOKS[kind]} data-off:opacity-0" data-kind="${kind}"></i></div></div>`;
 
 /** A few rules or steps, each with an emoji in front (the terms, "How to play"); the texts are HTML. */
 export const steps = (items) =>

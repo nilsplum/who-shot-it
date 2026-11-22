@@ -22,16 +22,21 @@
  *     players: [Player], banned: [key], game: Game | null, final: Final | null }
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, photos: [id],
- *             score, streak, onResults }   (onResults: still on the last game's end screen)
+ *             score, streak, onResults, ahead }
+ *   (onResults: still on the last game's end screen; ahead: the app loads the game's
+ *   photos ahead and says which round it is ready for, see `holdsRound`)
  *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
- *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
+ *             answers: { [id]: { pick, ms } }, loaded: { [id]: round }, waiting, shownAt,
  *             results: { [id]: { pick, points } } | null,
  *             peeks: { [id]: until }, flag: { by, until } | null, pausedAt: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
- *   (`peeks`: who holds "Show again" and until when; `flag`: who flagged the photo on
- *   screen and when it is deleted unless they cancel. While either holds the round, its
- *   clock stands still: `pausedAt` says since when, `rules.js` `settleClock`.)
+ *   (The game exists from the 3-2-1 on: it is dealt then, `round` 0 until it starts.
+ *   `loaded`: the round each phone is ready for; `waiting`: a leaderboard whose time is up
+ *   waits for the phones to be ready for the next round. `peeks`: who holds "Show again"
+ *   and until when; `flag`: who flagged the photo on screen and when it is deleted unless
+ *   they cancel. While either holds the round, its clock stands still: `pausedAt` says
+ *   since when, `rules.js` `settleClock`.)
  */
 
 import { BLOCKED_WORDS, EMOJIS, LIMITS, TIMING, normalizeSettings } from '../../web/shared/config.js';
@@ -69,7 +74,7 @@ export function newRoom(code, now, settings) {
   };
 }
 
-export function newPlayer({ id, key, name, avatar, now }) {
+export function newPlayer({ id, key, name, avatar, now, ahead = false }) {
   return {
     id,
     key,
@@ -83,6 +88,15 @@ export function newPlayer({ id, key, name, avatar, now }) {
     score: 0,
     streak: 0,
     onResults: false,
+    ahead,
+  };
+}
+
+/** A game dealt with its plan: nothing played yet (`round` 0) until the 3-2-1 ends. */
+export function newGame(plan) {
+  return {
+    plan, round: 0, mode: null, zoom: null, options: [], answers: {}, loaded: {}, waiting: false, shownAt: null, results: null,
+    peeks: {}, flag: null, pausedAt: null, stats: { fastest: null, fooled: {} },
   };
 }
 
@@ -127,9 +141,22 @@ export function currentEntry(room) {
   return room.game && inGame(room) ? room.game.plan[room.game.round - 1] || null : null;
 }
 
-/** The plan entry after the current one, or null (apps preload its photo). */
+/** The plan entry after the current one, or null (apps before the game's photos were loaded ahead preload its photo). */
 export function nextEntry(room) {
   return room.game && inGame(room) ? room.game.plan[room.game.round] || null : null;
+}
+
+/**
+ * The plan entries every phone may load now, in play order: from the 3-2-1 on (the game is
+ * dealt) all of them, during a game the round on screen and every later one; else none.
+ * The one answer to "which photos may reach the phones": the photo route serves exactly
+ * these (`isServablePhoto`) and the view lists them (`view.upcoming`). All of them become
+ * loadable at the same moment and in a random order, so nothing tells whose a photo is.
+ */
+export function upcomingEntries(room) {
+  const g = room.game;
+  if (!g || !(room.phase === 'countdown' || inGame(room))) return [];
+  return g.plan.slice(Math.max(0, g.round - 1));
 }
 
 /** The answer time speed points and late answers are measured against (with no clock: a reference time). */
@@ -140,24 +167,25 @@ export function answerTimeMs(settings, untimedReferenceMs) {
 /**
  * The full length of the timer the players see in the room's phase (ms), or null when the
  * phase has none: the 3-2-1, the answer time (when there is a clock), the reveal, and the
- * leaderboard (when the next round comes by itself). The one place that says how long each
- * phase's timer runs: `rules.js` sets its deadlines from it, `view.js` hands it to the apps
- * as the timer bar's length.
+ * leaderboard (when the next round comes by itself, and not while it waits for the phones'
+ * photos). The one place that says how long each phase's timer runs: `rules.js` sets its
+ * deadlines from it, `view.js` hands it to the apps as the timer bar's length.
  */
 export function timerMs(room) {
   switch (room.phase) {
     case 'countdown': return TIMING.countdownMs;
     case 'show': return room.settings.time ? room.settings.time * 1000 : null;
     case 'reveal': return TIMING.revealMs;
-    case 'board': return room.settings.auto ? TIMING.boardMs : null;
+    case 'board': return room.settings.auto && !room.game.waiting ? TIMING.boardMs : null;
     default: return null;
   }
 }
 
 /**
- * Every photo id the room still needs. Lobby: each ready player's chosen photos. During a
- * game: the photo on screen and all photos of later rounds (earlier ones are deleted as
- * soon as their round is over). After the game: none.
+ * Every photo id the room still needs. Lobby and 3-2-1: each ready player's chosen photos
+ * (they are theirs until the game starts). During a game: the photo on screen and all
+ * photos of later rounds (earlier ones are deleted as soon as their round is over). After
+ * the game: none.
  */
 export function referencedPhotoIds(room) {
   if (room.phase === 'lobby' || room.phase === 'countdown') return room.players.flatMap((p) => p.photos);
@@ -165,11 +193,39 @@ export function referencedPhotoIds(room) {
   return room.game.plan.slice(room.game.round - 1).map((e) => e.photo).filter(Boolean);
 }
 
-/** A photo may be downloaded only while it is on screen or next in line. */
+/** A photo may be downloaded only while its game is dealt and its round is not over (`upcomingEntries`). */
 export function isServablePhoto(room, photoId) {
-  const current = currentEntry(room);
-  const next = nextEntry(room);
-  return Boolean(photoId) && ((current && current.photo === photoId) || (next && next.photo === photoId));
+  return Boolean(photoId) && upcomingEntries(room).some((e) => e.photo === photoId);
+}
+
+/**
+ * Whether a player's phone holds what round `r` needs. An app that loads ahead
+ * (`player.ahead`) says the round it is ready for (`game.loaded`, LIMITS.readyAhead); an app
+ * before that reports only the photo on screen, during its round's `load`, so the room
+ * waits for it only there. Past the last round there is nothing to hold.
+ */
+export function holdsRound(room, player, r) {
+  const g = room.game;
+  if (r > g.plan.length) return true;
+  const mark = g.loaded[player.id] || 0;
+  return player.ahead || room.phase === 'load' ? mark >= r : true;
+}
+
+/** How many of the connected phones hold what round `r` needs: `{ ready, of }`. Offline phones never count: they would hold up everyone. */
+export function phonesReady(room, r) {
+  const connected = connectedPlayers(room);
+  return { ready: connected.filter((p) => holdsRound(room, p, r)).length, of: connected.length };
+}
+
+/**
+ * While the room waits for the phones' photos, which round it waits for and how many
+ * phones hold it: `{ round, ready, of }`, else null. It waits in `load` (for that round) and
+ * on a leaderboard whose time is up (`game.waiting`, for the next round).
+ */
+export function photoWait(room) {
+  const g = room.game;
+  const r = room.phase === 'load' ? g.round : room.phase === 'board' && g.waiting ? g.round + 1 : null;
+  return r === null ? null : { round: r, ...phonesReady(room, r) };
 }
 
 /** Everyone (at least two) is here and ready, and at least one photo is in the game. */

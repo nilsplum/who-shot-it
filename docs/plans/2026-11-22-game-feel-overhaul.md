@@ -34,6 +34,12 @@ know about. Kept up to date with every commit.
 - Commit 6: the vibrations can only be felt on a real phone; please check on both phones
   that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
   tests check that each one is played at its moment.
+- Commit 7: the privacy policy now says that once a game starts, the players' apps load its
+  photos in the background and keep them in memory only until each one's round is over.
+  The page's date stays 22 November 2026 (it is today's); the version 1.0.3 of the release
+  asks everyone to accept the terms again anyway. AGENTS.md's two photo rules say the same
+  (a photo is reachable from its game's 3-2-1 until its round is over, only if it is
+  played, never stored on the phones).
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
@@ -749,7 +755,7 @@ Status: done.
   (the overlay is opaque: the grid is not visible through it).
 
 ### Commit 7: game photos: dealt at the 3-2-1, loaded ahead in play order, the room waits for three
-Status: open.
+Status: done.
 
 - `config.js`: `LIMITS.loadAhead` 3 ("photos after the one on screen every phone loads
   first"), `LIMITS.readyAhead` 2 ("a phone is ready for a round when it holds its photo and
@@ -991,3 +997,12 @@ fonts, and removes any that look alike on one of them.
 | Commit 6: the swap's light tap | Added now (the flip itself becomes a real card flip in commit 10) | The vocabulary's meaning "a photo flips" holds from the start. |
 | Commit 6: the page's background | One utility `bg-page` in `styles/app.css`, used by the body and the 3-2-1 | The 3-2-1 covers the lobby fully and looks like a screen of its own, without a second copy of the gradient. |
 | Commit 6: testing vibrations | The fake phone records what the Haptics plugin would play (`window.felt`); the browser tests expect the 3-2-1's three buzzes, the light tap of a new photo, the verdict's pulse, the swap's taps and the refusal's two pulses | Vibrations cannot be felt in a browser, but when they are played can be checked. |
+| Commit 7: when the 3-2-1's deal starts over | One rule: the countdown runs only while its deal holds (everyone ready, every dealt photo still in its owner's hands, `dealHolds`); otherwise back to the lobby, and the next 3-2-1 deals afresh in the same step | Covers every way a deal can break (unready, leave, removal, a new Yes, a dropped player) without a special case in each event. Removing a player without photos keeps the countdown running. |
+| Commit 7: the leaderboard's wait | An explicit state, `game.waiting`, with its own deadline (`loadMaxMs`); no timer while it waits (`timerMs` gives none) | Deriving "time is up" from the clock would let `nextWake` return a time in the past (an alarm loop). |
+| Commit 7: what `loaded` means | "This phone is ready for round r" (it holds that round's photo and the next `readyAhead`), a mark that only grows; the app decides it (`readyFor`), the room only compares | One number per phone, robust to messages in any order; old apps' "loaded for the round on screen" fits the same mark. |
+| Commit 7: older apps | `hello.ahead` marks today's apps; the room waits for the others only in `load` for the photo on screen | Otherwise every leaderboard in a mixed room would wait the full `loadMaxMs` for an app that never reports ahead. |
+| Commit 7: a changed plan | A player leaving removes their later rounds and clears every mark; the view's `me.loaded` drops and the apps report again | The round numbers after the current one shift, so the old marks would overstate. |
+| Commit 7: a game saved by the previous server | `upgradeGame` gives it today's shape once (the held board's `paused`, `loaded` as a list, no `waiting`); the conversion of commit 4 moved there | One place for every upgrade of a stored game. |
+| Commit 7: one job queue for photos | `web/js/loader.js`: one job at a time, the next one picked afresh after each (`pick`); the game's photos use it now, the photo buckets will in commit 8 | Priority is never stored, so nothing goes stale in a queue. |
+| Commit 7: a failed photo | A second try, then it counts as done (never holds up the room); a 404 (deleted meanwhile) is not tried again | A network blip at the start does not cost a photo; a deleted photo is not fetched twice. |
+| Commit 7: the loading bar | `ui.progress(share, label)`, as tall as the timer bar's slot; the board swaps one for the other, the stage shows it during `load` | No jump when a leaderboard starts waiting. The share is the other phones' readiness plus this phone's own exact progress. |

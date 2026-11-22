@@ -12,8 +12,9 @@
  * - Create: "Create game" opens the "New game" step (`session.setup`, presets and
  *   settings for this phone), "Start game" creates the room with those settings.
  * - In a room, `RoomSocket` delivers the player's view; every view replaces
- *   `session.view`, preloads the round's and the next round's photo, acknowledges a
- *   loaded photo (`loaded`), deals photos when the lobby needs a set (`dealIfNeeded`),
+ *   `session.view`, hands the game's photos to the queue that loads them ahead
+ *   (`upcoming.js`), tells the room which round this phone is ready for (`loaded`,
+ *   `reportReady`), deals photos when the lobby needs a set (`dealIfNeeded`),
  *   lets the phone feel the room's moments (`moments`: a new photo, the reveal) and
  *   repaints. Actions are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
@@ -48,7 +49,7 @@
 import { CLOSE } from '../shared/api.js';
 import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
 import { shuffle } from '../shared/random.js';
-import { createRoom, serverUrl, uploadPhotos } from './api.js';
+import { createRoom, uploadPhotos } from './api.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
@@ -56,6 +57,7 @@ import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, ope
 import { chosenBlobs, photos, resetPhotos, roll, swap } from './photos.js';
 import { createPainter } from './render.js';
 import { device, keyFor, saveDevice, session } from './store.js';
+import { photoState, photoUrl, readyFor, shareFor, syncUpcoming } from './upcoming.js';
 import { floatEmoji, toast } from './ui.js';
 import { endScreen } from './views/end.js';
 import { gameScreen } from './views/game.js';
@@ -74,10 +76,9 @@ const paintSheet = createPainter($('sheet'));
 
 let socket = null;
 let lastReactAt = 0;
-let ackedPhoto = null;
 let checkingAccess = false;
-/** Preloaded photos by server path: { img, state: 'loading' | 'ok' | 'error' }. */
-const images = new Map();
+/** The round this phone last said it is ready for (reset to the room's word with every view). */
+let reported = 0;
 /** The room's timer for the phase on screen, counted down on this phone between views. */
 const roundClock = createClock();
 /** How long this phone's flag still waits before the room deletes the photo by itself. */
@@ -99,6 +100,19 @@ function myPick(v) {
   return session.pick && session.pick.photo === v.round.photo ? session.pick.id : null;
 }
 
+/**
+ * While the room waits for the phones' photos (`view.waiting`), how far the whole table is,
+ * 0 to 1: the other phones by what the room knows, this one by what it holds already
+ * (finer than its last report); else null.
+ */
+function loadShare(v) {
+  if (!v.waiting || !v.waiting.of || !v.round) return null;
+  const target = v.phase === 'board' ? v.round.n + 1 : v.round.n;
+  const counted = v.me.loaded >= target;
+  const others = v.waiting.ready - (counted ? 1 : 0);
+  return (others + (counted ? 1 : shareFor(v.round.n, v.upcoming, target))) / v.waiting.of;
+}
+
 // ---------- Rendering ----------
 
 function context() {
@@ -114,9 +128,9 @@ function screen() {
   // The end screen also for whoever is still on their results while the next game fills.
   if (v.phase === 'end' || v.me.onResults) return endScreen(context(), REACTIONS);
   if (inLobby(v)) return lobbyScreen(context());
-  if (v.phase === 'board') return boardScreen(context(), { reactions: REACTIONS });
-  const photo = images.get(v.round.photo);
-  return gameScreen(context(), { picked: myPick(v), late: isLate(v), photo: photo ? photo.state : 'loading', reactions: REACTIONS });
+  if (v.phase === 'board') return boardScreen(context(), { reactions: REACTIONS, loading: loadShare(v) });
+  const photo = v.round.photo;
+  return gameScreen(context(), { picked: myPick(v), late: isLate(v), photo: photoState(photo), src: photoUrl(photo), loading: loadShare(v), reactions: REACTIONS });
 }
 
 /** Paints `html` into `el` unless it is there already; returns whether it changed. */
@@ -136,7 +150,7 @@ function startStage() {
   const time = v.settings.time * 1000;
   const total = time ? time * TIMING.effectShare : TIMING.untimedEffectMs;
   const elapsed = time ? time - leftNow() : performance.now() - (session.shownAt[v.round.photo] || performance.now());
-  startEffect(stage, { mode: v.round.mode, zoom: v.round.zoom, src: serverUrl(v.round.photo), duration: total - elapsed });
+  startEffect(stage, { mode: v.round.mode, zoom: v.round.zoom, src: photoUrl(v.round.photo), duration: total - elapsed });
 }
 
 /**
@@ -170,7 +184,7 @@ function startBoard() {
 function lookSrc() {
   const v = session.view;
   if (session.look) return session.look;
-  return v && v.phase === 'board' && v.round.peek && v.round.photo ? serverUrl(v.round.photo) : null;
+  return v && v.phase === 'board' && v.round.peek && v.round.photo ? photoUrl(v.round.photo) : null;
 }
 
 function render() {
@@ -200,8 +214,9 @@ function frame() {
 
 // ---------- Room ----------
 
+/** The first message of every connection; `ahead`: this app loads the game's photos ahead (`upcoming.js`). */
 function hello() {
-  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar };
+  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true };
 }
 
 function openSocket(code) {
@@ -228,6 +243,8 @@ function exitRoom(message, { forget = false } = {}) {
   if (forget) device.lastRoom = null;
   saveDevice();
   resetPhotos();
+  // The game's photos leave memory with the game.
+  syncUpcoming([], render);
   keepAwake(false);
   stopEffects();
   if (message) toast(message);
@@ -256,28 +273,23 @@ function onEnd(code) {
   else if (code === CLOSE.gone) exitRoom(session.view ? 'This game is over.' : 'No game with this code.', { forget: true });
 }
 
-/** Preloads the photo on screen and the next one; acknowledges the current one once. */
-function preload(v) {
-  const wanted = v.round ? [v.round.photo, v.round.next].filter(Boolean) : [];
-  for (const path of images.keys()) if (!wanted.includes(path)) images.delete(path);
-  for (const path of wanted) {
-    if (images.has(path)) continue;
-    const entry = { img: new Image(), state: 'loading' };
-    images.set(path, entry);
-    entry.img.onload = () => { entry.state = 'ok'; acknowledge(); render(); };
-    entry.img.onerror = () => { entry.state = 'error'; acknowledge(); render(); };
-    entry.img.src = serverUrl(path);
-  }
+/**
+ * Tells the room the round this phone is ready for (`upcoming.readyFor`) whenever it is
+ * further than what the room knows; one message per step, so about one per round.
+ */
+function reportReady() {
+  const v = session.view;
+  if (!v || !v.me || !v.upcoming || !v.upcoming.length) return;
+  const ready = readyFor(v.round ? v.round.n : 1, v.upcoming);
+  if (ready <= reported) return;
+  reported = ready;
+  send({ type: 'loaded', round: ready });
 }
 
-/** Tells the room this app can show the round's photo (or never will), once per photo. */
-function acknowledge() {
-  const v = session.view;
-  if (!v || v.phase !== 'load') return;
-  const entry = images.get(v.round.photo);
-  if (!entry || entry.state === 'loading' || ackedPhoto === v.round.photo) return;
-  ackedPhoto = v.round.photo;
-  send({ type: 'loaded', round: v.round.n });
+/** A game photo arrived or failed: maybe a round further, and the stage may paint it. */
+function onPhotos() {
+  reportReady();
+  render();
 }
 
 function onMessage(msg) {
@@ -317,8 +329,10 @@ function onMessage(msg) {
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
   moments(previous, v);
-  preload(v);
-  acknowledge();
+  // The room's word on this phone's readiness (it forgets after a changed plan), then the photos.
+  reported = v.me.loaded || 0;
+  syncUpcoming(v.upcoming || [], onPhotos);
+  reportReady();
   dealIfNeeded();
   render();
 }
@@ -633,7 +647,7 @@ const HOLDS = {
     start: () => {
       const v = session.view;
       if (!v || v.phase !== 'board' || !v.round.photo) return;
-      session.look = serverUrl(v.round.photo);
+      session.look = photoUrl(v.round.photo);
       send({ type: 'peek', on: true });
       peekTimer = setInterval(() => send({ type: 'peek', on: true }), TIMING.peekRenewMs);
     },

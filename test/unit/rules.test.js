@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { LIMITS, SCORING, TIMING } from '../../web/shared/config.js';
 import { apply, nextWake } from '../../src/game/rules.js';
-import { referencedPhotoIds } from '../../src/game/state.js';
+import { isServablePhoto, referencedPhotoIds } from '../../src/game/state.js';
 import { T0, idOf, roomWith, seededRandom } from '../helpers.js';
 
 const rng = seededRandom(7);
@@ -139,14 +139,16 @@ describe('lobby and countdown', () => {
 });
 
 describe('rounds', () => {
-  test('the photo shows once every connected player has it, or after the load limit', () => {
+  test('the photo shows once every connected phone is ready for the round, or after the load limit', () => {
     const d = started();
     expect(d.room.phase).toBe('load');
     d.by('Ann', 'loaded', { round: 1 }).by('Ben', 'loaded', { round: 1 });
     expect(d.room.phase).toBe('load');
-    d.by('Cleo', 'loaded', { round: 2 });
+    // A report that names no round of the plan counts for nothing.
+    d.by('Cleo', 'loaded', { round: 0 }).by('Cleo', 'loaded', { round: '1' });
     expect(d.room.phase).toBe('load');
-    d.by('Cleo', 'loaded', { round: 1 });
+    // Ready for a later round means ready for this one too (it holds every photo up to it).
+    d.by('Cleo', 'loaded', { round: 2 });
     expect(d.room.phase).toBe('show');
     const late = started();
     late.wait(TIMING.loadMaxMs);
@@ -288,6 +290,63 @@ describe('rounds', () => {
     const d = started(['A', 'B', 'C', 'D', 'E', 'F'], { answers: 4 });
     expect(d.room.game.options).toHaveLength(4);
     expect(d.room.game.options).toContain(ownerOf(d));
+  });
+});
+
+describe('the deal at the 3-2-1, and the photos ahead', () => {
+  test('the game is dealt when the 3-2-1 starts, and dealt afresh whenever the deal stops holding', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo']));
+    d.by('Ann', 'ready', { photos: ['a1', 'a2'] }).by('Ben', 'ready', { photos: ['b1'] }).by('Cleo', 'ready', { photos: [] });
+    expect(d.room).toMatchObject({ phase: 'countdown', game: { round: 0 } });
+    expect(d.room.game.plan.map((e) => e.photo).sort()).toEqual(['a1', 'a2', 'b1']);
+    // The photos are the players' until the game starts, but every phone may load them now.
+    expect(referencedPhotoIds(d.room).sort()).toEqual(['a1', 'a2', 'b1']);
+    expect(['a1', 'a2', 'b1'].every((id) => isServablePhoto(d.room, id))).toBe(true);
+    // Ben says Yes to other photos: the deal no longer holds, a new 3-2-1 deals them.
+    d.wait(1000).by('Ben', 'ready', { photos: ['b9'] });
+    expect(d.room).toMatchObject({ phase: 'countdown', deadline: d.now + TIMING.countdownMs });
+    expect(d.room.game.plan.map((e) => e.photo)).toContain('b9');
+    // Cleo (no photos) is removed: the deal still holds, the 3-2-1 runs on.
+    const deadline = d.room.deadline;
+    d.wait(1000).by('Ann', 'kick', { target: idOf(d.room, 'Cleo') });
+    expect(d.room).toMatchObject({ phase: 'countdown', deadline });
+    // Ben unreadies: back to the lobby, the deal and its photo links are gone.
+    d.by('Ben', 'unready');
+    expect(d.room).toMatchObject({ phase: 'lobby', game: null });
+    expect(isServablePhoto(d.room, 'a1')).toBe(false);
+  });
+
+  test('phones that load ahead: round 1 starts when all are ready, a leaderboard waits for the next round, at most the load limit', () => {
+    const d = driver(roomWith(['Ann', 'Ben'], { ahead: true }));
+    d.by('Ann', 'ready', { photos: ['a1', 'a2', 'a3'] }).by('Ben', 'ready', { photos: ['b1', 'b2', 'b3'] });
+    // Both loaded what round 1 needs during the 3-2-1: it shows at once.
+    d.by('Ann', 'loaded', { round: 1 }).by('Ben', 'loaded', { round: 1 }).wait(TIMING.countdownMs);
+    expect(d.room).toMatchObject({ phase: 'show', game: { round: 1 } });
+    // The leaderboard's time is up and Ben is not ready for round 2: it waits, without a timer.
+    d.reveal().wait(TIMING.revealMs).by('Ann', 'loaded', { round: 2 }).wait(TIMING.boardMs);
+    expect(d.room).toMatchObject({ phase: 'board', game: { waiting: true }, deadline: d.now + TIMING.loadMaxMs });
+    expect(nextWake(d.room)).toBe(d.now + TIMING.loadMaxMs);
+    d.by('Ben', 'loaded', { round: 2 });
+    expect(d.room).toMatchObject({ phase: 'show', game: { round: 2, waiting: false } });
+    // Ben never gets ready for round 3: the wait ends after the load limit.
+    d.reveal().wait(TIMING.revealMs).by('Ann', 'loaded', { round: 3 }).wait(TIMING.boardMs);
+    expect(d.room.game.waiting).toBe(true);
+    d.wait(TIMING.loadMaxMs);
+    expect(d.room).toMatchObject({ phase: 'load', game: { round: 3 } });
+    // An offline phone never holds anyone up.
+    d.by('Ben', 'disconnect');
+    expect(d.room.phase).toBe('show');
+  });
+
+  test('when a player leaves, their later photos leave the plan and every phone reports again', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo'], { ahead: true }));
+    for (const name of ['Ann', 'Ben', 'Cleo']) d.by(name, 'ready', { photos: [`${name}1`, `${name}2`] });
+    for (const p of d.room.players) d.do('loaded', { playerId: p.id, round: 3 });
+    d.wait(TIMING.countdownMs);
+    const leaving = d.room.game.plan.slice(1).find((e) => e.owner !== d.room.game.plan[0].owner).owner;
+    d.do('leave', { playerId: leaving });
+    expect(d.room.game.plan.slice(1).some((e) => e.owner === leaving)).toBe(false);
+    expect(d.room.game.loaded).toEqual({});
   });
 });
 

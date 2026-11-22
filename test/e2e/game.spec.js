@@ -1,13 +1,14 @@
 /**
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
- * the terms, the "New game" step with a preset and the settings "?", joining by code,
- * the host removing a player, the photos dealt with "Play with these?", reload, the
- * automatic start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then Delete), five
- * rounds with their leaderboards (and "Show
- * again" held on one phone, seen on another), the end, "Play again" from a guest while the
- * others still look at their results, and leaving with the code remembered. Then "Which
- * photos" on a phone with screenshots and a chat full of text. Plus the website (the same
- * page in a plain browser): invite page and legal page.
+ * the terms, the "New game" step with a preset and the settings "?", joining by code, the
+ * host removing a player, the photos dealt with "Play with these?", reload, the automatic
+ * start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
+ * Delete), five rounds with their leaderboards (and "Show again" held on one phone, seen on
+ * another), the end, "Play again" from a guest while the others still look at their
+ * results, and leaving with the code remembered. A leaderboard that waits for a phone still
+ * loading the next photos. Then "Which photos" on a phone with screenshots and a chat full
+ * of text, the swaps and the hold in the photo choice, the terms after an update, and the
+ * website (the same page in a plain browser): invite page and legal page.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -155,6 +156,39 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await guests[1].getByRole('button', { name: 'Leave' }).click();
   await expect(guests[1].locator('#code')).toHaveValue(code);
   await expect(waiting).toHaveText('Waiting on Ann');
+});
+
+test('a leaderboard waits for a phone still loading the next photos, and shows how far the table is', async ({ browser }) => {
+  const host = await openApp(browser, 'Ann');
+  await host.getByRole('button', { name: 'Create game' }).click();
+  await host.getByRole('button', { name: 'Custom' }).click();
+  await host.locator('[data-k="photos"][data-v="4"]').click();
+  await host.locator('[data-k="rounds"][data-v="5"]').click();
+  await host.getByRole('button', { name: 'Done' }).click();
+  await host.getByRole('button', { name: 'Start game' }).click();
+  const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
+  // Ben's phone gets the game's first three photos at once, the rest only when the test lets them through.
+  const guest = await openApp(browser, 'Ben');
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let served = 0;
+  await guest.route('**/api/rooms/*/photos/*', async (route) => {
+    served += 1;
+    if (served > 3) await gate;
+    await route.continue();
+  });
+  await join(guest, code);
+  for (const page of [host, guest]) await choosePhotos(page, 4);
+  // Round 1 needs photos 1 to 3, which both phones hold after the 3-2-1.
+  await expect(guest.getByText('1 / 5', { exact: true })).toBeVisible();
+  for (const page of [host, guest]) await page.locator('[data-act="answer"]').first().click();
+  // The leaderboard's time runs out, but Ben does not hold round 2's photos yet: it stays.
+  await expect(host.getByRole('progressbar', { name: 'Loading photos' })).toBeVisible({ timeout: 20_000 });
+  await expect(host.getByRole('heading', { name: 'Round 1 of 5' })).toBeVisible();
+  release();
+  await expect(host.getByText('2 / 5', { exact: true })).toBeVisible();
 });
 
 test('"Which photos" leaves out photos full of text, and screenshots if asked', async ({ browser }) => {

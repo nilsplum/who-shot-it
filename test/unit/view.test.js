@@ -58,7 +58,7 @@ test('the leaderboard: everyone sees who holds "Show again" as a shared flag, an
   expect(JSON.stringify(view)).not.toContain('peeks');
 });
 
-test('timers are relative and carry their full length; photo links point at the current and next photo', () => {
+test('timers are relative and carry their full length; photo links point at the photo on screen and the next one', () => {
   const room = inShow();
   const shownAt = T0 + TIMING.countdownMs;
   const view = viewFor(room, idOf(room, 'Ann'), shownAt + 4000);
@@ -82,4 +82,23 @@ test('a flag: the others learn only that the photo is flagged, the flagger also 
   expect(other).toMatchObject({ paused: true, round: { flag: { mine: false } } });
   // Who flagged it is never in a view.
   expect(Object.keys(other.round.flag).sort()).toEqual(['left', 'mine']);
+});
+
+test('the photos a phone may load: the whole game from the 3-2-1 on, then from the round on screen, and nothing about owners', () => {
+  let room = roomWith(['Ann', 'Ben', 'Cleo'], { ahead: true });
+  room.players.forEach((p, i) => {
+    room = apply(room, { type: 'ready', playerId: p.id, photos: [`p${i}`] }, T0, rng);
+  });
+  const link = (e) => `/api/rooms/ABCD/photos/${e.photo}`;
+  const dealt = viewFor(room, idOf(room, 'Ann'), T0);
+  expect(dealt).toMatchObject({ phase: 'countdown', upcoming: room.game.plan.map(link), waiting: null, me: { loaded: 0 } });
+  // The 3-2-1 is over: round 1 waits for the phones; Ann is ready for it.
+  room = apply(room, { type: 'loaded', playerId: idOf(room, 'Ann'), round: 1 }, T0, rng);
+  room = apply(room, { type: 'tick' }, T0 + TIMING.countdownMs, rng);
+  const ann = viewFor(room, idOf(room, 'Ann'), T0 + TIMING.countdownMs);
+  expect(ann).toMatchObject({ phase: 'load', waiting: { ready: 1, of: 3 }, me: { loaded: 1 } });
+  // Round 1's photo is deleted: the list starts at round 2, the deleted one is gone from it.
+  room = apply(room, { type: 'report', playerId: idOf(room, 'Ben') }, T0 + TIMING.countdownMs, rng);
+  expect(viewFor(room, idOf(room, 'Ann'), T0 + TIMING.countdownMs).upcoming).toEqual(room.game.plan.slice(1).map(link));
+  expect(JSON.stringify(ann.upcoming)).not.toContain(idOf(room, 'Ann'));
 });

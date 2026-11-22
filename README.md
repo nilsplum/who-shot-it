@@ -78,9 +78,11 @@ would be okay with). "Create game", pick Classic or Tricky (or tune the settings
 game": a 4-letter code (no look-alike letters). Friends join with the code, a shared link
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
-lobby → 3-2-1 once everyone (at least two) is ready → per round *load* (everyone has the
-photo) → *show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo
-to everyone and stops the clock) → *end*. "Play again" is anyone's: the first tap opens the
+lobby → 3-2-1 once everyone (at least two) is ready (the game is dealt then: which photos,
+in which random order) → per round *load* (every phone holds the photo and the next two) →
+*show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo to
+everyone and stops the clock; when its time is up it waits until every phone holds the next
+round's photos) → *end*. "Play again" is anyone's: the first tap opens the
 next game under the same code, the others join it when they are done looking at the
 results. Apps get a full snapshot after every change, with the photo's owner hidden until
 the reveal.
@@ -93,8 +95,9 @@ phone. Yes uploads exactly the photos shown, shrunk to at most 1080 px JPEG with
 location data. A photo is deleted right after its round (its reveal and leaderboard), and
 also when reported, on "Change", "Leave", removal, a new photo count and at the game's end.
 A room keeps its code for 24 hours after its last activity, even when everyone left, so the
-same group can play again the next day; then it is deleted. Photo links work only for the
-current and next round.
+same group can play again the next day; then it is deleted. From the 3-2-1 on, every phone
+loads the game's photos in play order and keeps them in memory only; a photo's link works
+only until its round is over.
 
 **Keeping it friendly.** Anyone can flag the photo on screen (⚑): the others stop seeing
 it and the round waits; Delete photo deletes it for everyone at once, and after 15 s it goes

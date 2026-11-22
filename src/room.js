@@ -210,8 +210,9 @@ export class Room extends DurableObject {
     if (!isServablePhoto(this.room, id)) return fail(404, 'not_found');
     const row = this.sql.exec('SELECT data FROM photos WHERE id = ?', id).toArray()[0];
     if (!row) return fail(404, 'not_found');
-    // Ids are random and single-use, so the app may keep the photo for the round.
-    return new Response(row.data, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600' } });
+    // Never stored by the phone or anything in between: the apps keep a game's photos in
+    // memory only and drop each when its round is over (`web/js/upcoming.js`).
+    return new Response(row.data, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' } });
   }
 
   // ---------- WebSocket ----------
@@ -253,12 +254,12 @@ export class Room extends DurableObject {
     if (msg.type === 'leave') ws.close(CLOSE.left, 'left');
   }
 
-  hello(ws, { key, name, avatar }) {
+  hello(ws, { key, name, avatar, ahead }) {
     if (!isPlayerKey(key) || !cleanName(name)) {
       ws.close(1008, 'bad_hello');
       return;
     }
-    this.dispatch({ type: 'join', key, name, avatar });
+    this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true });
     const player = this.room && playerByKey(this.room, key);
     if (!player) {
       if (this.room && this.room.banned.includes(key)) ws.close(CLOSE.removed, 'removed');

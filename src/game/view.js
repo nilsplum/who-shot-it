@@ -18,10 +18,16 @@
  *   phase lasts. `paused` says the round's clock stands still (someone holds the round),
  *   so apps stop counting down; `left` is then frozen at the moment it stopped.
  * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
+ * - `upcoming` lists the links of the photos a phone may load now, in play order (from the
+ *   3-2-1 on: the whole game; then from the round on screen; `null` for a deleted one),
+ *   with nothing about their owners (`upcomingEntries`). `round.next` stays for apps that
+ *   load only the next photo. While the room waits for the phones to be ready for a round,
+ *   `waiting` says how many are (`photoWait`); `me.loaded` is the round this phone said it
+ *   is ready for, so an app reports again when the room forgot it (a changed plan).
  */
 
 import { API } from '../../web/shared/api.js';
-import { currentEntry, inGame, nextEntry, playerById, timerMs } from './state.js';
+import { currentEntry, inGame, nextEntry, photoWait, playerById, timerMs, upcomingEntries } from './state.js';
 
 /** The round's clock stands still (someone holds the round, `rules.js` `settleClock`). */
 const isPaused = (room) => Boolean(room.game && room.game.pausedAt != null && inGame(room));
@@ -82,19 +88,23 @@ function finalView(final) {
 
 export function viewFor(room, playerId, now) {
   const me = playerById(room, playerId);
+  const g = room.game;
   const { left, total } = timer(room, now);
+  const wait = g ? photoWait(room) : null;
   return {
     code: room.code,
     phase: room.phase,
     hostId: room.hostId,
     settings: room.settings,
-    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length, onResults: me.onResults } : null,
+    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length, onResults: me.onResults, loaded: g ? g.loaded[me.id] || 0 : 0 } : null,
     players: room.players.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
     })),
     left,
     total,
     paused: isPaused(room),
+    upcoming: upcomingEntries(room).map((e) => (e.photo ? API.photo(room.code, e.photo) : null)),
+    waiting: wait ? { ready: wait.ready, of: wait.of } : null,
     round: inGame(room) ? roundView(room, playerId, now) : null,
     final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };
