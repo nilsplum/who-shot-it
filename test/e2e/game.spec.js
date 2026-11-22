@@ -2,15 +2,18 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code,
  * the host removing a player, the photos dealt with "Play with these?", reload, the
- * automatic start, a reported photo, five rounds, the end and "Play again". Plus the
- * website (the same page in a plain browser): invite page and legal page.
+ * automatic start, a reported photo, five rounds, the end and "Play again". Then "Which
+ * photos" on a phone with screenshots and a chat full of text. Plus the website (the same
+ * page in a plain browser): invite page and legal page.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { newPhone } from './fake-phone.js';
+import { library, newPhone } from './fake-phone.js';
 
 /** Opens the app on a new phone: terms accepted, name typed. */
-async function openApp(browser, name) {
-  const page = await newPhone(browser);
+async function openApp(browser, name, photos) {
+  const page = await newPhone(browser, photos);
   await page.goto('/');
   await page.getByRole('button', { name: 'I agree, let’s play' }).click();
   await page.fill('#name', name);
@@ -94,6 +97,27 @@ test('friends play a full game and start another one', async ({ browser }) => {
     await expect(page.locator('.q')).toHaveText('Play with these?');
     await expect(page.locator('.grid div[style]')).toHaveCount(3);
   }
+});
+
+test('"Which photos" leaves out photos full of text, and screenshots if asked', async ({ browser }) => {
+  const text = (name) => fs.readFileSync(path.join(import.meta.dirname, '..', 'fixtures', 'text', name)).toString('base64');
+  // Two photos, a game screenshot (little text) and a chat screenshot (full of text).
+  const phone = await openApp(browser, 'Ann', [library[0], library[1], { data: text('keep-game.jpg'), screenshot: true }, { data: text('skip-chat.jpg'), screenshot: true }]);
+  await phone.getByRole('button', { name: 'Create game' }).click();
+  await phone.getByRole('button', { name: 'Start game' }).click();
+  await phone.getByRole('button', { name: 'Continue' }).click();
+  const tiles = phone.locator('.grid div[style]');
+  // The default, "Little text": everything but the chat (5 per player, but 3 fit).
+  await expect(tiles).toHaveCount(3);
+  const choose = async (label) => {
+    await phone.locator('.cfg').click();
+    await phone.locator('[data-k="filter"]', { hasText: label }).click();
+    await phone.getByRole('button', { name: 'Done' }).click();
+  };
+  await choose('No screenshots');
+  await expect(tiles).toHaveCount(2);
+  await choose('All');
+  await expect(tiles).toHaveCount(4);
 });
 
 test('in a browser the page is the website: the invite page and the legal page', async ({ page }) => {

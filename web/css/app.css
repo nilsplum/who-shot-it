@@ -27,6 +27,8 @@ html, body { margin: 0; color: var(--ink); font: 600 15px Inter, system-ui, sans
 body { min-height: 100vh; min-height: 100dvh; background: radial-gradient(800px 500px at 0% -10%, var(--glow1) 0, transparent 60%), radial-gradient(700px 450px at 110% 0%, var(--glow2) 0, transparent 55%), var(--bg); background-attachment: fixed; }
 .wrap { max-width: 480px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 button { font: inherit; color: inherit; cursor: pointer; -webkit-user-select: none; user-select: none; }
+/* Players' photos are for looking only: a long press opens no "Save to Photos" menu and selects nothing. */
+img, canvas, .stage, .grid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
 a { color: inherit; }
 .disp { font-family: var(--display); font-weight: 800; }
 .btn { appearance: none; border: 0; border-radius: 16px; padding: 16px; font-size: 17px; font-weight: 700; background: var(--card2); width: 100%; display: block; text-align: center; text-decoration: none; }

@@ -67,7 +67,8 @@ async function player(browser, library, [name, avatar]) {
       const yes = page.getByRole('button', { name: 'Yes' });
       if (await yes.count() && await yes.isEnabled()) await yes.click();
     }
-    const round = await page.locator('.rnd').textContent().catch(() => null);
+    // Read without waiting: a locator would wait for a round number the lobby does not show.
+    const round = await page.evaluate(() => document.querySelector('.rnd')?.textContent || null);
     const options = page.locator('button.opt:not([disabled])');
     if (round && round !== lastRound && await options.count()) {
       await pause(1500 + Math.random() * 3000);

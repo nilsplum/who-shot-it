@@ -55,6 +55,7 @@ my photos?".
 
     YOUR PHOTOS STAY YOURS
     • The app picks the photos on your phone. Nothing is shared until you tap Yes.
+    • Chats, emails and other photos full of text stay out, and screenshots can too.
     • Only the players in your game see them.
     • Each photo is deleted right after its round.
     • Anyone can report a photo, and it is gone for everyone at once.
@@ -69,6 +70,8 @@ never other apps' names):
     guess who,friends,group,camera roll,gallery,pictures,quiz,trivia,multiplayer,funny,icebreaker
 
 **What’s New** (later versions only): one or two plain sentences about what players notice.
+
+    New photos at once: tap No and the next ones are already there. And the new setting “Which photos” keeps chats, emails and other photos full of text out of the game.
 
 **URLs:**
 - Support URL: `https://who-shot-it.nils-plum.workers.dev/legal#imprint`

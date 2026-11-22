@@ -11,7 +11,7 @@
  * (read-only for everyone but the host), and the host taps a player to remove them.
  */
 
-import { SETTINGS } from '../../shared/config.js';
+import { SETTINGS, normalizeSettings } from '../../shared/config.js';
 import { photos } from '../photos.js';
 import { avatar, esc } from '../ui.js';
 
@@ -65,7 +65,12 @@ function mine({ view, session }) {
     return card('🔒', 'Photos are turned off', 'Allow photos for this app in your phone’s settings.', '<button class="btn main" data-act="opensettings">Open settings</button>');
   }
   if (photos.empty) {
-    return card('🫥', 'No photos found', session.access === 'limited' ? 'Share more photos with this app in your phone’s settings.' : 'This phone has no photos the game can use.', session.access === 'limited' ? '<button class="btn main" data-act="opensettings">Open settings</button>' : '');
+    const limited = session.access === 'limited';
+    const filtered = normalizeSettings(view.settings).filter !== 'all';
+    const why = limited ? 'Share more photos with this app in your phone’s settings.'
+      : filtered ? 'None of the photos here fit “Which photos” in the game settings.'
+        : 'This phone has no photos the game can use.';
+    return card('🫥', 'No photos found', why, limited ? '<button class="btn main" data-act="opensettings">Open settings</button>' : '');
   }
   return '<div class="pick"><div class="spin"></div></div>';
 }

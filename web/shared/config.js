@@ -94,6 +94,17 @@ export const EFFECTS = ['classic', 'blur', 'zoom', 'pixel'];
 export const SETTINGS = [
   { key: 'photos', label: 'Photos per player', default: 5, options: [[3, '3'], [5, '5'], [10, '10']] },
   {
+    // Applied on each player's phone while it picks (`web/js/photos.js`); the server only
+    // keeps the value. "Full of text" is LIMITS.textLines lines or more (`web/js/textcheck.js`).
+    key: 'filter', label: 'Which photos', default: 'little-text',
+    options: [['all', 'All'], ['little-text', 'Little text'], ['no-screenshots', 'No screenshots']],
+    help: [
+      ['All', 'Any photo, screenshots too.'],
+      ['Little text', 'No photos full of text, like chats or emails.'],
+      ['No screenshots', 'No screenshots, and no photos full of text.'],
+    ],
+  },
+  {
     key: 'rounds', label: 'Rounds', default: 0,
     options: [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30'], [0, 'All']],
     help: [['5 to 30', 'The game ends after this many photos.'], ['All', 'Every photo in the game is shown once.']],
@@ -147,6 +158,16 @@ export const LIMITS = {
   photoMaxSide: 1080,
   /** JPEG quality the phone encodes with (0 to 1). */
   photoQuality: 0.75,
+  /**
+   * Longest side of the previews the phone hands over for choosing (they never leave the
+   * phone). The text check's limits and its test images are made for exactly this size.
+   */
+  previewSide: 480,
+  previewQuality: 0.7,
+  /** A photo with this many lines of text or more counts as full of text ("Which photos"). */
+  textLines: 6,
+  /** How many sets of photos the app keeps ready beyond the one on screen, so "No" never waits. */
+  setsAhead: 2,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */
   photoMaxBytes: 1_500_000,
   /** Largest WebSocket message the room accepts from an app (all of them are tiny). */
@@ -183,6 +204,8 @@ export const TIMING = {
   sweepMs: 30000,
   /** Longest wait for the phone to hand over one photo (an iCloud original may download). */
   photoPickMs: 20000,
+  /** Longest wait for the phone to hand over a batch of previews (they are on the phone). */
+  previewMs: 10000,
 };
 
 /** Points: a right answer earns min..max by speed (or `fixed`), plus a streak bonus. */

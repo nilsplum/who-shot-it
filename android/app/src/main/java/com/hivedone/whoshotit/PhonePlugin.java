@@ -1,17 +1,19 @@
 /*
- * The app's own native plugin "Phone" on Android: photo access, one random photo at a
- * time, the app's page in the phone's settings, and keeping the screen on. JavaScript
- * reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js` documents every
- * method; the iPhone twin is `ios/App/App/PhonePlugin.swift`).
+ * The app's own native plugin "Phone" on Android: photo access, random previews to choose
+ * from and the chosen photos for upload, the app's page in the phone's settings, and keeping
+ * the screen on. JavaScript reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js`
+ * documents every method; the iPhone twin is `ios/App/App/PhonePlugin.swift`).
  *
  * Invariants:
- * - Photos are read only on the phone. A photo leaves this file as a JPEG at most
- *   `maxSide` pixels on its longest side, re-encoded from its pixels only, so location
- *   and all other metadata never reach JavaScript, and so never the server.
- * - Screenshots are never picked (they often show private messages or banking apps).
+ * - Photos are read only on the phone. Previews and photos leave this file as JPEGs at most
+ *   `side` / `maxSide` pixels on their longest side, re-encoded from their pixels only, so
+ *   location and all other metadata never reach JavaScript, and so never the server.
+ * - Previews are the phone's own thumbnails (quick, already upright), scaled to fit exactly
+ *   like on the iPhone, because the text check is tuned to that size.
+ * - Screenshots (anything in a Screenshots folder) are marked, so the game can leave them out.
  * - Access is "limited" when the player shared only some photos (Android 14 and newer,
  *   READ_MEDIA_VISUAL_USER_SELECTED); the game then draws from those.
- * - Slow work (decoding and shrinking a photo) runs on the plugin's own threads, never on
+ * - Slow work (decoding and shrinking) runs on the plugin's own threads, never on
  *   Capacitor's single plugin thread or the UI thread, so one slow photo never blocks
  *   the next call.
  */
@@ -27,6 +29,7 @@ import android.graphics.Bitmap;
 import android.graphics.ImageDecoder;
 import android.net.Uri;
 import android.os.Build;
+import android.util.Size;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Base64;
@@ -43,6 +46,7 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.io.ByteArrayOutputStream;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -106,46 +110,117 @@ public class PhonePlugin extends Plugin {
         resolveAccess(call);
     }
 
-    /** One random photo not in `exclude`: `{ id, data }` (base64 JPEG), or `{}` when none is left (or without photo access). */
-    @PluginMethod
-    public void randomPhoto(PluginCall call) {
+    private boolean readable() {
         String access = access();
-        if (!"full".equals(access) && !"limited".equals(access)) {
-            call.resolve(new JSObject());
+        return "full".equals(access) || "limited".equals(access);
+    }
+
+    private static Uri collection() {
+        return MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
+    }
+
+    /**
+     * Up to `count` random photos not in `exclude`, as previews: `{ photos: [{ id, data,
+     * screenshot }] }` (data: base64 JPEG). Fewer when the library has no more (or without
+     * photo access); a photo whose thumbnail cannot be read is skipped.
+     */
+    @PluginMethod
+    public void randomPhotos(PluginCall call) {
+        if (!readable()) {
+            JSObject none = new JSObject();
+            none.put("photos", new JSArray());
+            call.resolve(none);
             return;
         }
+        int count = call.getInt("count", 10);
         JSArray list = call.getArray("exclude", new JSArray());
         Set<String> exclude = new HashSet<>();
         for (int i = 0; i < list.length(); i++) exclude.add(list.optString(i));
-        int maxSide = call.getInt("maxSide", 1080);
-        double quality = call.getDouble("quality", 0.75);
+        int side = call.getInt("side", 480);
+        double quality = call.getDouble("quality", 0.7);
         work.execute(() -> {
             try {
-                JSObject photo = pick(exclude, maxSide, quality);
-                call.resolve(photo == null ? new JSObject() : photo);
+                call.resolve(previews(count, exclude, side, quality));
             } catch (Exception e) {
                 call.reject("unreadable");
             }
         });
     }
 
-    private JSObject pick(Set<String> exclude, int maxSide, double quality) throws Exception {
+    private JSObject previews(int count, Set<String> skip, int side, double quality) {
         ContentResolver resolver = getContext().getContentResolver();
-        Uri collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
-        String where = "(" + MediaStore.Images.Media.RELATIVE_PATH + " IS NULL OR " + MediaStore.Images.Media.RELATIVE_PATH + " NOT LIKE ?)";
-        try (Cursor cursor = resolver.query(collection, new String[] { MediaStore.Images.Media._ID }, where, new String[] { "%screenshot%" }, null)) {
-            if (cursor == null || cursor.getCount() == 0) return null;
-            long id = randomId(cursor, exclude);
-            if (id < 0) return null;
-            Bitmap bitmap = shrink(resolver, ContentUris.withAppendedId(collection, id), maxSide);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.JPEG, (int) Math.round(quality * 100), out);
-            bitmap.recycle();
-            JSObject photo = new JSObject();
-            photo.put("id", String.valueOf(id));
-            photo.put("data", Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
-            return photo;
+        JSArray photos = new JSArray();
+        String[] columns = { MediaStore.Images.Media._ID, MediaStore.Images.Media.RELATIVE_PATH };
+        try (Cursor cursor = resolver.query(collection(), columns, null, null, null)) {
+            while (cursor != null && cursor.getCount() > 0 && photos.length() < count) {
+                long id = randomId(cursor, skip);
+                if (id < 0) break;
+                skip.add(String.valueOf(id));
+                // randomId leaves the cursor on the picked row.
+                String folder = cursor.getString(1);
+                try {
+                    Bitmap thumb = fit(resolver.loadThumbnail(ContentUris.withAppendedId(collection(), id), new Size(side, side), null), side);
+                    JSObject photo = new JSObject();
+                    photo.put("id", String.valueOf(id));
+                    photo.put("data", jpeg(thumb, quality));
+                    photo.put("screenshot", folder != null && folder.toLowerCase(Locale.ROOT).contains("screenshot"));
+                    photos.put(photo);
+                } catch (Exception unreadable) {
+                    // A broken or vanished file: the next random one takes its place.
+                }
+            }
         }
+        JSObject result = new JSObject();
+        result.put("photos", photos);
+        return result;
+    }
+
+    /** The photo `id` for upload: `{ id, data }` (base64 JPEG at most `maxSide`). Rejects when it cannot be read. */
+    @PluginMethod
+    public void photo(PluginCall call) {
+        String id = call.getString("id");
+        if (!readable() || id == null) {
+            call.reject("unreadable");
+            return;
+        }
+        int maxSide = call.getInt("maxSide", 1080);
+        double quality = call.getDouble("quality", 0.75);
+        work.execute(() -> {
+            try {
+                Uri uri = ContentUris.withAppendedId(collection(), Long.parseLong(id));
+                JSObject photo = new JSObject();
+                photo.put("id", id);
+                photo.put("data", jpeg(shrink(getContext().getContentResolver(), uri, maxSide), quality));
+                call.resolve(photo);
+            } catch (Exception e) {
+                call.reject("unreadable");
+            }
+        });
+    }
+
+    /** A fresh JPEG of the bitmap's pixels (no metadata), as base64; recycles the bitmap. */
+    private static String jpeg(Bitmap bitmap, double quality) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, (int) Math.round(quality * 100), out);
+        bitmap.recycle();
+        return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+    }
+
+    /** Scaled to fit `side` on its longest side (thumbnails may come larger than asked for). */
+    private static Bitmap fit(Bitmap bitmap, int side) {
+        if (bitmap.getConfig() == Bitmap.Config.HARDWARE) {
+            // Pixels in graphics memory cannot be scaled in software: copy them out first.
+            Bitmap soft = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            bitmap.recycle();
+            bitmap = soft;
+        }
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        double scale = (double) side / Math.max(w, h);
+        if (scale >= 1.0) return bitmap;
+        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, Math.max(1, (int) Math.round(w * scale)), Math.max(1, (int) Math.round(h * scale)), true);
+        bitmap.recycle();
+        return scaled;
     }
 
     /** A few random tries first; when nearly everything is excluded, one pass from a random start. */
@@ -176,13 +251,7 @@ public class PhonePlugin extends Plugin {
             while (longest / (sample * 2) >= maxSide) sample *= 2;
             decoder.setTargetSampleSize(sample);
         });
-        int w = decoded.getWidth();
-        int h = decoded.getHeight();
-        double scale = Math.min(1.0, (double) maxSide / Math.max(w, h));
-        if (scale >= 1.0) return decoded;
-        Bitmap scaled = Bitmap.createScaledBitmap(decoded, Math.max(1, (int) Math.round(w * scale)), Math.max(1, (int) Math.round(h * scale)), true);
-        decoded.recycle();
-        return scaled;
+        return fit(decoded, maxSide);
     }
 
     @PluginMethod

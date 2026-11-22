@@ -11,7 +11,8 @@
  * missing), and the version from `package.json`; it attaches the uploaded build with that version and
  * sets categories, content rights, age rating, price (free) and countries. Running it again
  * updates the same version until Apple reviews it; after a rejection it sends the same
- * submission back, with the rejection marked as answered. Two settings have no API and are made by
+ * submission back, with the rejection marked as answered. Once a version is live, the next
+ * run starts the new one (with "What's New"); while one is with Apple, it refuses. Two settings have no API and are made by
  * hand once (store/listing.md): App Privacy and the EU trader status; until then Apple
  * refuses the submission and this script prints Apple's reason.
  *
@@ -150,8 +151,16 @@ async function setAppDetails(app, info) {
 
 async function setVersion(app) {
   const versions = (await get(`/v1/apps/${app.id}/appStoreVersions`)).data;
-  const version = versions.find((v) => ['PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED', 'METADATA_REJECTED'].includes(v.attributes.appStoreState));
-  if (!version) throw new Error('No App Store version is open for editing (is one already in review?).');
+  let version = versions.find((v) => ['PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED', 'METADATA_REJECTED'].includes(v.attributes.appStoreState));
+  if (!version) {
+    // Apple keeps one version on its way at a time: the next one starts once the last is live.
+    const busy = versions.find((v) => !['READY_FOR_SALE', 'REMOVED_FROM_SALE', 'DEVELOPER_REMOVED_FROM_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(v.attributes.appStoreState));
+    if (busy) throw new Error(`Version ${busy.attributes.versionString} is still with Apple (${busy.attributes.appStoreState}); a new one can follow once it is live.`);
+    // App Store Connect copies the texts and screenshots of the live version into the new one.
+    version = (await api('POST', '/v1/appStoreVersions', { data: { type: 'appStoreVersions', attributes: { platform: 'IOS', versionString: VERSION }, relationships: { app: ref('apps', app.id) } } })).data;
+  }
+  // "What's New" exists only for updates: Apple refuses it on an app's first version.
+  const update = versions.some((v) => v.id !== version.id && v.attributes.appStoreState === 'READY_FOR_SALE');
   // Apple processes an upload for about 15 minutes; right after an upload, wait for it (at
   // most 40 minutes, asking once a minute), otherwise stop with the reason.
   let builds = [];
@@ -167,8 +176,9 @@ async function setVersion(app) {
   await patch('appStoreVersionLocalizations', loc.id, {
     description: field('Description:'), keywords: field('Keywords'), promotionalText: field('Promotional text'),
     marketingUrl: url('Marketing URL'), supportUrl: url('Support URL'),
+    ...(update ? { whatsNew: field('What’s New') } : {}),
   });
-  console.log(`✓ version ${VERSION} with build ${BUILD}, description, keywords, promotional text, URLs, copyright`);
+  console.log(`✓ version ${VERSION} with build ${BUILD}, description, keywords, promotional text, URLs, copyright${update ? ', what’s new' : ''}`);
   return { version, loc };
 }
 

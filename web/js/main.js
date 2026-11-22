@@ -30,12 +30,12 @@
  */
 
 import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting } from '../shared/config.js';
+import { APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings } from '../shared/config.js';
 import { createRoom, serverUrl, uploadPhotos } from './api.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
 import { askPhotoAccess, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
-import { photos, readyBlobs, resetPhotos, roll } from './photos.js';
+import { chosenBlobs, photos, resetPhotos, roll } from './photos.js';
 import { createPainter } from './render.js';
 import { device, keyFor, saveDevice, session } from './store.js';
 import { floatEmoji, toast } from './ui.js';
@@ -241,6 +241,15 @@ function onMessage(msg) {
 
 // ---------- Photos ----------
 
+/**
+ * The room's photo settings: how many photos, and which ones ("Which photos" falls back to
+ * its default with a server that does not know it yet).
+ */
+function photoSettings(v) {
+  const { photos: size, filter } = normalizeSettings(v.settings);
+  return { size, filter };
+}
+
 /** Deals a fresh set when the lobby needs one and the app may read photos. */
 function dealIfNeeded() {
   const v = session.view;
@@ -250,9 +259,10 @@ function dealIfNeeded() {
     return;
   }
   if (!canReadPhotos()) return;
-  // A new game, or a new "Photos per player", needs a fresh set.
-  const stale = photos.spent || (photos.size > 0 && photos.size !== v.settings.photos);
-  if (stale || (!photos.rolling && !photos.chosen.length && !photos.empty)) roll(v.settings.photos, render);
+  // A new game, a new "Photos per player" or a new "Which photos" needs a fresh set.
+  const { size, filter } = photoSettings(v);
+  const stale = photos.spent || (photos.size > 0 && (photos.size !== size || photos.filter !== filter));
+  if (stale || (!photos.rolling && !photos.chosen.length && !photos.empty)) roll(size, filter, render);
 }
 
 /** Asks the phone what the app may read; a change since last time starts over. */
@@ -272,11 +282,19 @@ async function checkAccess() {
   render();
 }
 
-async function readyWith(blobs) {
+/** "Yes" (or playing without photos): waits for the photos, then uploads them. */
+async function readyWith(blobsOf) {
   if (session.uploading || !session.code) return;
   session.uploading = true;
   render();
   try {
+    let blobs;
+    try {
+      blobs = await blobsOf();
+    } catch {
+      toast('These photos would not load. Tap No for others.');
+      return;
+    }
     await uploadPhotos(session.code, keyFor(session.code), blobs);
   } catch {
     toast('Upload failed. Try again.');
@@ -408,12 +426,14 @@ const ACTIONS = {
     render();
   },
   opensettings: openSettings,
-  guess: () => readyWith([]),
+  guess: () => readyWith(async () => []),
   no: () => {
     const v = session.view;
-    if (v && v.me) roll(v.settings.photos, render);
+    if (!v || !v.me) return;
+    const { size, filter } = photoSettings(v);
+    roll(size, filter, render);
   },
-  yes: () => readyWith(readyBlobs()),
+  yes: () => readyWith(chosenBlobs),
   unready: () => send({ type: 'unready' }),
   answer: (id) => {
     const v = session.view;

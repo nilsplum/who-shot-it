@@ -1,5 +1,6 @@
 /**
- * Everything the app needs from the phone, in one place: photo access and random photos,
+ * Everything the app needs from the phone, in one place: photo access, random previews
+ * and the chosen photos,
  * keeping the screen on and opening the app's settings (the app's own native plugin
  * `Phone`, `docs/apps.md`), the share sheet, invite links and the Android back button
  * (Capacitor's official App and Share plugins), and where the server is.
@@ -10,9 +11,10 @@
  * end-to-end tests inject a fake `Phone` plugin, so they play the real UI in a browser.
  *
  * Invariants:
- * - Photos are picked, shrunk and re-encoded on the phone (JPEG at most LIMITS.photoMaxSide
- *   on the longest side, location data dropped); a photo only becomes a Blob here, it
- *   leaves the phone only through `uploadPhotos` after the player taps "Yes".
+ * - Photos are picked, shrunk and re-encoded on the phone (JPEG, location and all other
+ *   data dropped): small previews (LIMITS.previewSide) to choose from, which never leave
+ *   the phone, and the chosen photos (LIMITS.photoMaxSide), which leave it only through
+ *   `uploadPhotos` after the player taps "Yes".
  * - The app's own page runs at one of `SERVER.appOrigins` and talks to `SERVER.origin`;
  *   anywhere else (the website, local development, the tests) it talks to the origin it
  *   came from. `serverOrigin` and `codeFromLink` are pure, so they are unit-tested.
@@ -52,22 +54,41 @@ export async function askPhotoAccess() {
   return (await plugin('Phone').requestPhotoAccess()).access;
 }
 
+/** The plugin's base64 JPEG as a Blob. A plain loop: it runs for every preview and photo, and
+ * a mapping callback per byte would keep the page busy right when "No" is tapped. */
 function jpegBlob(base64) {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const text = atob(base64);
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
   return new Blob([bytes], { type: 'image/jpeg' });
 }
 
+/** The phone's answer, or an error after `ms` (the caller then tries other photos). */
+function within(ms, call) {
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+  return Promise.race([call, timeout]);
+}
+
 /**
- * One random photo from the phone that is not in `exclude` (ids from earlier calls):
- * `{ id, blob }`, or null when every photo the app may see is excluded. Screenshots are
- * never picked. Throws if the phone needs longer than TIMING.photoPickMs (for example an
- * iCloud original that does not download), so the caller can draw another one.
+ * Up to `count` random photos that are not in `exclude` (ids from earlier calls), as
+ * previews to choose from: `[{ id, blob, screenshot }]`. Fewer when the phone has no more
+ * (an empty array: every photo the app may see is excluded). Quick: previews come from
+ * what the phone keeps on the device.
  */
-export async function randomPhoto(exclude) {
-  const call = plugin('Phone').randomPhoto({ exclude, maxSide: LIMITS.photoMaxSide, quality: LIMITS.photoQuality });
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMING.photoPickMs));
-  const photo = await Promise.race([call, timeout]);
-  return photo && photo.id && photo.data ? { id: photo.id, blob: jpegBlob(photo.data) } : null;
+export async function randomPhotos(count, exclude) {
+  const answer = await within(TIMING.previewMs, plugin('Phone').randomPhotos({ count, exclude, side: LIMITS.previewSide, quality: LIMITS.previewQuality }));
+  return (answer.photos || []).filter((p) => p.id && p.data).map((p) => ({ id: p.id, blob: jpegBlob(p.data), screenshot: Boolean(p.screenshot) }));
+}
+
+/**
+ * The photo `id` as it is uploaded: a JPEG Blob at most LIMITS.photoMaxSide. Throws if the
+ * phone cannot read it or needs longer than TIMING.photoPickMs (an iCloud original that
+ * does not download).
+ */
+export async function photo(id) {
+  const answer = await within(TIMING.photoPickMs, plugin('Phone').photo({ id, maxSide: LIMITS.photoMaxSide, quality: LIMITS.photoQuality }));
+  if (!answer || !answer.data) throw new Error('unreadable');
+  return jpegBlob(answer.data);
 }
 
 /** Opens this app's page in the phone's settings (to turn photo access on). */

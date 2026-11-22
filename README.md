@@ -14,7 +14,8 @@ fast scores the most, and every reveal is a story.
   Nothing leaves a phone before its owner taps **Yes**, and each photo is deleted right after
   its round.
 - **Two ways to start, every option to tune:** Classic or Tricky (blurry, zoomed, pixelated),
-  then photos per player, rounds, time, points, streak bonus and more, each explained by a "?".
+  then photos per player, which photos (screenshots and photos full of text can stay out),
+  rounds, time, points, streak bonus and more, each explained by a "?".
 
 An iPhone and an Android app ([Capacitor](https://capacitorjs.com) around the game in
 `web/`) and one server on Cloudflare's free plan: a Worker plus one Durable Object per game
@@ -65,7 +66,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `src/game/` | Pure game logic: `rules.js` (state machine and timers), `plan.js` (which photo when), `score.js`, `view.js` (what an app may see), `state.js` (room shape, name filter). No I/O, fully unit-tested. |
 | `src/room.js` | The room: turns messages, uploads and its alarm into events, then persists, deletes unreferenced photos, broadcasts views and sets the next alarm. |
 | `src/worker.js` | Creates rooms (EU only), checks who may call, forwards room requests. Everything else is the website from `web/`. |
-| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set), `phone.js` (everything native). |
+| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin). |
@@ -79,9 +80,12 @@ lobby → 3-2-1 once everyone (at least two) is ready → per round *load* (ever
 photo) → *show* → *reveal* → *end* → "Play again". Apps get a full snapshot after every
 change, with the photo's owner hidden until the reveal.
 
-**Photos.** With the player's permission, the app picks n random photos on the phone (never
-screenshots), shrunk to at most 1080 px JPEG without location data; No draws others, Yes
-uploads exactly these. A photo is deleted right after its round, and also when reported, on
+**Photos.** With the player's permission, the app picks n random photos on the phone and
+shows small previews; a few sets wait ready, so No shows others at once. The host's "Which
+photos" decides what may come up: all, little text (default: photos with 6 or more lines of
+text, like chats and emails, stay out) or no screenshots either; the check runs on the
+phone. Yes uploads exactly the photos shown, shrunk to at most 1080 px JPEG without
+location data. A photo is deleted right after its round, and also when reported, on
 "Change", "Leave", removal, a new photo count, the game's end and when the room closes (last
 player gone, or 2 hours without activity). Photo links work only for the current and next
 round.

@@ -16,9 +16,12 @@ export const library = [1, 2, 3, 4, 5, 6].map((i) => fs.readFileSync(path.join(F
 /**
  * Runs in the page before the app (a Playwright init script): it must be self-contained.
  * Also used by the store images and the demo players (scripts/helpers/) with drawn photos.
+ * `photos` are base64 JPEGs, or `{ data, screenshot }` for a photo the phone marks as a
+ * screenshot. A photo serves as its own preview and upload.
  */
 export function installFakePhone(photos) {
   let access = 'ask';
+  const library = photos.map((p, i) => ({ id: `photo-${i + 1}`, data: typeof p === 'string' ? p : p.data, screenshot: Boolean(p.screenshot) }));
   window.Capacitor = {
     Plugins: {
       Phone: {
@@ -27,9 +30,14 @@ export function installFakePhone(photos) {
           access = 'full';
           return { access };
         },
-        randomPhoto: async ({ exclude }) => {
-          const free = photos.map((data, i) => ({ id: `photo-${i + 1}`, data })).filter((p) => !exclude.includes(p.id));
-          return free.length ? free[Math.floor(Math.random() * free.length)] : {};
+        randomPhotos: async ({ count, exclude }) => {
+          const free = library.filter((p) => !exclude.includes(p.id)).sort(() => Math.random() - 0.5);
+          return { photos: access === 'ask' ? [] : free.slice(0, count) };
+        },
+        photo: async ({ id }) => {
+          const found = library.find((p) => p.id === id);
+          if (!found) throw new Error('unreadable');
+          return { id, data: found.data };
         },
         openSettings: async () => {},
         keepAwake: async () => {},
@@ -38,9 +46,9 @@ export function installFakePhone(photos) {
   };
 }
 
-/** A new phone: its own browser context (own storage), with the fake plugin installed. */
-export async function newPhone(browser) {
+/** A new phone: its own browser context (own storage), with the fake plugin and `photos` installed. */
+export async function newPhone(browser, photos = library) {
   const context = await browser.newContext();
-  await context.addInitScript(installFakePhone, library);
+  await context.addInitScript(installFakePhone, photos);
   return context.newPage();
 }
