@@ -44,6 +44,12 @@ know about. Kept up to date with every commit.
   asks everyone to accept the terms again anyway. AGENTS.md's two photo rules say the same
   (a photo is reachable from its game's 3-2-1 until its round is over, only if it is
   played, never stored on the phones).
+- Commit 8: the big versions prepared ahead come only from photos stored on the phone
+  (no iCloud download); a photo kept only in iCloud downloads once it is on screen.
+- Commit 9: screens now start right under the status bar and end right above the home
+  indicator (checked in the iPhone simulator; please look on a real iPhone and the iPad).
+  With 16 players the lobby still scrolls on the smallest phones until commit 10 makes its
+  pills compact; my commit 8 had briefly let the photos overlap No and Yes there (fixed).
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
