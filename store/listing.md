@@ -82,6 +82,22 @@ never other apps' names):
 **Screenshots:** `store/images/app-store/` (6.9 inch iPhone, 1290 x 2796), in their numbered
 order. Only the first three show in search results, so they tell the whole idea.
 
+**App Review contact** (seen only by Apple's reviewers):
+
+    Nils Plum, +49 177 2438912, whoshotit.info@gmail.com
+
+**App Review notes:**
+
+    The game needs at least two phones in the same game. Install the app on two devices, accept the terms, enter a name, tap Create game, then Start game, and join on the second device with the four letter code. Allow photo access when asked (both devices need a few photos in their library). Content moderation: every player confirms their own photos (Yes or No) before anything is shared; the flag on each photo deletes it for everyone at once; the host can remove a player (tap the player), who cannot rejoin; nicknames with blocked words are replaced; every player accepts the terms (16+) before playing. No account, no ads, no tracking. Contact: whoshotit.info@gmail.com
+
+**Settings made by `scripts/helpers/app-store.mjs`** (`node scripts/helpers/app-store.mjs submit`):
+categories (above), content rights (players share their own photos), age rating (user
+generated content and contests yes, everything else no, raised to 16+ to match the terms),
+free, every country except China mainland (games there need a licence), release after
+approval. Only two settings have no API and are made by hand once: App Privacy (Photos
+or Videos and User ID, App Functionality only, not linked, no tracking) and the EU trader
+status (docs/apps.md).
+
 ## Google Play (prepared; see docs/guides/android.md)
 
 **App name** (30): `Who Shot It? Photo Party Game`

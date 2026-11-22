@@ -42,8 +42,10 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
 3. `./scripts/release-apps.sh` (or `ios` / `android` only). It runs every test, builds,
    signs and uploads:
    - **iPhone:** to App Store Connect. About 15 minutes later the build is in TestFlight
-     (install it on your iPhone with Apple's TestFlight app). To publish: App Store
-     Connect, the app, the version, pick the build, **Submit for Review**.
+     (install it on your iPhone with Apple's TestFlight app). With `--submit` the script
+     then fills in the App Store page from `store/listing.md` and sends the version to
+     App Review; it goes live by itself after approval. `node scripts/helpers/app-store.mjs
+     status` shows where things stand (builds, TestFlight beta check, review).
    - **Android:** to Google Play, released on the production track: Google reviews it
      (hours to a few days), then it goes live. `--android-track internal` releases to the
      internal test track instead.
@@ -60,14 +62,20 @@ the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
   the first Android build. With Play App Signing (the default) Google signs what players
   install, and a lost upload key can be replaced through Google support.
 - `google-play.json`: the key of the service account that uploads to Google Play.
+- `app-store-connect.p8` and `app-store-connect.json` (`{ "keyId", "issuerId" }`): the App
+  Store Connect team API key (Users and Access, Integrations, App Store Connect API, Team
+  Keys, access Admin; the `.p8` can be downloaded only once). It fills in and submits the
+  App Store page. Revoke and replace it there if it ever leaks.
 
 ## First release (once per store, by hand)
 
-**App Store:** in App Store Connect create the app (My Apps, +, New App: iOS, name
+**App Store:** in App Store Connect create the app (Apps, +, New App: iOS, name
 `Who Shot It?`, language English, bundle ID `com.hivedone.whoshotit`, SKU `whoshotit`).
-Then `./scripts/release-apps.sh ios` uploads the first build. Fill in the version page,
-App Privacy, age rating and the EU trader details with the answers below, then Submit for
-Review.
+Two settings have no API and are made by hand once: **App Privacy** (Apps, the app, left
+column App Privacy, Get Started: "Yes, we collect data", tick Photos or Videos and User ID,
+each for App Functionality only, not linked, no tracking, Publish) and the **EU trader
+status** (Business, Agreements, Compliance, Digital Services Act, Complete Compliance
+Requirements). Then `./scripts/release-apps.sh ios --submit` does the rest.
 
 **Google Play:** step by step in [guides/android.md](guides/android.md) (account, forms,
 the first upload by hand, the key for automatic uploads).
@@ -101,13 +109,6 @@ target audience 16 and older, no children.
 > whole library, which is the point of the game. Only photos the player confirms leave the
 > device; they are shown to the players in that private game and deleted after their round.
 
-**Review notes (both stores):**
-> The game needs at least two phones in the same game. Install the app on two devices,
-> accept the terms, enter a name, tap Create game, Start game, then join on the second
-> device with the 4-letter code. Allow photo access when asked (both devices need a few
-> photos). Content moderation: every player confirms their own photos (Yes/No); the flag
-> on each photo deletes it for everyone at once; the host can remove players (tap a
-> player), who cannot rejoin; nicknames with blocked words are replaced; every player
-> accepts the terms (16+) before playing; contact: whoshotit.info@gmail.com.
+**Review notes and contact (both stores):** in [store/listing.md](../store/listing.md).
 
 **Screenshots:** use only your own photos, or photos of people who agreed.

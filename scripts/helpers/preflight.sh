@@ -2,7 +2,8 @@
 # Preflight checks shared by every script in scripts/. Each check is one function that
 # prints a short reason and the exact fix when it fails; each script runs its bundle
 # (preflight_setup, preflight_test, preflight_dev, preflight_deploy, preflight_android,
-# preflight_ios) before doing anything; release-apps.sh adds check_play_upload_key. Sourced, never run directly. Expects to be called
+# preflight_ios) before doing anything; release-apps.sh adds check_play_upload_key and
+# check_app_store_key. Sourced, never run directly. Expects to be called
 # from the repo root.
 
 fail() {
@@ -77,6 +78,11 @@ check_xcode() {
 check_ios_team() {
   grep -q "DEVELOPMENT_TEAM = " ios/App/App.xcodeproj/project.pbxproj \
     || fail "No Apple developer team is set for the iPhone app." "Open ios/App/App.xcodeproj in Xcode, target App, Signing & Capabilities: tick 'Automatically manage signing' and pick your team. Commit the change."
+}
+
+# App Store submissions sign in with a team API key (docs/apps.md, Keys in secrets/).
+check_app_store_key() {
+  [ -f secrets/app-store-connect.p8 ] && [ -f secrets/app-store-connect.json ] || fail "The App Store Connect API key is missing (secrets/app-store-connect.p8 and .json)." "Create it as described in docs/apps.md (Keys in secrets/), or leave out --submit."
 }
 
 # Uploads to Google Play sign in with a service account key (docs/apps.md, Google Play).

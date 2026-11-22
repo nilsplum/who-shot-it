@@ -9,7 +9,10 @@
 #   --no-upload               only build: dist/who-shot-it-<version>.aab and dist/ios/App.ipa
 #   --android-track internal  release to Google Play's internal test track instead
 #   --store-images            also redraw the store screenshots in store/images/ (when the
-#                             app's look changed; they are uploaded by hand)
+#                             app's look changed)
+#   --submit                  after the iPhone upload, fill in the App Store page from
+#                             store/listing.md and send the version to App Review
+#                             (scripts/helpers/app-store.mjs, with the API key in secrets/)
 #
 # Every run first runs all tests, draws the icons from web/icons/icon.svg and copies web/
 # into the native projects (npx cap sync). The version is package.json's "version"; raise
@@ -29,13 +32,15 @@ platforms=()
 upload=true
 track=production
 store_images=false
+submit=false
 while [ $# -gt 0 ]; do
   case "$1" in
     android | ios) platforms+=("$1") ;;
     --no-upload) upload=false ;;
     --android-track) shift; track="${1:-}" ;;
     --store-images) store_images=true ;;
-    *) fail "Unknown option: $1" "Use: ./scripts/release-apps.sh [android] [ios] [--no-upload] [--android-track internal|production] [--store-images]" ;;
+    --submit) submit=true ;;
+    *) fail "Unknown option: $1" "Use: ./scripts/release-apps.sh [android] [ios] [--no-upload] [--android-track internal|production] [--store-images] [--submit]" ;;
   esac
   shift
 done
@@ -44,7 +49,9 @@ case "$track" in internal | production) ;; *) fail "Unknown Google Play track: $
 for p in "${platforms[@]}"; do
   "preflight_$p"
   [ "$p" = android ] && [ "$upload" = true ] && check_play_upload_key
+  [ "$p" = ios ] && [ "$submit" = true ] && check_app_store_key
 done
+[ "$submit" = false ] || [ "$upload" = true ] || fail "--submit needs the upload." "Leave out --no-upload."
 
 version=$(node -p "require('./package.json').version")
 build=$(node -p "const [a, b, c] = require('./package.json').version.split('.').map(Number); a * 10000 + b * 100 + c")
@@ -119,8 +126,11 @@ PLIST
   echo "→ iPhone: signing and $([ "$upload" = true ] && echo "uploading to App Store Connect" || echo "exporting")"
   xcodebuild -quiet -exportArchive -archivePath dist/ios/App.xcarchive -exportPath dist/ios \
     -exportOptionsPlist dist/ios/export.plist -allowProvisioningUpdates
-  if [ "$upload" = true ]; then
-    echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight; to publish, add it to the version in App Store Connect and press Submit for Review."
+  if [ "$submit" = true ]; then
+    echo "→ iPhone: filling in the App Store page and sending it to App Review"
+    node scripts/helpers/app-store.mjs submit --wait
+  elif [ "$upload" = true ]; then
+    echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight. To publish: node scripts/helpers/app-store.mjs submit"
   else
     echo "✓ dist/ios/App.ipa: upload it with Apple's Transporter app."
   fi
