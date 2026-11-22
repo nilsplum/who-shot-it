@@ -1,6 +1,8 @@
 # Game flow overhaul: settings, photo choice, leaderboard, play again (plan)
 
-Status: planned on 22 November 2026, not implemented yet. Each commit below is implemented
+Status: implemented on 22 November 2026 (all ten commits). Open: trying the iPhone's
+iCloud previews on a real phone through TestFlight, and submitting 1.0.2 to App Review once
+1.0.0 is live. Each commit below is implemented
 with `docs/prompts/implement.md`; after each one its status line here is set to done and
 its decisions are added to the decision log at the end.
 
@@ -466,7 +468,7 @@ Status: done (tried on a real iPhone through TestFlight in commit 10).
   through TestFlight (the release commit says so).
 
 ### Commit 10: helpers, docs and the release
-Status: done except the server deploy, which waits for the operator's confirmation (version 1.0.2, build 10002, is in TestFlight).
+Status: done. Version 1.0.2 (build 10002) is in TestFlight; the server was deployed on 22 November 2026 after the operator confirmed, and a full game with demo players (removal, report, five rounds with leaderboards, Play again) ran on it.
 
 - `demo-players.mjs`: wait through the board; on the results, tap "Play again" when
   `data-next` says a new game is open, and also before leaving; their guide updated.
