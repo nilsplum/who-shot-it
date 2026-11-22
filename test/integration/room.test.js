@@ -233,6 +233,23 @@ describe('a full game', () => {
   });
 });
 
+describe('reactions', () => {
+  test('a reaction from the list reaches the others; anything else (an old app\'s emoji) does not', async () => {
+    const code = await createRoom();
+    const ann = await connect(code, 'Ann');
+    const ben = await connect(code, 'Ben');
+    await ann.until((v) => v.players.length === 2);
+    ann.send({ type: 'react', emoji: '😱' });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    ann.send({ type: 'react', emoji: '🔥' });
+    await new Promise((resolve) => {
+      const check = () => (ben.messages.some((m) => m.type === 'react') ? (resolve(), true) : false);
+      if (!check()) ben.waiters.push(check);
+    });
+    expect(ben.messages.filter((m) => m.type === 'react').map((m) => m.emoji)).toEqual(['🔥']);
+  });
+});
+
 describe('leaving and closing', () => {
   test('leaving deletes the player\'s photos; the last one out deletes the room', async () => {
     const code = await createRoom();

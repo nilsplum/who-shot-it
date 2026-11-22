@@ -79,8 +79,11 @@ export const STORES = {
 /** Avatars a player can pick (the picker shows them in this order). */
 export const EMOJIS = ['😎', '🦊', '🐸', '🐼', '🦄', '🐙', '👻', '🤖', '🐯', '🍕', '🌵', '🔥', '🐳', '🦖', '🍩', '👽', '🐧', '🦁', '🍉', '⚡'];
 
-/** Reactions everyone can send during the reveal and on the end screen. */
-export const REACTIONS = ['😂', '😱', '🔥', '😍', '🙈', '💀'];
+/**
+ * Reactions everyone can send on the reveal, the leaderboard and the end screen, most used
+ * first (the row scrolls to the rest). The room passes on only these.
+ */
+export const REACTIONS = ['😂', '🙈', '🔥', '🤯', '👀', '🫣', '😩', '🫠', '🧐', '🎉'];
 
 /** The photo effects a round can use; "mix" draws one of these per round. */
 export const EFFECTS = ['classic', 'blur', 'zoom', 'pixel'];

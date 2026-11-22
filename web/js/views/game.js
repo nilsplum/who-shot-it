@@ -1,30 +1,27 @@
 /**
- * A round on screen: round counter and score, the timer bar, the photo (with a flag to
- * report it), the answer buttons (everyone answers, the owner included, and anyone may
- * pick themselves), who has answered, and the reveal.
+ * A round on screen: the round counter, the timer bar, the photo (with a flag to report
+ * it), one card per player to pick from (everyone answers, the owner included, and anyone
+ * may pick themselves), who has answered, and the reveal.
  *
  * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
  * photo (and the next one), tells the room once it is loaded, starts the effect when the
- * `stage` part changes and animates the timer bar (`#tbar`) every frame. Photo links in
- * the view are server paths; `serverUrl` makes them full addresses. The host can tap a
- * player in the "who has answered" row to remove them (`views/sheets.js`).
+ * `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates on the
+ * reveal (`phone.buzz`). Photo links in the view are server paths; `serverUrl` makes them
+ * full addresses. The host can tap a player in the "who has answered" row to remove them
+ * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here.
  *
- * Invariants: the reveal keeps the answer buttons in place, so the eye stays where it
- * was: the owner's turns green, a wrong own pick red; under each name are the avatars of
- * who picked it, plus each player's total and this round's points. Players who were not
- * among the answers ("Answers: Only 4") are added below, so every score is visible.
+ * Invariants: a card shows only the avatar and the name, in the same place before and
+ * after the reveal, so the eye stays where it was. On the reveal the owner's card turns
+ * green with a ✓, my wrong pick red with a ✗ (colour never carries the meaning alone);
+ * a right pick also makes the owner's card pop and throw a little confetti.
  */
 
 import { serverUrl } from '../api.js';
-import { avatar, esc } from '../ui.js';
+import { avatar, esc, reactionsRow } from '../ui.js';
 
 function bar(view) {
-  const r = view.round;
-  const me = view.players.find((p) => p.id === view.me.id);
-  const gained = view.phase === 'reveal' && r.results && r.results[view.me.id] ? r.results[view.me.id].points : 0;
   return `<button class="icon" data-act="leave" aria-label="Leave">✕</button>
-    <span class="rnd">${r.n} / ${r.total}</span>
-    <span class="pts">${me ? me.score : 0}${gained > 0 ? `<span class="gain">+${gained}</span>` : ''}</span>`;
+    <span class="rnd">${view.round.n} / ${view.round.total}</span><span></span>`;
 }
 
 /**
@@ -42,31 +39,38 @@ function stage(view, loaded) {
     <button class="flag" data-act="report" aria-label="Report this photo">⚑</button>`;
 }
 
-function optionButton(view, id, { picked, late }) {
-  const me = id === view.me.id ? ' <i>(you)</i>' : '';
-  const p = view.players.find((x) => x.id === id);
+const player = (view, id) => view.players.find((p) => p.id === id);
+
+function pickCard(view, id, { picked, late }) {
+  const p = player(view, id);
   const cls = picked ? (picked === id ? 'sel' : 'off') : late ? 'off' : '';
-  return `<button class="opt ${cls}" data-act="answer" data-v="${esc(id)}" ${picked || late ? 'disabled' : ''}>${avatar(p)}<span class="nm">${esc(p.name)}${me}</span></button>`;
+  return `<button class="opt ${cls}" data-act="answer" data-v="${esc(id)}" ${picked || late ? 'disabled' : ''}>${avatar(p)}<span class="nm">${esc(p.name)}</span></button>`;
 }
 
-function revealTile(view, p) {
+/** Ten confetti pieces flying out of a card, each its own direction and colour. */
+const CONFETTI = Array.from({ length: 10 }, (_, i) => {
+  const angle = (i / 10) * 2 * Math.PI;
+  return `<i class="cf" style="--x:${Math.round(Math.cos(angle) * 90)}px;--y:${Math.round(Math.sin(angle) * 60)}px;--c:var(--p${i})"></i>`;
+}).join('');
+
+function revealCard(view, id) {
+  const p = player(view, id);
   const r = view.round;
-  const res = r.results || {};
-  const myPick = res[view.me.id] && res[view.me.id].pick;
-  const voters = view.players.filter((q) => res[q.id] && res[q.id].pick === p.id);
-  const cls = p.id === r.owner ? 'ok' : myPick === p.id ? 'bad' : 'rest';
-  const gained = res[p.id] ? res[p.id].points : 0;
-  const me = p.id === view.me.id ? ' <i>(you)</i>' : '';
-  return `<div class="opt ${cls}">${avatar(p)}<div class="col"><div class="nm">${esc(p.name)}${me}</div><div class="vt">${voters.map((q) => avatar(q)).join('')}</div></div><span class="sc">${p.score}${gained ? `<b>+${gained}</b>` : ''}</span></div>`;
+  const mine = r.results && r.results[view.me.id] ? r.results[view.me.id].pick : null;
+  const name = esc(p.name);
+  if (id === r.owner) {
+    const won = mine === id;
+    return `<div class="opt ok ${won ? 'win' : ''}" aria-label="${name}: their photo">${avatar(p)}<span class="nm">${name}</span><span class="badge">✓</span>${won ? CONFETTI : ''}</div>`;
+  }
+  if (id === mine) return `<div class="opt bad" aria-label="${name}: your pick, wrong">${avatar(p)}<span class="nm">${name}</span><span class="badge">✗</span></div>`;
+  return `<div class="opt">${avatar(p)}<span class="nm">${name}</span></div>`;
 }
 
-function options(view, { picked, late, loaded }) {
-  const r = view.round;
+function cards(view, { picked, late, loaded }) {
   if (view.phase === 'load' || !loaded) return '';
-  if (view.phase === 'show') return `<div class="opts">${r.options.map((id) => optionButton(view, id, { picked, late })).join('')}</div>`;
-  const listed = r.options.map((id) => view.players.find((p) => p.id === id)).filter(Boolean);
-  const others = view.players.filter((p) => !r.options.includes(p.id));
-  return `<div class="opts">${[...listed, ...others].map((p) => revealTile(view, p)).join('')}</div>`;
+  const ids = view.round.options;
+  const card = view.phase === 'show' ? (id) => pickCard(view, id, { picked, late }) : (id) => revealCard(view, id);
+  return `<div class="opts">${ids.map(card).join('')}</div>`;
 }
 
 function dots(view, host) {
@@ -83,7 +87,7 @@ function dots(view, host) {
 function after(view, host, reactions) {
   if (view.phase !== 'reveal') return '';
   const next = host ? (view.settings.auto ? '<button class="link" data-act="next">Next ›</button>' : '<button class="btn main" data-act="next">Next</button>') : '';
-  return `<div class="reacts">${reactions.map((e) => `<button data-act="react" data-v="${e}" aria-label="React ${e}">${e}</button>`).join('')}</div>${next}`;
+  return `${reactionsRow(reactions)}${next}`;
 }
 
 /**
@@ -106,7 +110,7 @@ export function gameScreen(c, state) {
     parts: {
       bar: bar(view),
       stage: stage(view, state.loaded),
-      opts: options(view, state),
+      opts: cards(view, state),
       dots: dots(view, host),
       after: after(view, host, state.reactions),
     },

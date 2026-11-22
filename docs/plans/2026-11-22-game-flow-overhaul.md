@@ -350,7 +350,7 @@ Status: done.
   press opens and closes the look (the fake phone has enough photos).
 
 ### Commit 5: the game screen: simple cards, colours, reactions
-Status: open.
+Status: done.
 
 - `views/game.js`: the top bar keeps ✕ and the round; the score and `.gain` go. Cards:
   avatar and name only (no "(you)", no voter avatars, no points), at least 64 points
@@ -540,3 +540,7 @@ Status: open.
 | Commit 4: sizing the square grid | The grid sits in a box that takes the free height (container query units, `min(100cqw, 100cqh)`); the lobby page gets the screen's exact height (`.wrap.fit`) | Container units need a container with a definite height; with only a minimum height they measure 0 (the tiles had no size). Content that does not fit still scrolls. On iOS 15 without container units the grid takes the full width. |
 | Commit 4: tiles as buttons | Each photo of the choice is a button (tap to swap, `data-hold` to look); the "Ready" grid uses plain tiles that can only be held | Buttons are reachable for screen readers and get the standard tap behaviour. |
 | Commit 4: refused swap | Also when the deck has no photo ready (a nearly empty library) | Same feedback for every "not possible", no new message. |
+| Commit 5: the host's "Next" | Stays on the reveal until commit 6 adds the board | "Host taps" games must keep working between commits. |
+| Commit 5: players not among the options | No longer listed below the cards on the reveal | They were there only to show every score; scores move to the board. |
+| Commit 5: the reaction test | An integration test that the room passes on a listed reaction and drops an old app's emoji, instead of a unit test comparing the constant with itself | The app and the server read the same constant; what can break is the server's filter. |
+| Commit 5: when to vibrate | On the first view of a round's reveal (also after reconnecting during one), from the room's own results | The room's results are the truth; an optimistic pick could differ. |

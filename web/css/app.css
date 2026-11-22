@@ -189,9 +189,6 @@ button.chip { border: 0; color: inherit; }
 .gbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .gbar .icon { justify-self: start; margin-left: -8px; }
 .rnd { font: 800 18px var(--display); }
-.pts { justify-self: end; color: var(--y); position: relative; }
-.gain { position: absolute; right: 0; top: -2px; color: var(--g); animation: gain 1.6s ease-out forwards; white-space: nowrap; }
-@keyframes gain { 0% { transform: translateY(10px); opacity: 0; } 20% { transform: translateY(-14px); opacity: 1; } 100% { transform: translateY(-30px); opacity: 0; } }
 .timer { height: 6px; background: var(--card2); border-radius: 99px; overflow: hidden; margin: 10px 0 12px; }
 .timer i { display: block; height: 100%; background: linear-gradient(90deg, var(--a), var(--y), var(--g)); transform-origin: left; }
 .timer.off i { opacity: 0; }
@@ -204,32 +201,39 @@ button.chip { border: 0; color: inherit; }
 button.bare { background: none; border: 0; padding: 0; }
 .spin { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--y); animation: spin .8s linear infinite; }
 .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.opt { --c: var(--p0); display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; background: var(--card); border: 2px solid transparent; text-align: left; min-height: 58px; transition: opacity .2s, border-color .2s, background .2s; }
+.opt { --c: var(--p0); position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: var(--card); color: var(--ink); border: 3px solid transparent; text-align: left; min-height: 64px; transition: opacity .2s, border-color .2s, background .2s; }
 .opt:active { transform: scale(.97); }
-.opt .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.opt .nm i { font-style: normal; color: var(--mut); font-weight: 500; }
-.opt .col { flex: 1; min-width: 0; }
-.opt .vt { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; min-height: 18px; }
-.opt .vt .av { width: 18px; height: 18px; font-size: 10px; border-width: 1px; }
-.opt .sc { color: var(--mut); font-size: 13px; text-align: right; white-space: nowrap; }
-.opt .sc b { display: block; color: var(--g); font-size: 12px; }
+.opt .av { width: 40px; height: 40px; font-size: 22px; }
+.opt .nm { flex: 1; min-width: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opt.sel { border-color: var(--y); background: var(--sel-bg); }
 .opt.off { opacity: .35; }
+/* The reveal: the owner's card green with ✓, my wrong pick red with ✗. */
 .opt.ok { border-color: var(--g); background: var(--ok-bg); animation: pop .45s cubic-bezier(.3, 1.6, .5, 1); }
 .opt.bad { border-color: var(--r); background: var(--bad-bg); }
-.opt.rest { opacity: .55; }
+.opt .badge { font-size: 26px; font-weight: 800; line-height: 1; }
+.opt.ok .badge { color: var(--g); }
+.opt.bad .badge { color: var(--r); }
+/* A right guess: the card pops bigger and throws confetti. */
+.opt.win { animation: win .6s cubic-bezier(.3, 1.6, .5, 1); z-index: 1; }
+@keyframes win { 0% { transform: scale(.9); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.cf { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; border-radius: 2px; background: var(--c); pointer-events: none; animation: burst .9s ease-out forwards; }
+@keyframes burst { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(220deg); opacity: 0; } }
 div.opt:active { transform: none; }
 @keyframes pop { from { transform: scale(.9); } to { transform: scale(1); } }
 .dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 12px; min-height: 26px; }
 .dots .av { width: 26px; height: 26px; font-size: 13px; opacity: .25; transition: opacity .2s; }
 .dots .av.on { opacity: 1; }
 .after { margin-top: 12px; }
-.reacts { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-.reacts button { width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--card); font-size: 22px; }
-.reacts button:active { transform: scale(.85); }
+/* The reaction row: big buttons that scroll sideways, and a quiet arrow to page through them. */
+.reacts { display: flex; align-items: center; gap: 6px; }
+.rrow { flex: 1; display: flex; gap: 8px; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; padding: 4px 2px; }
+.rrow::-webkit-scrollbar { display: none; }
+.rrow button { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--card); font-size: 26px; }
+.rrow button:active { transform: scale(.85); }
+.rmore { flex: 0 0 auto; width: 32px; height: 52px; border: 0; background: none; color: var(--mut); font-size: 26px; padding: 0; }
 .after .btn { margin-top: 14px; }
-.float { position: fixed; bottom: 90px; font-size: 38px; pointer-events: none; z-index: 60; animation: up 2.4s ease-out forwards; }
-@keyframes up { 0% { transform: translateY(0) scale(.5); opacity: 0; } 12% { opacity: 1; transform: translateY(-30px) scale(1.15); } 100% { transform: translateY(-55vh); opacity: 0; } }
+.float { position: fixed; font-size: 40px; line-height: 1; pointer-events: none; z-index: 60; animation: up 2.4s ease-out forwards; }
+@keyframes up { 0% { transform: translate(-50%, 0) scale(.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
 
 /* End */
 .podium { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin: 28px 0 14px; }
@@ -249,7 +253,8 @@ div.opt:active { transform: none; }
 
 /* Reduce Motion: the new swap animations become instant changes. */
 @media (prefers-reduced-motion: reduce) {
-  .tile.in, .tile.flip, .tile.no .x { animation: none; }
+  .tile.in, .tile.flip, .tile.no .x, .opt.ok, .opt.win { animation: none; }
+  .cf { display: none; }
 }
 
 /* Toast */

@@ -1,6 +1,6 @@
 /**
- * Shared UI building blocks: HTML escaping, avatars, the one toast, floating reactions and
- * the logo.
+ * Shared UI building blocks: HTML escaping, avatars, the one toast, the reaction row and
+ * its floating emojis, and the logo.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -32,11 +32,29 @@ export function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
 }
 
+/**
+ * The reaction row, the same on every screen that has one: big emoji buttons in a row that
+ * scrolls sideways (most used first), and a small arrow that pages through it
+ * (`main.js`, action `reactmore`). Its markup never changes, so a repaint keeps the scroll.
+ */
+export function reactionsRow(reactions) {
+  return `<div class="reacts"><div class="rrow">${reactions.map((e) => `<button data-act="react" data-v="${e}" aria-label="React ${e}">${e}</button>`).join('')}</div><button class="rmore" data-act="reactmore" aria-label="More reactions">›</button></div>`;
+}
+
+/**
+ * Lets `emoji` rise up the screen: from its button in the reaction row when that button is
+ * on screen (also for someone else's reaction), else from the bottom middle.
+ */
 export function floatEmoji(emoji) {
   const el = document.createElement('span');
   el.className = 'float';
   el.textContent = emoji;
-  el.style.left = `${10 + Math.random() * 75}vw`;
+  const button = [...document.querySelectorAll('.rrow [data-act="react"]')].find((b) => b.dataset.v === emoji);
+  const row = button && button.parentElement.getBoundingClientRect();
+  const box = button && button.getBoundingClientRect();
+  const visible = box && box.width && box.left >= row.left - 1 && box.right <= row.right + 1;
+  el.style.left = visible ? `${box.left + box.width / 2}px` : '50vw';
+  el.style.top = visible ? `${box.top}px` : 'calc(100vh - 90px)';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
 }

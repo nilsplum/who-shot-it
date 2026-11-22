@@ -7,7 +7,7 @@
  * All photos of the game are already deleted on the server at this point.
  */
 
-import { avatar, esc } from '../ui.js';
+import { avatar, esc, reactionsRow } from '../ui.js';
 
 export function endScreen({ view }, reactions) {
   const host = view.hostId === view.me.id;
@@ -30,7 +30,7 @@ export function endScreen({ view }, reactions) {
       <div class="top"><button class="icon" data-act="leave" aria-label="Leave">✕</button><span></span><span></span></div>
       <div data-part="body"></div>
       <div class="spacer"></div>
-      <div class="reacts end-reacts">${reactions.map((e) => `<button data-act="react" data-v="${e}" aria-label="React ${e}">${e}</button>`).join('')}</div>
+      <div class="end-reacts">${reactionsRow(reactions)}</div>
       <div data-part="again"></div>
     </div>`,
     parts: {

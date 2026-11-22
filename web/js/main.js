@@ -13,7 +13,8 @@
  * - In a room, `RoomSocket` delivers the player's view; every view replaces
  *   `session.view`, preloads the round's and the next round's photo, acknowledges a
  *   loaded photo (`loaded`), deals photos when the lobby needs a set (`dealIfNeeded`),
- *   and repaints. Actions are sent as small messages; the server decides what happens.
+ *   vibrates when a round is revealed (one pulse right, two wrong) and repaints. Actions
+ *   are sent as small messages; the server decides what happens.
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings.
@@ -239,6 +240,12 @@ function onMessage(msg) {
   if (!inRound(v) && ['leave', 'report'].includes(session.sheet)) session.sheet = null;
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
+  // The reveal of a round, once: one pulse for a right guess, two for anything else.
+  const revealed = (x) => x && x.phase === 'reveal' && x.round ? x.round.n : null;
+  if (revealed(v) && revealed(previous) !== revealed(v)) {
+    const mine = v.round.results && v.round.results[v.me.id];
+    buzz(mine && mine.pick && mine.pick === v.round.owner ? 'yes' : 'no');
+  }
   preload(v);
   acknowledge();
   dealIfNeeded();
@@ -460,6 +467,12 @@ const ACTIONS = {
     lastReactAt = performance.now();
     send({ type: 'react', emoji });
     floatEmoji(emoji);
+  },
+  /** The arrow of the reaction row: one page further, and back to the start at the end. */
+  reactmore: (value, el) => {
+    const row = el.closest('.reacts').querySelector('.rrow');
+    const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
+    row.scrollTo({ left: atEnd ? 0 : row.scrollLeft + row.clientWidth * 0.8 });
   },
   report: () => openSheet('report'),
   reportnow: () => {
