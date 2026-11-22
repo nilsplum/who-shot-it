@@ -77,6 +77,8 @@
   --color-red-dark: #40222b; /* behind a wrong pick */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
   --color-warning-ink: #ffcfa8;
+  --color-blue: #5b8cff; /* the timer while everyone looks at the answer (reveal, leaderboard), to violet */
+  --color-violet: #a66bff;
   --color-silver: #cfd6e6; /* the podium's second and third place (first is yellow) */
   --color-bronze: #e0a070;
 

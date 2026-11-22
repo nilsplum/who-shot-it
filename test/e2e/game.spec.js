@@ -89,12 +89,17 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await expect(guests[1].getByText('1 / 5', { exact: true })).toBeVisible();
   await guests[1].getByRole('button', { name: 'Report this photo' }).click();
   await guests[1].getByRole('button', { name: 'Delete photo' }).click();
+  const bar = host.locator('#tbar');
   for (let round = 2; round <= 5; round++) {
     for (const page of everyone) {
       await expect(page.getByText(`${round} / 5`, { exact: true })).toBeVisible();
+      // The time to answer has the warm look.
+      if (page === host) await expect(bar).toHaveAttribute('data-kind', 'answer');
       await page.locator('[data-act="answer"]').first().click();
     }
     for (const page of everyone) await expect(page.locator('[aria-label$=": their photo"]')).toHaveCount(1);
+    // Everyone answered: the time to look at the answer has the cool look, on the reveal and the leaderboard.
+    await expect(bar).toHaveAttribute('data-kind', 'look');
     if (round === 2) {
       // The leaderboard after the reveal: everyone ranked, with this round's pick.
       await expect(host.getByRole('heading', { name: 'Round 2 of 5' })).toBeVisible();

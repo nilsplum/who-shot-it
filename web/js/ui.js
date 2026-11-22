@@ -73,10 +73,22 @@ export const hero = (title, { small = false, more = '' } = {}) =>
 export const SPINNER = '<div class="mx-auto size-10 animate-spin rounded-full border-4 border-line border-t-yellow"></div>';
 
 /**
- * The timer bar under the top bar (game and leaderboard). `main.js` shrinks `#tbar` every
- * frame and sets `data-off` on it while no timer runs (the empty track stays).
+ * The timer bar's two looks, by what the time is for: `answer`, warm (coral to green), the
+ * time to pick; `look`, cool (blue to violet), the time to look at the answer on the reveal
+ * and the leaderboard, which runs on by itself.
  */
-export const TIMER_BAR = '<div class="mt-2.5 mb-3 h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb from-coral via-yellow to-green data-off:opacity-0"></i></div>';
+const TIMER_LOOKS = {
+  answer: 'from-coral via-yellow to-green',
+  look: 'from-blue to-violet',
+};
+
+/**
+ * The timer bar under the top bar (game and leaderboard), in one of its looks; `data-kind`
+ * names it for the tests. `main.js` shrinks `#tbar` every frame and sets `data-off` on it
+ * while no timer runs (the empty track stays).
+ */
+export const timerBar = (kind) =>
+  `<div class="mt-2.5 mb-3 h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb ${TIMER_LOOKS[kind]} data-off:opacity-0" data-kind="${kind}"></i></div>`;
 
 /** A few rules or steps, each with an emoji in front (the terms, "How to play"); the texts are HTML. */
 export const steps = (items) =>

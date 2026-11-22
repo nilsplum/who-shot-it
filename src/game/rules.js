@@ -20,9 +20,12 @@
  *   too (they join) or leave; the new game waits for them like for anyone not ready.
  * - A room is never closed by its players leaving: an empty room goes back to an empty
  *   lobby (no host, no game) and keeps its code until it idles out (TIMING.roomIdleMs).
- * - "Show again" (`peek`) holds expire by themselves (`peeks`, TIMING.peekHoldMs after the
- *   last renewal), and while any is active the board's clock stands still (`paused` keeps
- *   the remaining time), so a lost connection can never stop a game.
+ * - The round's clock stands still while anyone holds the round ("Show again" on the
+ *   board, `peeks`): nothing moves the round on by itself meanwhile, and when it is let go
+ *   the clock runs on from where it stood (`settleClock`). Every hold ends by itself
+ *   (TIMING.peekHoldMs after its last renewal), so a lost connection can never stop a game.
+ * - How long each phase's timer runs comes from one place, `timerMs` (`state.js`), which
+ *   the view also hands to the apps.
  * - Any player may report the photo on screen: it is removed for everyone at once (the
  *   app store and EU content rules ask for a report and a block mechanism; the host's
  *   "Remove" is the block, and a removed player's key cannot rejoin the room).
@@ -39,13 +42,22 @@ import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
 import {
   answerTimeMs, canStart, cleanName, connectedPlayers, currentEntry, freeAvatar, inGame, makeId,
-  newPlayer, playerById, playerByKey,
+  newPlayer, playerById, playerByKey, timerMs,
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
 /** The round's photo is no longer being guessed (its reveal or its leaderboard). */
 const afterGuessing = (room) => room.phase === 'reveal' || room.phase === 'board';
 const isHost = (room, playerId) => Boolean(playerId) && room.hostId === playerId;
+/** Someone holds the round, so its clock stands still: "Show again" on the leaderboard. */
+const held = (g) => Boolean(g && Object.keys(g.peeks || {}).length);
+/** The round's clock stands still (`settleClock`); a game saved before `pausedAt` existed has none. */
+const stopped = (g) => Boolean(g && g.pausedAt != null);
+/** `now` plus the phase's timer, or null when the phase has none (`timerMs`). */
+const timerEnd = (room, now, extra = 0) => {
+  const ms = timerMs(room);
+  return ms === null ? null : now + ms + extra;
+};
 
 // ---------- Phase transitions ----------
 
@@ -79,7 +91,7 @@ function startGame(room, now, rng) {
   }
   room.game = {
     plan, round: 0, mode: null, zoom: null, options: [], answers: {}, loaded: [], shownAt: null, results: null,
-    peeks: {}, paused: null, stats: { fastest: null, fooled: {} },
+    peeks: {}, pausedAt: null, stats: { fastest: null, fooled: {} },
   };
   startRound(room, 1, now, rng);
 }
@@ -111,16 +123,16 @@ function startRound(room, n, now, rng) {
   g.shownAt = null;
   g.results = null;
   g.peeks = {};
-  g.paused = null;
+  g.pausedAt = null;
   room.phase = 'load';
   room.deadline = now + TIMING.loadMaxMs;
 }
 
 function show(room, now) {
-  const s = room.settings;
   room.phase = 'show';
   room.game.shownAt = now;
-  room.deadline = s.time ? now + s.time * 1000 + TIMING.answerGraceMs : null;
+  // Answers still on the wire when the time is up count: the room waits a little longer.
+  room.deadline = timerEnd(room, now, TIMING.answerGraceMs);
 }
 
 function reveal(room, now) {
@@ -150,25 +162,49 @@ function reveal(room, now) {
   g.stats.fooled[owner] = (g.stats.fooled[owner] || 0) + wrong;
   g.results = results;
   room.phase = 'reveal';
-  room.deadline = now + TIMING.revealMs;
+  room.deadline = timerEnd(room, now);
 }
 
 /** The leaderboard between the photos; the round's photo stays for "Show again". */
 function board(room, now) {
   room.phase = 'board';
-  room.deadline = room.settings.auto ? now + TIMING.boardMs : null;
+  room.deadline = timerEnd(room, now);
 }
 
-/** Ends expired "Show again" holds; when none is left, a paused board's clock runs on. */
+/** Ends expired "Show again" holds and those of players who are gone. */
 function settlePeeks(room, now) {
   const g = room.game;
   if (!g || !g.peeks) return;
   for (const [id, until] of Object.entries(g.peeks)) {
     if (until <= now || !playerById(room, id)) delete g.peeks[id];
   }
-  if (g.paused !== null && !Object.keys(g.peeks).length) {
-    if (room.phase === 'board') room.deadline = now + g.paused;
-    g.paused = null;
+}
+
+/**
+ * The round's clock follows whether the round is held: it stops when someone takes hold
+ * (`pausedAt` notes when) and, once everyone has let go, runs on from where it stood: the
+ * deadline and the moment the photo was shown move by the time it stood still, so the answer
+ * time and the speed points stay exactly as they were. A new round starts with a running clock.
+ */
+function settleClock(room, now) {
+  const g = room.game;
+  if (!g) return;
+  // A game saved by the previous server version kept a held board's remaining time in
+  // `paused` (and no deadline): it becomes a clock that stopped now with that much left.
+  if (g.paused !== undefined) {
+    if (g.paused !== null) {
+      room.deadline = now + g.paused;
+      g.pausedAt = now;
+    }
+    delete g.paused;
+  }
+  const hold = held(g) && inGame(room);
+  if (hold && !stopped(g)) g.pausedAt = now;
+  else if (!hold && stopped(g)) {
+    const stood = now - g.pausedAt;
+    if (room.deadline !== null) room.deadline += stood;
+    if (g.shownAt !== null) g.shownAt += stood;
+    g.pausedAt = null;
   }
 }
 
@@ -282,12 +318,14 @@ const HANDLERS = {
     g.loaded.push(playerId);
   },
 
+  /** An answer counts with the time it took; while the round's clock stands still, as of the moment it stopped. */
   answer(room, { playerId, pick }, now) {
     const g = room.game;
     if (room.phase !== 'show' || !playerById(room, playerId) || g.answers[playerId] || !g.options.includes(pick)) return;
+    const at = stopped(g) ? g.pausedAt : now;
     const total = answerTimeMs(room.settings, TIMING.untimedReferenceMs);
-    if (room.settings.time && now > g.shownAt + total + TIMING.answerGraceMs) return;
-    g.answers[playerId] = { pick, ms: Math.min(total, Math.max(0, now - g.shownAt)) };
+    if (room.settings.time && at > g.shownAt + total + TIMING.answerGraceMs) return;
+    g.answers[playerId] = { pick, ms: Math.min(total, Math.max(0, at - g.shownAt)) };
   },
 
   resolve(room, { playerId }, now) {
@@ -300,21 +338,15 @@ const HANDLERS = {
 
   /**
    * "Show again" on the leaderboard: while any player holds it (their app renews the hold
-   * every TIMING.peekRenewMs), everyone sees the round's photo and the clock stands still.
+   * every TIMING.peekRenewMs), everyone sees the round's photo and the round is held, so its
+   * clock stands still (`settleClock`).
    */
   peek(room, { playerId, on }, now) {
     const g = room.game;
     const entry = currentEntry(room);
     if (room.phase !== 'board' || !playerById(room, playerId) || !entry || !entry.photo) return;
-    if (!on) {
-      delete g.peeks[playerId];
-      return;
-    }
-    g.peeks[playerId] = now + TIMING.peekHoldMs;
-    if (room.deadline !== null && g.paused === null) {
-      g.paused = Math.max(0, room.deadline - now);
-      room.deadline = null;
-    }
+    if (on) g.peeks[playerId] = now + TIMING.peekHoldMs;
+    else delete g.peeks[playerId];
   },
 
   /** "Play again": opens the next game for everyone, or joins it when it is open already. */
@@ -360,13 +392,15 @@ function transition(room, now, rng) {
     return true;
   }
   const g = room.game;
+  // A held round does not move on by itself: its clock stands still until it is let go.
+  if (inGame(room) && stopped(g)) return false;
   const due = room.deadline !== null && now >= room.deadline;
   const connected = connectedPlayers(room);
   switch (room.phase) {
     case 'lobby':
       if (canStart(room)) {
         room.phase = 'countdown';
-        room.deadline = now + TIMING.countdownMs;
+        room.deadline = timerEnd(room, now);
         return true;
       }
       return false;
@@ -442,6 +476,7 @@ function settle(room, now, rng) {
   else if (!inLobby(room) && !host.connected && firstConnected && now >= host.goneAt + TIMING.hostGraceMs) room.hostId = firstConnected.id;
 
   settlePeeks(room, now);
+  settleClock(room, now);
   for (let i = 0; i < 100 && transition(room, now, rng); i++);
 }
 
@@ -468,7 +503,9 @@ export function apply(room, event, now, rng) {
 export function nextWake(room) {
   if (!room || room.closed) return null;
   const times = [room.touchedAt + TIMING.roomIdleMs];
-  if (room.deadline !== null) times.push(room.deadline);
+  // A stopped clock's deadline means nothing until the round is let go; the holds' own
+  // ends (below) wake the room for that.
+  if (room.deadline !== null && !stopped(room.game)) times.push(room.deadline);
   if (room.game && room.game.peeks) times.push(...Object.values(room.game.peeks));
   const someoneHere = connectedPlayers(room).length > 0;
   for (const p of room.players) {

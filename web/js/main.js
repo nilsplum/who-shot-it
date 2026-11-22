@@ -21,7 +21,8 @@
  *   it in the phone's settings.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
- *   is animated every frame from `session.clock`.
+ *   is animated every frame from the round's clock (`clock.js`, synced with every view)
+ *   and the timer's length the view carries (`total`).
  * - Hold to look: elements with `data-hold` start an entry of the `HOLDS` table when a
  *   finger stays on them; it ends when the finger lifts anywhere, and meanwhile the page
  *   neither scrolls nor opens the phone's long-press menu. The photo it shows is painted
@@ -40,6 +41,7 @@ import { CLOSE } from '../shared/api.js';
 import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
 import { shuffle } from '../shared/random.js';
 import { createRoom, serverUrl, uploadPhotos } from './api.js';
+import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
 import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
@@ -68,6 +70,8 @@ let ackedPhoto = null;
 let checkingAccess = false;
 /** Preloaded photos by server path: { img, state: 'loading' | 'ok' | 'error' }. */
 const images = new Map();
+/** The room's timer for the phase on screen, counted down on this phone between views. */
+const roundClock = createClock();
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -75,12 +79,8 @@ const canReadPhotos = () => session.access === 'full' || session.access === 'lim
 
 // ---------- Time ----------
 
-/** Milliseconds left on the room's current timer, counted down locally (not while the room paused it). */
-function leftNow() {
-  const { at, left } = session.clock;
-  if (left === null) return null;
-  return session.view && session.view.paused ? left : Math.max(0, left - (performance.now() - at));
-}
+/** Milliseconds left on the room's current timer (frozen while the room holds the round), or null. */
+const leftNow = () => roundClock.left();
 
 const isLate = (v) => v.phase === 'show' && Boolean(v.settings.time) && leftNow() === 0;
 
@@ -170,15 +170,13 @@ function render() {
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
 
+/** Shrinks the timer bar every frame: what is left of the timer's full length (`view.total`), hidden while there is none. */
 function frame() {
   const bar = $('tbar');
   const v = session.view;
   if (bar && v) {
-    let total = null;
-    if (v.phase === 'show' && v.settings.time) total = v.settings.time * 1000;
-    else if (v.phase === 'reveal') total = TIMING.revealMs;
-    else if (v.phase === 'board' && v.settings.auto) total = TIMING.boardMs;
     const left = leftNow();
+    const total = v.total || null;
     bar.toggleAttribute('data-off', total === null || left === null);
     if (total && left !== null) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / total))})`;
   }
@@ -276,7 +274,8 @@ function onMessage(msg) {
   const previous = session.view;
   const v = msg.view;
   session.view = v;
-  session.clock = { at: performance.now(), left: v.left };
+  // The timer is named by its phase and round: within one, a snapshot never moves it (`clock.js`).
+  roundClock.sync(`${v.phase}|${v.round ? v.round.n : ''}`, v.left, v.paused);
   if (!v.me) return;
   if (previous && previous.hostId !== v.hostId && v.hostId === v.me.id) toast('You’re the host now 👑');
   if (v.phase === 'show' && !session.shownAt[v.round.photo]) session.shownAt[v.round.photo] = performance.now();

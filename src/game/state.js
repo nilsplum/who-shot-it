@@ -27,13 +27,13 @@
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
  *             results: { [id]: { pick, points } } | null,
- *             peeks: { [id]: until }, paused: ms | null,
+ *             peeks: { [id]: until }, pausedAt: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
- *   (`peeks`: who holds "Show again" and until when; `paused`: the board's remaining time
- *   while held)
+ *   (`peeks`: who holds "Show again" and until when. While anyone holds the round, its
+ *   clock stands still: `pausedAt` says since when, `rules.js` `settleClock`.)
  */
 
-import { BLOCKED_WORDS, EMOJIS, LIMITS, normalizeSettings } from '../../web/shared/config.js';
+import { BLOCKED_WORDS, EMOJIS, LIMITS, TIMING, normalizeSettings } from '../../web/shared/config.js';
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -131,9 +131,26 @@ export function nextEntry(room) {
   return room.game && inGame(room) ? room.game.plan[room.game.round] || null : null;
 }
 
-/** Answer time used for scoring and for the timer bar. */
+/** The answer time speed points and late answers are measured against (with no clock: a reference time). */
 export function answerTimeMs(settings, untimedReferenceMs) {
   return settings.time ? settings.time * 1000 : untimedReferenceMs;
+}
+
+/**
+ * The full length of the timer the players see in the room's phase (ms), or null when the
+ * phase has none: the 3-2-1, the answer time (when there is a clock), the reveal, and the
+ * leaderboard (when the next round comes by itself). The one place that says how long each
+ * phase's timer runs: `rules.js` sets its deadlines from it, `view.js` hands it to the apps
+ * as the timer bar's length.
+ */
+export function timerMs(room) {
+  switch (room.phase) {
+    case 'countdown': return TIMING.countdownMs;
+    case 'show': return room.settings.time ? room.settings.time * 1000 : null;
+    case 'reveal': return TIMING.revealMs;
+    case 'board': return room.settings.auto ? TIMING.boardMs : null;
+    default: return null;
+  }
 }
 
 /**

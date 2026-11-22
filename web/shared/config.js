@@ -248,6 +248,12 @@ export const TIMING = {
   boardMs: 5000,
   /** A "Show again" hold ends by itself this long after the app last renewed it (a lost connection). */
   peekHoldMs: 2500,
+  /**
+   * An app keeps its countdown while the room's snapshots describe the same timer and agree
+   * within this much; each snapshot arrives with a slightly different network delay, and
+   * following every one would make the timer bar jump (`web/js/clock.js`).
+   */
+  clockSlackMs: 500,
   /** How often an app renews a "Show again" hold while the finger stays down. */
   peekRenewMs: 1000,
   /** Speed points with an unlimited timer are measured against this time. */

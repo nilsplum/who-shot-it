@@ -11,21 +11,30 @@
  *   player's secret `key` can never leak.
  * - The owner of the photo on screen stays hidden until the reveal, and so do the other
  *   players' picks: before that an app only learns who has answered, and its own pick.
- * - Remaining times are relative (`left`, in ms), so a phone's wrong clock never matters;
- *   `paused` says the clock stands still ("Show again" held), so apps stop counting down.
+ * - The phase's timer is relative: `left` (ms) and `total` (its full length, from
+ *   `timerMs`), so a phone's wrong clock never matters and no app needs to know how long a
+ *   phase lasts. `paused` says the round's clock stands still (someone holds the round),
+ *   so apps stop counting down; `left` is then frozen at the moment it stopped.
  * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
  */
 
 import { API } from '../../web/shared/api.js';
-import { currentEntry, inGame, nextEntry, playerById } from './state.js';
+import { currentEntry, inGame, nextEntry, playerById, timerMs } from './state.js';
 
-/** Milliseconds left on the timer the app shows for the current phase, or null. */
-function msLeft(room, now) {
-  const left = (t) => Math.max(0, t - now);
-  if (room.phase === 'board' && room.game.paused !== null) return room.game.paused;
-  if (room.phase === 'countdown' || room.phase === 'reveal' || room.phase === 'board') return room.deadline !== null ? left(room.deadline) : null;
-  if (room.phase === 'show' && room.settings.time) return left(room.game.shownAt + room.settings.time * 1000);
-  return null;
+/** The round's clock stands still (someone holds the round, `rules.js` `settleClock`). */
+const isPaused = (room) => Boolean(room.game && room.game.pausedAt != null && inGame(room));
+
+/**
+ * The timer the app shows for the current phase: `{ left, total }` in ms, or nulls when the
+ * phase has none. The answer time ends at the moment the players see, before the room's
+ * own deadline (which waits a little longer for answers on the wire).
+ */
+function timer(room, now) {
+  const total = timerMs(room);
+  if (total === null || room.deadline === null) return { left: null, total: null };
+  const at = isPaused(room) ? room.game.pausedAt : now;
+  const end = room.phase === 'show' ? room.game.shownAt + total : room.deadline;
+  return { left: Math.max(0, end - at), total };
 }
 
 function roundView(room, playerId) {
@@ -69,6 +78,7 @@ function finalView(final) {
 
 export function viewFor(room, playerId, now) {
   const me = playerById(room, playerId);
+  const { left, total } = timer(room, now);
   return {
     code: room.code,
     phase: room.phase,
@@ -78,8 +88,9 @@ export function viewFor(room, playerId, now) {
     players: room.players.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
     })),
-    left: msLeft(room, now),
-    paused: Boolean(room.game && room.phase === 'board' && room.game.paused !== null),
+    left,
+    total,
+    paused: isPaused(room),
     round: inGame(room) ? roundView(room, playerId) : null,
     final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };

@@ -52,17 +52,22 @@ test('the leaderboard: everyone sees who holds "Show again" as a shared flag, an
   room = apply(room, { type: 'tick' }, now + TIMING.revealMs, rng);
   room = apply(room, { type: 'peek', playerId: idOf(room, 'Ben'), on: true }, now + TIMING.revealMs + 2000, rng);
   const view = viewFor(room, idOf(room, 'Cleo'), now + TIMING.revealMs + 9000);
-  expect(view).toMatchObject({ phase: 'board', paused: true, left: TIMING.boardMs - 2000 });
+  expect(view).toMatchObject({ phase: 'board', paused: true, left: TIMING.boardMs - 2000, total: TIMING.boardMs });
   expect(view.round.peek).toBe(true);
   expect(view.round.results).toBeTruthy();
   expect(JSON.stringify(view)).not.toContain('peeks');
 });
 
-test('timers are relative and photo links point at the current and next photo', () => {
+test('timers are relative and carry their full length; photo links point at the current and next photo', () => {
   const room = inShow();
   const shownAt = T0 + TIMING.countdownMs;
   const view = viewFor(room, idOf(room, 'Ann'), shownAt + 4000);
-  expect(view.left).toBe(room.settings.time * 1000 - 4000);
+  // The answer time the players see ends before the room's deadline (its grace for late answers).
+  expect(view).toMatchObject({ left: room.settings.time * 1000 - 4000, total: room.settings.time * 1000, paused: false });
+  const revealed = apply(room, { type: 'resolve', playerId: idOf(room, 'Ann') }, shownAt + 5000, rng);
+  expect(viewFor(revealed, idOf(room, 'Ann'), shownAt + 6000)).toMatchObject({ left: TIMING.revealMs - 1000, total: TIMING.revealMs });
+  // Without a clock the answer time has no timer at all.
+  expect(viewFor({ ...room, settings: { ...room.settings, time: 0 } }, idOf(room, 'Ann'), shownAt + 4000)).toMatchObject({ left: null, total: null });
   expect(view.round.photo).toBe(`/api/rooms/ABCD/photos/${room.game.plan[0].photo}`);
   expect(view.round.next).toBe(`/api/rooms/ABCD/photos/${room.game.plan[1].photo}`);
 });

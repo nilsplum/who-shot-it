@@ -100,8 +100,6 @@ export const session = {
   look: null,
   /** The answer just tapped, shown before the room confirms it: { photo, id }. */
   pick: null,
-  /** When the latest view arrived (performance.now()) and its `left`, for local timers. */
-  clock: { at: 0, left: null },
   /** performance.now() when each photo was first shown, for effects without a timer. */
   shownAt: {},
   uploading: false,

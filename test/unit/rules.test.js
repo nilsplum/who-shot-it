@@ -220,12 +220,15 @@ describe('rounds', () => {
     const d = loadAll(started()).by('Ann', 'resolve').wait(TIMING.revealMs).wait(1000);
     expect(d.room.phase).toBe('board');
     d.by('Ben', 'peek', { on: true });
-    expect(d.room).toMatchObject({ deadline: null, game: { paused: TIMING.boardMs - 1000 } });
-    // Held for 10 s, renewed every second, by two players for a while.
+    expect(d.room.game.pausedAt).toBe(d.now);
+    // While held, the deadline is no reason to wake up: only the hold's own end is.
+    expect(nextWake(d.room)).toBe(d.now + TIMING.peekHoldMs);
+    // Held for 10 s, renewed every second, by two players for a while: the board stays.
     for (let i = 0; i < 10; i++) d.wait(TIMING.peekRenewMs).by('Ben', 'peek', { on: true });
     d.by('Cleo', 'peek', { on: true }).by('Ben', 'peek', { on: false });
-    expect(d.room).toMatchObject({ phase: 'board', deadline: null });
+    expect(d.room.phase).toBe('board');
     d.by('Cleo', 'peek', { on: false });
+    expect(d.room.game.pausedAt).toBeNull();
     expect(d.room.deadline).toBe(d.now + TIMING.boardMs - 1000);
     d.wait(TIMING.boardMs - 1001);
     expect(d.room.phase).toBe('board');
@@ -238,7 +241,7 @@ describe('rounds', () => {
     d.by('Ben', 'peek', { on: true });
     expect(nextWake(d.room)).toBe(d.now + TIMING.peekHoldMs);
     d.wait(TIMING.peekHoldMs);
-    expect(d.room).toMatchObject({ phase: 'board', deadline: d.now + TIMING.boardMs, game: { peeks: {}, paused: null } });
+    expect(d.room).toMatchObject({ phase: 'board', deadline: d.now + TIMING.boardMs, game: { peeks: {}, pausedAt: null } });
   });
 
   test('"Show again" only on the board, only by players, only while the photo exists', () => {
@@ -249,10 +252,23 @@ describe('rounds', () => {
     d.do('peek', { playerId: 'nobody', on: true });
     expect(d.room.game.peeks).toEqual({});
     d.by('Ben', 'peek', { on: true }).by('Cleo', 'report');
-    expect(d.room).toMatchObject({ phase: 'board', game: { peeks: {}, paused: null } });
+    expect(d.room).toMatchObject({ phase: 'board', game: { peeks: {}, pausedAt: null } });
     expect(d.room.game.plan[0].photo).toBeNull();
     d.by('Ben', 'peek', { on: true });
     expect(d.room.game.peeks).toEqual({});
+  });
+
+  test('a held board saved by the previous server version runs on with the time it had left', () => {
+    const d = loadAll(started()).by('Ann', 'resolve').wait(TIMING.revealMs).wait(1000);
+    // The previous version kept the remaining time in `paused` and no deadline.
+    const g = d.room.game;
+    delete g.pausedAt;
+    d.room = { ...d.room, deadline: null, game: { ...g, paused: 3000, peeks: { [idOf(d.room, 'Ben')]: d.now + 1000 } } };
+    d.wait(1);
+    expect(d.room).toMatchObject({ phase: 'board', game: { pausedAt: d.now } });
+    expect(d.room.game.paused).toBeUndefined();
+    d.wait(TIMING.peekHoldMs);
+    expect(d.room).toMatchObject({ phase: 'board', deadline: d.now + 3000, game: { pausedAt: null } });
   });
 
   test('effects: mix draws a real effect per round; zoom starts away from the edges', () => {

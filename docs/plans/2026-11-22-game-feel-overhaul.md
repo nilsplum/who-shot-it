@@ -4,6 +4,29 @@ Status: planned on 22 November 2026, not implemented yet. Each commit below is i
 with `docs/prompts/implement.md`; after each one its status line here is set to done and
 its decisions are added to the decision log at the end.
 
+## Operator handoff
+
+What only the operator can do, and the decisions made while implementing that he should
+know about. Kept up to date with every commit.
+
+**To do by hand**
+- Deploy the server before releasing the apps (`./scripts/deploy.sh`, a critical command;
+  section 6): the new server keeps the installed apps working.
+- After commit 8: try the photo choice on a real iPhone and a real Android phone
+  (`./scripts/dev.sh ios` and `android`): the native `photo` call changed (AGENTS.md §5).
+- At the release (commit 13): upload the apps (`./scripts/release-apps.sh --submit`), and
+  enter the changed Android store texts in the Play Console by hand (`./scripts/dev.sh
+  store` shows them).
+
+**Decisions worth knowing** (details in the decision log, section 12)
+- Your own AGENTS.md edit got into my commit 2 by mistake (`git add -A`); I took it out
+  again before you committed it yourself. From then on only the files of a commit are
+  staged.
+- Commit 3 fixed a bug found on the way: every tap in the settings sheet threw its list
+  back to the top.
+- Commit 4: the bar's jitter came from re-anchoring the countdown on every snapshot; the
+  app now keeps one countdown per timer (`web/js/clock.js`).
+
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
 where it goes, how it looks and behaves for the players, and what to watch out for. The
@@ -637,7 +660,7 @@ Status: done.
   plan (history, left), store texts (none mention it).
 
 ### Commit 4: clock: one clock for the round, the timer's length from the room, a bar that never jumps
-Status: open.
+Status: done.
 
 - `state.js` (Game shape): `pausedAt: ms | null` replaces `paused`; `flag` is added in commit
   5. Comments: what holds a round, what stands still.
@@ -945,3 +968,7 @@ fonts, and removes any that look alike on one of them.
 | Commit 3: more players than rounds | The lower bounds are handed out in the shuffled owners' order until the rounds are full | With 16 players and 15 rounds the lower bounds can add up to more than the rounds; who gets one is then random. |
 | Commit 3: the settings sheet jumped to the top | A long sheet's scrolling box is part of its layout, only the list in it is a part | Found while checking the new row at 320 px: every tap repainted the box and reset its scroll, so a setting low in the list (now eleven) jumped away under the finger. An e2e check opens the "?" of Photo mix and expects it in view (it failed on the old code). |
 | Commit 3: "Fewer points" at 320 px | Wraps to two lines, like "No screenshots" | Short enough on every other phone; a shorter word would say less. |
+| Commit 4: how long each timer runs | One function, `timerMs(room)` in `state.js`, used by the rules for their deadlines and by the view for `total` | The mapping existed twice (the rules and `main.js` `frame()`); now the app knows none of it. |
+| Commit 4: the app's countdown | A small pure module `web/js/clock.js` with the time source passed in, unit tested; `session.clock` goes | The same countdown is needed again for the flag's automatic deletion (commit 5). |
+| Commit 4: a held board in "Host taps" mode | The clock stops too (there is just no deadline to move) | One rule for every held round; harmless without a deadline. |
+| Commit 4: older apps | `left` and `paused` keep their names and meaning; `total` is new | 1.0.2 reads `left` and `paused` (its bar stops while held); it computes its own lengths. |

@@ -19,7 +19,7 @@
  * keep join order. Every row says the same in words for screen readers.
  */
 
-import { LEAVE_BUTTON, TIMER_BAR, avatar, esc, reactionsRow, topBar } from '../ui.js';
+import { LEAVE_BUTTON, avatar, esc, reactionsRow, timerBar, topBar } from '../ui.js';
 
 /** Players ranked by `score(p)`, ties in join order: [{ p, rank, index }]. */
 function ranking(players, score) {
@@ -66,7 +66,7 @@ export function boardScreen({ view }, { reactions }) {
     layout: `<div class="screen h-dvh">
       ${topBar(LEAVE_BUTTON)}
       <h2 class="mt-1 text-center font-display text-4xl font-extrabold">Round ${r.n} of ${r.total}</h2>
-      ${TIMER_BAR}
+      ${timerBar('look')}
       <div class="mt-1 min-h-0 flex-1 overflow-y-auto" data-part="board"></div>
       ${reactionsRow(reactions)}
       <div data-part="next"></div>

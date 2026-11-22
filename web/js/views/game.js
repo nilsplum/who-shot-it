@@ -6,7 +6,8 @@
  * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
  * photo (and the next one), tells the room once it is loaded, starts the effect when the
  * `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates on the
- * reveal (`phone.buzz`). Photo links in the view are server paths; `serverUrl` makes them
+ * reveal (`phone.buzz`). The bar is a part of its own: on the reveal it changes from the
+ * answer time's look to the look time's (`ui.timerBar`). Photo links in the view are server paths; `serverUrl` makes them
  * full addresses. The host can tap a player in the "who has answered" row to remove them
  * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here.
  *
@@ -24,7 +25,7 @@
  */
 
 import { serverUrl } from '../api.js';
-import { LEAVE_BUTTON, SPINNER, TIMER_BAR, avatar, barTitle, esc, reactionsRow, topBar } from '../ui.js';
+import { LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, reactionsRow, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -121,13 +122,14 @@ export function gameScreen(c, state) {
     key: `game|${view.code}`,
     layout: `<div class="screen h-dvh">
       <div data-part="bar"></div>
-      ${TIMER_BAR}
+      <div data-part="timer"></div>
       <div class="relative min-h-[30dvh] flex-1 overflow-hidden rounded-3xl bg-stage" data-part="stage"></div>
       <div data-part="opts"></div>
       <div class="min-h-21"><div data-part="dots"></div><div data-part="after"></div></div>
     </div>`,
     parts: {
       bar: bar(view),
+      timer: timerBar(view.phase === 'reveal' ? 'look' : 'answer'),
       stage: stage(view, state.loaded),
       opts: cards(view, state),
       dots: dots(view, host),
