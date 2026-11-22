@@ -12,8 +12,9 @@
  *
  * Invariants: every text from a player (names) passes through `esc` before it reaches
  * the DOM. A player's colour is one of the tokens `--color-p0`..`--color-p11`, chosen by
- * the emoji, so a player looks the same on the home screen and in every room (the room
- * keeps avatars unique, so two players never look alike); `--player` on an element hands it
+ * the emoji, so a player looks the same on the home screen and in every room (a big game
+ * has more players than colours, so some share one, but the room keeps avatars unique, so
+ * two players never look alike); `--player` on an element hands it
  * to the classes `border-player`, `bg-player` and `bg-player-fill`. Class names are always
  * written out whole: Tailwind builds only the classes it finds as complete words here.
  */

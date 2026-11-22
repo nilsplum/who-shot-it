@@ -8,7 +8,7 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 
 | What | Android | iPhone |
 |---|---|---|
-| The app's own plugin `Phone` (photo access, random previews and the chosen photos, settings page, screen on) | `android/app/src/main/java/com/hivedone/whoshotit/PhonePlugin.java` | `ios/App/App/PhonePlugin.swift` |
+| The app's own plugin `Phone` (photo access, random previews, a photo in its upload size, from iCloud only when asked, settings page, screen on) | `android/app/src/main/java/com/hivedone/whoshotit/PhonePlugin.java` | `ios/App/App/PhonePlugin.swift` |
 | Registering it | `MainActivity.java` | `MainViewController` in `PhonePlugin.swift`, used by `SceneDelegate.swift` |
 | Permissions, invite links `whoshotit://join/<CODE>`, portrait only | `AndroidManifest.xml` | `Info.plist` |
 | Privacy manifest | (none on Android) | `PrivacyInfo.xcprivacy` |

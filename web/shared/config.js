@@ -32,7 +32,7 @@ export const APP = {
    * The app's version, restated from `package.json` (the page cannot read it; a test keeps
    * both equal). Every new version asks for the terms once more (`termsToken`).
    */
-  version: '1.0.2',
+  version: '1.0.3',
 };
 
 export const SERVER = {
@@ -199,7 +199,8 @@ export const LIMITS = {
    * The most players a game takes; the room refuses anyone beyond (`CLOSE.full`). The
    * guessing screen's cards, the lobby's pills and the leaderboard are laid out for up to
    * this many on a 360 px phone, and a full room's photos stay small for the free plan's
-   * storage. The store texts say "2 to 16 players".
+   * storage. The store description is built from it and `minPlayers`; the README says
+   * "2 to 16 players".
    */
   maxPlayers: 16,
   nameMax: 16,

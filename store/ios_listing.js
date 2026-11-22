@@ -20,12 +20,12 @@
  *   is published through the managing director's own account (web/legal.html, Imprint).
  * - Review texts are seen only by Apple's reviewers; the preview never shows them.
  */
-import { SERVER } from '../web/shared/config.js';
+import { SERVER, TIMING } from '../web/shared/config.js';
 
 const promotionalText = 'Tonight’s best party game is already on your phones. Random photos from everyone’s camera roll, one question: whose is it?';
 
 /** One or two plain sentences about what players notice (Apple takes it only for updates). */
-const whatsNew = 'New photos at once, and you can swap single photos. A leaderboard after every photo, with Show again for one more look. Everyone can tap Play again, and a game’s code works for a whole day. The new setting “Which photos” keeps chats, emails and other photos full of text out of the game.';
+const whatsNew = 'Up to 16 players and over 130 avatars. Photos are ready faster, and a swapped photo turns over like a card. The leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */
 const howToTest = `HOW TO TEST
@@ -36,7 +36,7 @@ On both: tap Continue and allow photo access. Tap No for other random photos, or
 
 PHOTOS AND SAFETY
 Only photos a player confirms with Yes leave the phone, and only to the players of that one game. Each photo is deleted from our server right after its round.
-Report: tap the flag on a photo, then Delete photo: it is deleted for everyone at once.
+Report: tap the flag on a photo. The others stop seeing it at once, and Delete photo deletes it for everyone (after ${TIMING.flagMs / 1000} seconds it is deleted anyway).
 Remove: the host taps a player to remove them. They cannot rejoin that game.
 Offensive nicknames are replaced. Everyone accepts the terms (16+) before playing.
 Questions and reports: whoshotit.info@gmail.com`;

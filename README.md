@@ -41,8 +41,9 @@ It refuses while a `TODO_OPERATOR:` value is left or the machine is not logged i
 deploys only if every test passes. Keep Cloudflare's cookie-setting extras (Bot Fight Mode,
 Web Analytics, Zaraz) off: the privacy policy promises no cookies and no analytics.
 
-**Apps:** raise `"version"` in `package.json`, run `./scripts/release-apps.sh --submit`. It
-uploads both apps and sends them to review; both go live by themselves after approval. Store setup and the first release by hand:
+**Apps:** raise `"version"` in `package.json` and `APP.version` (a test keeps them equal),
+run `./scripts/release-apps.sh --submit`. It uploads both apps and sends them to review;
+both go live by themselves after approval. Store setup and the first release by hand:
 [docs/apps.md](docs/apps.md); everything the stores get (texts, images, form answers): `store/`.
 
 **The server's address** is `SERVER.origin` in `web/shared/config.js` (and `wrangler.jsonc`;
@@ -67,7 +68,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `src/room.js` | The room: turns messages, uploads and its alarm into events, then persists, deletes unreferenced photos, broadcasts views and sets the next alarm. |
 | `src/worker.js` | Creates rooms (EU only), checks who may call, forwards room requests. Everything else is the website from `web/`. |
 | `styles/app.css` | The design: Tailwind's theme (every colour, with the dark blue and the yellow as main colours; the type scale, fonts, animations) and the shared `screen`, `btn` and `link`. Built into `web/css/app.css` (git-ignored) by `wrangler dev`/`deploy` and the app release. |
-| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
+| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `clock.js` (the timer bar's countdown), `photos.js` (the photos to choose from, with a bucket of previews kept ready), `upcoming.js` (the game's photos, loaded ahead in play order), `loader.js` (one job at a time, for both), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. `scripts/helpers/listing.mjs` is the one reader: the iOS upload, the image scripts and the preview (`./scripts/dev.sh store`) all use it, so the preview shows what both stores get. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
@@ -83,9 +84,9 @@ in which random order) → per round *load* (every phone holds the photo and the
 *show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo to
 everyone and stops the clock; when its time is up it waits until every phone holds the next
 round's photos) → *end*. The last photo's reveal goes straight to *end*, and the board
-before it says only "FINAL ROUND", so the standings stay secret until the podium. "Play again" is anyone's: the first tap opens the
-next game under the same code, the others join it when they are done looking at the
-results. Apps get a full snapshot after every change, with the photo's owner hidden until
+before it says only "FINAL ROUND", so the standings stay secret until the podium. "Play
+again" is anyone's: the first tap opens the next game under the same code, the others join
+it when they are done looking at the results. Apps get a full snapshot after every change, with the photo's owner hidden until
 the reveal.
 
 **Photos.** With the player's permission, the app picks n random photos on the phone and

@@ -1,28 +1,43 @@
 # Game feel overhaul: layout, flag, timer, photos ahead, leaderboard, podium (plan)
 
-Status: planned on 22 November 2026, being implemented on the branch
-`feat/game-feel-overhaul` (each commit's status line below says how far). Each commit is
-implemented with `docs/prompts/implement.md`; after each one its status line is set to done
-and its decisions are added to the decision log at the end. The branch is merged into `main`
-after the last commit.
+Status: planned on 22 November 2026, implemented on the branch `feat/game-feel-overhaul`
+(all thirteen commits, each with `docs/prompts/implement.md`, its decisions in the decision
+log at the end) and merged into `main` on 22 November 2026. Not deployed and not released
+yet: both are the operator's (Operator handoff, below).
 
 ## Operator handoff
 
-What only the operator can do, and the decisions made while implementing that he should
-know about. Kept up to date with every commit.
+What only the operator can do, and the decisions made while implementing that are worth
+knowing. Kept up to date with every commit.
 
-**To do by hand**
-- Deploy the server before releasing the apps (`./scripts/deploy.sh`, a critical command;
-  section 6): the new server keeps the installed apps working.
-- Try the photo choice on a real iPhone and a real Android phone (`./scripts/dev.sh ios`
-  and `android`): the native `photo` call got `download` in commit 8 (AGENTS.md §5). The
-  iPhone app compiles with it (simulator build); what only a real phone shows: with
-  "Optimize iPhone Storage" on, photos kept only in iCloud get their big version when they
-  are on screen (watch that "Yes" still uploads them), and the bucket's first minute of
-  work after the app starts should not make the phone warm or slow.
-- At the release (commit 13): upload the apps (`./scripts/release-apps.sh --submit`), and
-  enter the changed Android store texts in the Play Console by hand (`./scripts/dev.sh
-  store` shows them).
+**To do by hand, in this order**
+1. Try version 1.0.3 on a real iPhone and a real Android phone (`./scripts/dev.sh ios` and
+   `android`); the browser tests cannot show or feel these:
+   - The photo choice: the native `photo` call got `download` in commit 8 (AGENTS.md §5;
+     the iPhone app compiles with it in the simulator). With "Optimize iPhone Storage" on,
+     photos kept only in iCloud get their big version once they are on screen (watch that
+     "Yes" still uploads them), and the bucket's first minute of work after the app starts
+     should not make the phone warm or slow.
+   - The vibrations (commit 6): the 3-2-1 is a 120 ms buzz, a new photo a light tap, a
+     right guess one pulse, a wrong one two, FINAL ROUND a thud, the podium's ticks (the
+     winner's drumroll speeds up to about ten light taps a second).
+   - The animations (commits 10 to 12), which the phones' web views draw themselves: the
+     swap's card turn, the leaderboard's overtaking, FINAL ROUND falling onto the screen,
+     the podium's reveal.
+   - The screen edges (commit 9): screens start right under the status bar and end right
+     above the home indicator (checked in the iPhone simulator); also look on the iPad.
+2. Deploy the server before releasing the apps (`./scripts/deploy.sh`, a critical command;
+   section 6): the new server keeps the installed apps working.
+3. Record the App Review video again with the 1.0.3 TestFlight build before sending it to
+   review (`docs/guides/demo-players.md`, "Record the video for App Review"): the review
+   notes say the attached video was made with the build under review, and the flag, the
+   leaderboard and the end of a game look different now. If it is not needed any more
+   (the app is already live), change the first review note in `store/ios_listing.js` instead.
+4. Release the apps: `./scripts/release-apps.sh --submit` (the version is 1.0.3 already,
+   the store screenshots are redrawn). Then in the Play Console by hand
+   (`docs/guides/android.md`): the description (its party and privacy bullets changed) and
+   the four redrawn screenshots `store/images/android_screenshot-{1,2,3,5}-*.png`;
+   `./scripts/dev.sh store` shows both pages to copy from.
 
 **Decisions worth knowing** (details in the decision log, section 12)
 - Your own AGENTS.md edit got into my commit 2 by mistake (`git add -A`); I took it out
@@ -37,30 +52,31 @@ know about. Kept up to date with every commit.
   (your rule), the sheet does not come back.
 - Commit 5: two icons were Emoji 14 (🫥), an empty box on Android 10 to 12; replaced, and a
   test now fails on any emoji newer than Emoji 12.0 in the app.
-- Commit 6: the vibrations can only be felt on a real phone; please check on both phones
-  that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
-  tests check that each one is played at its moment.
-- Commits 10 to 12: the swap's 3D turn, the leaderboard's overtaking, FINAL ROUND and the
-  podium's reveal are checked in Chrome; please look at them once on a real iPhone and
-  Android phone, where the web views draw them themselves, and feel FINAL ROUND's thud and
-  the podium's ticks (the winner's drumroll speeds up to about ten light taps a second).
-- Commit 12: the podium now takes about 6 s before "Play again" appears (third place, then
-  second, then the winner). The App Review recording guide says to wait for it.
-- Commit 11: after the last photo the game goes from its reveal straight to the podium (no
-  last leaderboard); the board before it shows only "Results are hidden" and FINAL ROUND.
-  The store texts still say "a leaderboard after every photo" until the release commit.
+- Commit 6: the browser tests check that each vibration is played at its moment; how it
+  feels only a real phone shows (to do 1).
 - Commit 7: the privacy policy now says that once a game starts, the players' apps load its
   photos in the background and keep them in memory only until each one's round is over.
-  The page's date stays 22 November 2026 (it is today's); the version 1.0.3 of the release
-  asks everyone to accept the terms again anyway. AGENTS.md's two photo rules say the same
-  (a photo is reachable from its game's 3-2-1 until its round is over, only if it is
-  played, never stored on the phones).
+  The page's date stays 22 November 2026 (it is today's); version 1.0.3 asks everyone to
+  accept the terms again anyway. AGENTS.md's two photo rules say the same (a photo is
+  reachable from its game's 3-2-1 until its round is over, only if it is played, never
+  stored on the phones).
 - Commit 8: the big versions prepared ahead come only from photos stored on the phone
   (no iCloud download); a photo kept only in iCloud downloads once it is on screen.
-- Commit 9: screens now start right under the status bar and end right above the home
-  indicator (checked in the iPhone simulator; please look on a real iPhone and the iPad).
-  With 16 players the lobby still scrolls on the smallest phones until commit 10 makes its
-  pills compact; my commit 8 had briefly let the photos overlap No and Yes there (fixed).
+- Commits 9 and 10: no in-game screen scrolls as a page with 16 players on 360 x 640,
+  375 x 667 and 393 x 852 (a browser test plays such a game on three phones with 13 light
+  bots); commit 8 had briefly let the photos overlap No and Yes on small phones (fixed in
+  commit 9).
+- Commit 11: after the last photo the game goes from its reveal straight to the podium (no
+  last leaderboard); the board before it shows only "Results are hidden" and FINAL ROUND.
+- Commits 11 and 12: an animation that tells a story (the leaderboard, FINAL ROUND, the
+  podium) is played over the screen's final state, once per screen, so a repaint or a
+  reconnect never restarts or cuts it. AGENTS.md's rendering rule now says so.
+- Commit 12: the podium takes about 6 s before "Play again" appears (third place, then
+  second, then the winner). The App Review recording guide says to wait for it.
+- Commit 13: the store description's player count is built from the config (like its
+  links), the report sentences say what the flag does now, What's New describes 1.0.3,
+  and the leaderboard screenshot is taken right after its animation, so its timer bar
+  still shows (it was almost empty with the first try).
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
@@ -920,7 +936,7 @@ Status: done.
   game test wait for it). `demo-players.mjs`: waits for "Play again" to be visible.
 
 ### Commit 13: release: docs, store texts and images, demo players, version 1.0.3
-Status: open.
+Status: done.
 
 - Pass 2 over everything above: README (game life: dealt at the 3-2-1, photos loaded ahead,
   FINAL ROUND, 16 players), `AGENTS.md` (the photo rules if not done in commit 7, the player
@@ -1058,3 +1074,11 @@ fonts, and removes any that look alike on one of them.
 | Commit 12: the timeline | A 0.3 s breath, then third place trembles 1 s, second 1.4 s, the winner 2 s, 0.5 s after each reveal; ticks every 330 ms, the winner's from 400 ms down to 90 ms apart (about 13); a `land` at each reveal; about 6 s in all | The plan said about 6.5 s; the pauses are 0.5 s. |
 | Commit 12: shared pieces | The confetti moved from the guessing screen into `ui.js` (`CONFETTI`), used by the reveal and the podium; `animate-winner` became `appear` for 0.6 s without its delay; the end screen's part is `results` (was `body`), the name `main.js` starts the podium by | One confetti, one pop; a part name no other screen uses. |
 | Commit 12: the demo players | `demo-players.mjs` unchanged: its tap on "Play again" waits until the button is visible (Playwright does); `docs/guides/demo-players.md` says to stop the App Review recording once "Play again" appears | The plan listed a change to the script; it is not needed. |
+| Commit 13: the player count in the store description | Built from `LIMITS.minPlayers` and `LIMITS.maxPlayers`, like the links from `SERVER.origin` (the listing's header says so); `config.js` names the README as the one written copy | One copy less of a config value. What's New stays written out: it describes this version only and is rewritten with the next. |
+| Commit 13: the description's party bullet | "Reactions, a leaderboard between the photos, a secret final round and a podium at the end" | The plan's sentence left out the reactions the old bullet named; they are still part of the game. |
+| Commit 13: the report sentences | Description: "Anyone can flag a photo: it is hidden at once and deleted for everyone." Test steps for the reviewers: tap the flag, the others stop seeing it at once, Delete photo deletes it for everyone, after `TIMING.flagMs` (15 s, built in) it is deleted anyway | A reviewer who waits sees the photo go by itself; the steps say why. The welcome screen and the terms speak of reporting (Delete photo), which still deletes at once (commit 5's decision). |
+| Commit 13: What's New | Up to 16 players and over 130 avatars, photos ready faster, the swap's card turn, the overtaking leaderboard, the hidden scores of the final round, the podium, the flag, "Own photo" | What players notice first; plain words, no dashes. |
+| Commit 13: the leaderboard screenshot | Taken 1.7 s after the rows appear (plus `snap`'s 0.5 s pause), when the entrance has just ended | With commit 11's 2.5 s wait the picture came 3 s into the 5 s board and its timer bar was almost empty (checked: the bar itself runs as before). Now it shows half, in the new blue to violet. |
+| Commit 13: pass 2 | README: `clock.js`, `photos.js`, `upcoming.js` and `loader.js` in the app's file list, and both places of the version in Release; `docs/apps.md`: the `Phone` row names the big version and its iCloud choice (Haptics was named since commit 6); the demo guide: "Waiting on"; `ui.js` and `styles/app.css`: a big game shares the 12 player colours, the avatars tell players apart; AGENTS.md, Rendering: an entrance never changes a view's markup, `main.js` plays it over the final state once per screen key | The entrance pattern is a rule for the next change to an animation, so it belongs with the painter's rule. AGENTS.md's photo rules were updated in commit 7; its player colours note stays true. |
+| Commit 13: version | 1.0.3 in `package.json`, its lock file and `APP.version` | Every player accepts the terms once more after the update (`termsToken`). No deploy and no upload: both are the operator's (Operator handoff). |
+| Commit 13: the App Review video | Not recorded again here | It needs a real iPhone with the 1.0.3 TestFlight build; the review notes claim it shows the build under review (Operator handoff, to do 3). |

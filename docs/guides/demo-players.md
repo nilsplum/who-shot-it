@@ -68,4 +68,4 @@ including reporting a photo and removing a player. What worked:
 | "No game with this code" in the script's output | A typo, or the game is closed. Start a new game and use its code. |
 | They never appear in the lobby | The computer is offline, or the test browser is missing: run `./scripts/setup.sh`. |
 | They join but never get ready | Wait the half minute. If it takes longer, Ctrl+C and start them again. |
-| The game does not start | Someone is not ready yet: the lobby says who ("Waiting for …"). |
+| The game does not start | Someone is not ready yet: the lobby says who ("Waiting on …"). |

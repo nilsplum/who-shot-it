@@ -82,7 +82,8 @@
   --color-silver: #cfd6e6; /* the podium's second and third place (first is yellow) */
   --color-bronze: #e0a070;
 
-  /* One colour per player, picked by the avatar (`colourOf` in web/js/ui.js), and the confetti. */
+  /* A player's colour, picked by the avatar (`colourOf` in web/js/ui.js; a big game repeats
+     some, the avatars tell players apart), and the confetti. */
   --color-p0: #ff5a5f;
   --color-p1: #ffd23f;
   --color-p2: #3ddc97;

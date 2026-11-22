@@ -18,8 +18,8 @@
  *   commas, colons and full stops read better on a phone.
  * - A key set here is never set again in a platform's listing (`problems` in listing.mjs):
  *   each fact has one home.
- * - Links are built from SERVER.origin, never written out, so a move to a domain moves
- *   them too.
+ * - Links and the number of players are built from the config (SERVER.origin, LIMITS),
+ *   never written out, so a move to a domain or a new player limit changes them too.
  * - Screenshots show only drawn stand-in photos (`scripts/helpers/demo-photos.mjs`), never
  *   real ones: nobody's private pictures, no image licence needed.
  *
@@ -31,7 +31,7 @@
  * photos?". The imprint link at the end keeps the imprint one tap from the store page
  * (German law), on Android too, where the page links only the website.
  */
-import { APP, SERVER } from '../web/shared/config.js';
+import { APP, LIMITS, SERVER } from '../web/shared/config.js';
 
 const description = `Your camera roll is full of stories. Time to play them.
 
@@ -45,10 +45,10 @@ HOW IT WORKS
 3. The photos pop up one by one. Tap who took it. Fast and right scores the most.
 
 MADE FOR PARTIES
-• 2 to 16 players, best together in one room
+• ${LIMITS.minPlayers} to ${LIMITS.maxPlayers} players, best together in one room
 • Classic, or Tricky: photos start blurry, zoomed in or pixelated
 • Pick rounds, time and points, each option explained in one sentence
-• A leaderboard after every photo, reactions and a podium at the end
+• Reactions, a leaderboard between the photos, a secret final round and a podium at the end
 • Free, no account, no ads
 
 YOUR PHOTOS STAY YOURS
@@ -56,7 +56,7 @@ YOUR PHOTOS STAY YOURS
 • Chats, emails and other photos full of text stay out, and screenshots can too.
 • Only the players in your game see them.
 • Each photo is deleted right after its round.
-• Anyone can report a photo, and it is gone for everyone at once.
+• Anyone can flag a photo: it is hidden at once and deleted for everyone.
 
 Grab your friends, open the app and find out who really took that photo.
 
