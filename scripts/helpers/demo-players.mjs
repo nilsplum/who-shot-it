@@ -1,7 +1,7 @@
 /**
  * Demo players: computer opponents that join a real game, so one person with one phone can
  * play, demonstrate or record the whole game (for example the screen recording App Review
- * asks for). Usage, with the code the phone shows:
+ * asks for; step by step in docs/guides/demo-players.md). Usage, with the code the phone shows:
  *   node scripts/helpers/demo-players.mjs ABCD            two players on the live server
  *   node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787   three, local server
  *
