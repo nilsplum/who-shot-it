@@ -82,7 +82,8 @@ lobby → 3-2-1 once everyone (at least two) is ready (the game is dealt then: w
 in which random order) → per round *load* (every phone holds the photo and the next two) →
 *show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo to
 everyone and stops the clock; when its time is up it waits until every phone holds the next
-round's photos) → *end*. "Play again" is anyone's: the first tap opens the
+round's photos) → *end*. The last photo's reveal goes straight to *end*, and the board
+before it says only "FINAL ROUND", so the standings stay secret until the podium. "Play again" is anyone's: the first tap opens the
 next game under the same code, the others join it when they are done looking at the
 results. Apps get a full snapshot after every change, with the photo's owner hidden until
 the reveal.

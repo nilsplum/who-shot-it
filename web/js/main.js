@@ -18,8 +18,11 @@
  *   lets the phone feel the room's moments (`moments`: a new photo, the reveal) and
  *   repaints. Actions are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
- *   (`moments`), each new number of the 3-2-1 (when it is painted), and a swap's flip or
- *   refusal (action `swap`).
+ *   (`moments`), each new number of the 3-2-1 (when it is painted), a swap's flip or
+ *   refusal (action `swap`), and FINAL ROUND landing (`startBoard`).
+ * - Entrances: a screen that tells a story when it appears (the leaderboard: who overtakes
+ *   whom; FINAL ROUND) is painted in its final state, and `startBoard` plays the story over
+ *   it once (`session.shown`), so a repaint or a reconnect never plays it again or cuts it.
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
@@ -157,30 +160,86 @@ function startStage() {
 }
 
 /**
- * The leaderboard's entrance, once its rows are painted: a moment in the old order with the
- * old totals, then the rows slide to their places and the totals count up (at once with
- * Reduce Motion).
+ * When each step of the leaderboard's entrance starts, in ms: the old order stands for a
+ * moment, then the totals count up for COUNT_MS while the round's points pop in, then the
+ * rows slide home (their own transition, `views/board.js`, is as long: 0.7 s), and last the
+ * changed ranks pop. About 2 s, well inside the board's time.
+ */
+const BOARD_STEPS = { count: 400, slide: 1100, ranks: 1800 };
+const COUNT_MS = 700;
+/** When FINAL ROUND hits the screen: 45% into its 0.6 s `smash` (styles/app.css). */
+const SMASH_LANDS_MS = 270;
+
+/**
+ * The leaderboard's entrance, once per board (`session.shown`), cause before effect. The
+ * painted markup is the final state, so this first puts the start state over it, in the
+ * same task as the paint (no frame shows the end first): every row where it stood before
+ * this round, with its old rank and total, its points not there yet. Then step by step
+ * (`BOARD_STEPS`): the totals count up while the points pop in; the rows slide home, the
+ * ones moving up lifted above the others (`data-lift`); the changed ranks pop. FINAL ROUND
+ * instead falls onto the screen, which shakes and vibrates (`land`) as it lands. With
+ * Reduce Motion, or for a board already shown, the final state simply stays. A step whose
+ * rows were replaced meanwhile (a repaint: someone left) does nothing; the new rows are
+ * final.
  */
 function startBoard() {
-  const rows = [...document.querySelectorAll('[data-part="board"] [data-rank]')];
-  const quick = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setTimeout(() => {
-    for (const row of rows) {
-      if (!row.isConnected) return;
-      row.style.setProperty('--shift', 0);
-      row.querySelector('[data-cell="rank"]').textContent = row.dataset.rank;
-      const total = row.querySelector('[data-cell="total"]');
-      const from = Number(total.dataset.from);
-      const to = Number(total.dataset.to);
-      const begin = performance.now();
-      const step = (t) => {
-        const k = quick ? 1 : Math.min(1, (t - begin) / 600);
-        total.textContent = Math.round(from + (to - from) * k);
-        if (k < 1 && total.isConnected) requestAnimationFrame(step);
-      };
-      if (from !== to) requestAnimationFrame(step);
+  const v = session.view;
+  const part = document.querySelector('[data-part="board"]');
+  const key = `board|${v.code}|${v.round.n}`;
+  if (!part || session.shown.has(key)) return;
+  session.shown.add(key);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const final = part.querySelector('[data-cell="final"]');
+  if (final) {
+    final.toggleAttribute('data-go', true);
+    setTimeout(() => {
+      if (!final.isConnected) return;
+      $('app').firstElementChild.toggleAttribute('data-go', true);
+      buzz('land');
+    }, SMASH_LANDS_MS);
+    return;
+  }
+  const cell = (row, name) => row.querySelector(`[data-cell="${name}"]`);
+  const rows = [...part.querySelectorAll('[data-rank]')].map((row) => ({
+    row, rank: cell(row, 'rank'), total: cell(row, 'total'), gain: cell(row, 'gain'),
+    from: Number(cell(row, 'total').dataset.from), to: Number(cell(row, 'total').textContent),
+  }));
+  const later = (ms, run) => setTimeout(() => rows.every((r) => r.row.isConnected) && run(), ms);
+  for (const r of rows) {
+    r.row.style.setProperty('--shift', r.row.dataset.shift);
+    r.rank.textContent = r.row.dataset.was;
+    r.total.textContent = r.from;
+    if (r.gain) r.gain.style.visibility = 'hidden';
+  }
+  later(BOARD_STEPS.count, () => {
+    for (const r of rows.filter((x) => x.gain)) {
+      r.gain.style.visibility = '';
+      r.gain.toggleAttribute('data-go', true);
     }
-  }, quick ? 0 : 400);
+    const begin = performance.now();
+    const count = (t) => {
+      if (!rows.every((r) => r.row.isConnected)) return;
+      const k = Math.min(1, (t - begin) / COUNT_MS);
+      const eased = 1 - (1 - k) ** 3;
+      for (const r of rows) r.total.textContent = Math.round(r.from + (r.to - r.from) * eased);
+      if (k < 1) requestAnimationFrame(count);
+    };
+    requestAnimationFrame(count);
+  });
+  later(BOARD_STEPS.slide, () => {
+    for (const r of rows) {
+      r.row.toggleAttribute('data-lift', Number(r.row.dataset.shift) > 0);
+      r.row.style.setProperty('--shift', 0);
+    }
+  });
+  later(BOARD_STEPS.ranks, () => {
+    for (const r of rows) {
+      r.row.toggleAttribute('data-lift', false);
+      if (r.row.dataset.was === r.row.dataset.rank) continue;
+      r.rank.textContent = r.row.dataset.rank;
+      r.rank.toggleAttribute('data-go', true);
+    }
+  });
 }
 
 /**
@@ -319,6 +378,8 @@ function onMessage(msg) {
   flagClock.sync(`flag|${v.round ? v.round.n : ''}`, flag && flag.mine ? flag.left : null);
   if (!v.me) return;
   if (previous && previous.hostId !== v.hostId && v.hostId === v.me.id) toast('You’re the host now 👑');
+  // Back in a lobby (not still looking at the last results): the next game plays its entrances again.
+  if (inLobby(v) && !v.me.onResults) session.shown.clear();
   if (v.phase === 'show' && !session.shownAt[v.round.photo]) session.shownAt[v.round.photo] = performance.now();
   // Sheets that no longer fit close by themselves.
   if (!inLobby(v) && ['settings', 'invite'].includes(session.sheet)) session.sheet = null;

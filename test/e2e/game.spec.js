@@ -3,9 +3,10 @@
  * the terms, the "New game" step with a preset and the settings "?", joining by code, the
  * host removing a player, the photos dealt with "Play with these?", reload, the automatic
  * start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
- * Delete), five rounds with their leaderboards (and "Show again" held on one phone, seen on
- * another), the end, "Play again" from a guest while the others still look at their
- * results, and leaving with the code remembered. A leaderboard that waits for a phone still
+ * Delete), five rounds with their leaderboards (one ending in the new order, "Show again"
+ * held on one phone and seen on another, FINAL ROUND before the last photo), the end,
+ * "Play again" from a guest while the others still look at their results, and leaving with
+ * the code remembered. A leaderboard that waits for a phone still
  * loading the next photos. A full table of 16 (three phones of the smallest sizes and light
  * bots, `bots.js`) on every screen of a game: nothing scrolls the page, the lobby's photos
  * are as wide as No and Yes, and the reaction row shows whole buttons. Then "Which photos"
@@ -135,9 +136,16 @@ test('friends play a full game and start another one', async ({ browser }) => {
     if (round === 2) {
       // The leaderboard after the reveal: everyone ranked, with this round's pick.
       await expect(host.getByRole('heading', { name: 'Round 2 of 5' })).toBeVisible();
-      const rows = host.locator('[data-part="board"] > *');
+      const rows = host.locator('[data-part="board"] [data-rank]');
       await expect(rows).toHaveCount(3);
       await expect(rows.first()).toContainText(/[✓✗] /);
+      // Its entrance starts in the old order and ends in the new one: top to bottom by rank,
+      // each row showing its new rank.
+      const standing = () => rows.evaluateAll((els) => els
+        .map((el) => ({ top: el.getBoundingClientRect().top, shown: Number(el.querySelector('[data-cell="rank"]').textContent), rank: Number(el.dataset.rank) }))
+        .sort((a, b) => a.top - b.top)
+        .every((r, i, all) => r.shown === r.rank && (i === 0 || all[i - 1].rank <= r.rank)));
+      await expect.poll(standing).toBe(true);
       // Holding "Show again" on one phone shows the photo on every phone.
       const button = guests[0].getByRole('button', { name: 'Show the photo again' });
       const box = await button.boundingBox();
@@ -146,6 +154,14 @@ test('friends play a full game and start another one', async ({ browser }) => {
       await expect(host.locator('#look').getByRole('img', { name: 'Photo' })).toBeVisible();
       await guests[0].mouse.up();
       await expect(host.locator('#look img')).toHaveCount(0);
+    }
+    if (round === 4) {
+      // The board before the last photo keeps the standings secret: FINAL ROUND lands with a
+      // heavy thud, no ranking. After the last photo the podium comes straight away.
+      await expect(host.getByText('FINAL ROUND', { exact: true })).toBeVisible();
+      await expect(host.getByText('Results are hidden')).toBeVisible();
+      await expect(host.locator('[data-part="board"] [data-rank]')).toHaveCount(0);
+      await expect.poll(() => host.evaluate(() => window.felt.at(-1))).toBe('HEAVY');
     }
   }
 
@@ -296,8 +312,14 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
       }
       await expect(host.locator('[aria-label$=": their photo"]')).toHaveCount(1);
       if (round === 1) for (const page of phones) await fits(page);
+      // The last photo's reveal goes straight to the podium.
+      if (round === 5) break;
       await expect(host.getByRole('heading', { name: `Round ${round} of 5` })).toBeVisible();
       if (round === 1) for (const page of phones) await fits(page, { paging: true });
+      if (round === 4) {
+        for (const page of phones) await expect(page.getByText('FINAL ROUND', { exact: true })).toBeVisible();
+        for (const page of phones) await fits(page);
+      }
       await host.getByRole('button', { name: 'Next' }).click();
     }
     const podium = (page) => page.getByRole('list', { name: 'Podium' }).getByRole('listitem');

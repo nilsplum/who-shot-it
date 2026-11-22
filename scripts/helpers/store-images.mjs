@@ -98,8 +98,9 @@ async function takeScreens(browser, library) {
   // is right and the leaderboard shows both a ✓ with points and a ✗.
   await host.locator('[data-act="answer"]').nth(1).click();
   await guests[1].locator('[data-act="answer"]').nth(2).click();
-  await host.locator('[data-part="board"] > *').first().waitFor({ timeout: 20000 });
-  await host.waitForTimeout(1500);
+  await host.locator('[data-part="board"] [data-rank]').first().waitFor({ timeout: 20000 });
+  // The leaderboard's entrance (about 2 s: the points, then the rows overtaking) has ended.
+  await host.waitForTimeout(2500);
   await snap(host, 'board');
   for (const page of everyone) await page.context().close();
   return screens;

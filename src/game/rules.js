@@ -37,7 +37,10 @@
  * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
  *   lobby ("Play again"). The reveal is always timed; the board (the leaderboard between
  *   the photos) is timed when "Next round" is automatic and waits for the host's "Next"
- *   otherwise.
+ *   otherwise. The last round has no board: its reveal ends the game, so the final
+ *   standings stay secret until the podium (the board before it is the apps' "FINAL
+ *   ROUND", `views/board.js`). "Last" is the plan as it is then: a player who left took
+ *   their later rounds with them.
  * - The game is dealt when the 3-2-1 starts (`deal`: which photos, in which order), so the
  *   phones load its photos during the countdown. The countdown runs only while its deal
  *   holds: everyone is ready and every dealt photo is still in its owner's hands
@@ -509,7 +512,8 @@ function transition(room, now, rng) {
       return false;
     case 'reveal':
       if (due) {
-        board(room, now);
+        if (g.round >= g.plan.length) endGame(room);
+        else board(room, now);
         return true;
       }
       return false;

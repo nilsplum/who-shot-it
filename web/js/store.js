@@ -103,6 +103,12 @@ export const session = {
    * choice, by its place) or `{ photo }` (the round's photo, "Show again"); else null.
    */
   look: null,
+  /**
+   * The entrances this phone already played (a leaderboard's, FINAL ROUND's, by the screen's
+   * key): a repaint or a reconnect then shows their end state (`main.js` `startBoard`).
+   * Forgotten when this phone is back in a lobby, so the next game plays them again.
+   */
+  shown: new Set(),
   /** The answer just tapped, shown before the room confirms it: { photo, id }. */
   pick: null,
   /** performance.now() when each photo was first shown, for effects without a timer. */

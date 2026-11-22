@@ -40,8 +40,12 @@ know about. Kept up to date with every commit.
 - Commit 6: the vibrations can only be felt on a real phone; please check on both phones
   that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
   tests check that each one is played at its moment.
-- Commit 10: the swap turns the tile over in 3D (checked in Chrome); please look at it once
-  on a real iPhone and Android phone, where the web views draw it themselves.
+- Commits 10 and 11: the swap's 3D turn, the leaderboard's overtaking and FINAL ROUND are
+  checked in Chrome; please look at them once on a real iPhone and Android phone, where the
+  web views draw them themselves (and feel FINAL ROUND's heavy thud).
+- Commit 11: after the last photo the game goes from its reveal straight to the podium (no
+  last leaderboard); the board before it shows only "Results are hidden" and FINAL ROUND.
+  The store texts still say "a leaderboard after every photo" until the release commit.
 - Commit 7: the privacy policy now says that once a game starts, the players' apps load its
   photos in the background and keep them in memory only until each one's round is over.
   The page's date stays 22 November 2026 (it is today's); the version 1.0.3 of the release
@@ -886,7 +890,7 @@ Status: done.
   edges.
 
 ### Commit 11: leaderboard: the overtaking animation, FINAL ROUND, straight to the podium
-Status: open.
+Status: done.
 
 - `rules.js`: the reveal of the last round ends the game (no leaderboard after it); the
   header's phase list says so.
@@ -1042,3 +1046,8 @@ fonts, and removes any that look alike on one of them.
 | Commit 10: the pills | Border always 2 px: green when ready, dashed grey (`line-strong`) while the game waits for the player (not ready, or offline); the ✓ stays for ready | The same "not yet" look as the dashed avatar ring in "who has answered". |
 | Commit 10: the swap counter | "Tap to swap (N left), hold to preview", small; the count's markup carries the number and, at 0, `photos.refusals`, so each change is a new element whose animation plays once (`bump` while counting down, `jiggle` at 0) | No timers and no animation state in the view: the painter's normal repaint replays it. A refusal while swaps are left (the bucket ran dry, rare) only vibrates, since a bump there would look like a count. The animation is named `bump`, not `bounce` (Tailwind's own endless `animate-bounce`). |
 | Commit 10: the turn | The tile is the card (`transform-3d`, keyframes with `perspective()`), the new photo its front face, the old preview a back face turned away (`rotate-y-180`, `backface-hidden`); the old preview's link is released when the turn ends (`settleLater`, timed with the CSS: `ENTRANCE_MS`) | A revoked link would show an empty back face; the big version of the old photo goes at once. Reduce Motion: no turn, the back face stays hidden. The cross on a refused photo and `refused` are gone, as is the `pop` animation it used. |
+| Commit 11: the last round | The reveal of the round that is last in the plan as it is then ends the game (`transition`, `rules.js`); a player who leaves during a reveal can make it the last | Uses the existing plan shrinking (`removePlayer`) instead of a second notion of "last". Tested: a full game, a game of one photo (no leaderboard at all), a reveal that became the last. |
+| Commit 11: entrances and repaints | The board's markup is always its final state (new order, ranks, totals), with the old values in `data-*`; `main.js` `startBoard` puts the start state over it in the same task as the paint and plays the steps, once per board (`session.shown`, cleared when this phone is back in a lobby) | The plan had the view read `session.shown`; but marking a board shown would then change the markup on the next repaint (every 250 ms) and cut the running entrance. With final markup a repaint can neither restart nor cut it, and a reconnect shows the end state. The same pattern serves the podium. |
+| Commit 11: the board's steps | 0.4 s old order, 0.7 s count-up with the points chips popping in (`appear`), 0.7 s slide with the rows moving up lifted (`data-lift`: `scale-103`, `shadow-lift`, above the others), then the changed ranks pop; about 2 s | The round's points moved from the pick line ("✓ Ann +978") into a green chip beside the total, so they appear exactly when the total counts up; the screen reader label still says them. |
+| Commit 11: FINAL ROUND | "Results are hidden" (muted) over FINAL ROUND (`text-8xl`, yellow, two lines by `w-min`), falling in at 2.6x and turned (`smash`, 0.6 s), landing at 45% with the screen's `shake` and the `land` vibration | Frames checked in Chrome; no new type size was needed. |
+| Commit 11: animations never scroll the page | `#app` clips both ways (`overflow-clip`, was sideways only) | The shake moves the whole screen a few pixels down for 0.4 s, which would make the page scrollable meanwhile; `#app` grows with its screen, so only an animation's overshoot is clipped. |

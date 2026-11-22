@@ -201,17 +201,18 @@ describe('a full game', () => {
       const reveal = await ann.until((v) => v.phase === 'reveal' && v.round.n === round);
       expect(reveal.round.owner).toBeTruthy();
       expect(Object.keys(reveal.round.results)).toHaveLength(2);
-      // The leaderboard: the photo can still be shown again until the host moves on.
+      expect((await call(reveal.round.photo)).status).toBe(200);
       await advance(code, TIMING.revealMs);
+      // The last photo's reveal ends the game (no leaderboard gives the standings away).
+      if (round === 3) break;
+      // The leaderboard: the photo can still be shown again until the host moves on.
       await ann.until((v) => v.phase === 'board' && v.round.n === round);
       expect((await call(reveal.round.photo)).status).toBe(200);
       ann.send({ type: 'next' });
-      if (round < 3) {
-        await ann.until((v) => v.phase === 'load' && v.round.n === round + 1);
-        // The finished round's photo is gone, from storage and from the API.
-        expect(await countRows(code, 'photos')).toBe(3 - round);
-        expect((await call(reveal.round.photo)).status).toBe(404);
-      }
+      await ann.until((v) => v.phase === 'load' && v.round.n === round + 1);
+      // The finished round's photo is gone, from storage and from the API.
+      expect(await countRows(code, 'photos')).toBe(3 - round);
+      expect((await call(reveal.round.photo)).status).toBe(404);
     }
     const end = await ann.until((v) => v.phase === 'end');
     expect(end.final.players).toHaveLength(2);

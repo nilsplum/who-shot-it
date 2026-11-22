@@ -369,18 +369,23 @@ describe('scores and stats', () => {
 });
 
 describe('the end and again', () => {
-  test('the game ends after the last round with every photo released; again returns to the lobby', () => {
+  test('the last reveal ends the game, without a leaderboard, with every photo released; again returns to the lobby', () => {
     const d = loadAll(started(['Ann', 'Ben'], { rounds: 0 }));
     expect(d.room.game.plan).toHaveLength(4);
     expect(referencedPhotoIds(d.room)).toHaveLength(4);
-    for (let round = 1; round <= 4; round++) {
+    for (let round = 1; round <= 3; round++) {
       if (round > 1) loadAll(d);
       expect(referencedPhotoIds(d.room)).toHaveLength(5 - round);
       // The round's photo stays through its reveal and leaderboard ("Show again").
       d.reveal().wait(TIMING.revealMs);
+      expect(d.room.phase).toBe('board');
       expect(referencedPhotoIds(d.room)).toHaveLength(5 - round);
       d.by('Ann', 'next');
     }
+    // The last photo: its reveal, then straight to the end, so the standings stay secret until the podium.
+    loadAll(d).reveal().wait(TIMING.revealMs - 1);
+    expect(d.room.phase).toBe('reveal');
+    d.wait(1);
     expect(d.room.phase).toBe('end');
     expect(referencedPhotoIds(d.room)).toEqual([]);
     expect(d.room.final.players.map((p) => p.score)).toEqual(d.room.players.map((p) => p.score));
@@ -400,6 +405,23 @@ describe('the end and again', () => {
     expect(d.room.final).toBeNull();
     d.by('Ann', 'ready', { photos: [] });
     expect(d.room.phase).toBe('countdown');
+  });
+
+  test('a game of one photo has no leaderboard at all', () => {
+    const d = driver(roomWith(['Ann', 'Ben']));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).wait(TIMING.countdownMs);
+    expect(d.room.game.plan).toHaveLength(1);
+    loadAll(d).reveal().wait(TIMING.revealMs);
+    expect(d.room.phase).toBe('end');
+  });
+
+  test('a reveal that became the last one (the later photos left with their owner) ends the game', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo']));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: ['b1'] }).by('Cleo', 'ready', { photos: [] }).wait(TIMING.countdownMs);
+    loadAll(d).reveal();
+    const later = d.room.players.find((p) => p.id === d.room.game.plan[1].owner);
+    d.by(later.name, 'leave').wait(TIMING.revealMs);
+    expect(d.room.phase).toBe('end');
   });
 });
 

@@ -9,7 +9,8 @@
  * a second) costs almost nothing.
  *
  * Invariant: views are pure string builders; all DOM writes happen here (plus the
- * timer bar and effects, which main.js and effects.js animate directly).
+ * timer bar, the effects and the entrances, which main.js and effects.js animate directly
+ * on the painted markup until the next repaint replaces it).
  */
 
 export function createPainter(root) {
