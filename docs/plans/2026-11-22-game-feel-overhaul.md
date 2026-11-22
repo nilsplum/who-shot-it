@@ -2,17 +2,26 @@
 
 Status: planned on 22 November 2026, implemented on the branch `feat/game-feel-overhaul`
 (all thirteen commits, each with `docs/prompts/implement.md`, its decisions in the decision
-log at the end) and merged into `main` on 22 November 2026. Not deployed and not released
-yet: both are the operator's (Operator handoff, below).
+log at the end) and merged into `main` on 22 November 2026. The server is deployed and the
+iPhone app is in TestFlight (23 November); the store release waits for the operator's test
+(Operator handoff, below).
 
 ## Operator handoff
 
 What only the operator can do, and the decisions made while implementing that are worth
 knowing. Kept up to date with every commit.
 
+**Done on 23 November 2026**
+- The server is deployed (`./scripts/deploy.sh`, Cloudflare version `e697ec83`); installed
+  apps keep working with it (section 6). If it ever has to go back: `npx wrangler rollback`
+  (a critical command, ask first).
+- The iPhone app 1.0.3 (build 10003) is uploaded to App Store Connect: in TestFlight, not
+  sent to App Review.
+
 **To do by hand, in this order**
-1. Try version 1.0.3 on a real iPhone and a real Android phone (`./scripts/dev.sh ios` and
-   `android`); the browser tests cannot show or feel these:
+1. Try version 1.0.3 on a real iPhone (the TestFlight build, which plays against the live
+   server) and a real Android phone (`./scripts/dev.sh android`, the game from this Mac);
+   the browser tests cannot show or feel these:
    - The photo choice: the native `photo` call got `download` in commit 8 (AGENTS.md §5;
      the iPhone app compiles with it in the simulator). With "Optimize iPhone Storage" on,
      photos kept only in iCloud get their big version once they are on screen (watch that
@@ -26,18 +35,24 @@ knowing. Kept up to date with every commit.
      the podium's reveal.
    - The screen edges (commit 9): screens start right under the status bar and end right
      above the home indicator (checked in the iPhone simulator); also look on the iPad.
-2. Deploy the server before releasing the apps (`./scripts/deploy.sh`, a critical command;
-   section 6): the new server keeps the installed apps working.
-3. Record the App Review video again with the 1.0.3 TestFlight build before sending it to
+2. Record the App Review video again with the 1.0.3 TestFlight build before sending it to
    review (`docs/guides/demo-players.md`, "Record the video for App Review"): the review
    notes say the attached video was made with the build under review, and the flag, the
    leaderboard and the end of a game look different now. If it is not needed any more
    (the app is already live), change the first review note in `store/ios_listing.js` instead.
-4. Release the apps: `./scripts/release-apps.sh --submit` (the version is 1.0.3 already,
-   the store screenshots are redrawn). Then in the Play Console by hand
-   (`docs/guides/android.md`): the description (its party and privacy bullets changed) and
-   the four redrawn screenshots `store/images/android_screenshot-{1,2,3,5}-*.png`;
-   `./scripts/dev.sh store` shows both pages to copy from.
+3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
+   Store page and sends the TestFlight build 10003 to App Review (no new upload; it goes
+   live by itself once approved). A change to the app after this test needs version 1.0.4
+   and a new upload.
+4. Release the Android app. This Mac has neither the Android upload key
+   (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
+   (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
+   `./scripts/release-apps.sh android`. Without the upload key the script would create a
+   new one, which Google refuses for an app that was uploaded with another key before.
+   Then in the Play Console by hand (`docs/guides/android.md`): the description (its party
+   and privacy bullets changed) and the four redrawn screenshots
+   `store/images/android_screenshot-{1,2,3,5}-*.png`; `./scripts/dev.sh store` shows both
+   pages to copy from.
 
 **Decisions worth knowing** (details in the decision log, section 12)
 - Your own AGENTS.md edit got into my commit 2 by mistake (`git add -A`); I took it out
