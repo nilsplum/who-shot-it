@@ -25,8 +25,8 @@ browser), and internet. The computer must stay awake while they play.
 4. Choose your photos (**Continue**, then **Yes**). The game starts by itself once everyone
    is ready.
 5. In each round they tap a random player a few seconds after the photo appears.
-6. After the podium they stay **two minutes** and play along if you tap **Play again**. Then
-   they leave by themselves.
+6. After the podium they stay **two minutes**; when you tap **Play again** they join the next
+   game. Otherwise they leave by themselves.
 
 They also leave when you remove them or when the game is gone. Ctrl+C on the computer ends
 them all at once.

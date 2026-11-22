@@ -10,8 +10,9 @@
  * so they upload nobody's real photos. They accept the terms, join, wait half a minute
  * before they say Yes to their photos (the game starts by itself once everyone is ready, so
  * the host has time to show the lobby, for example removing a player), guess a random
- * player a moment after each photo appears, and stay on the end screen for two minutes
- * (playing along if the host taps "Play again") before they leave. They also stop when the
+ * player a moment after each photo appears, wait through each leaderboard, and stay on the
+ * end screen for two minutes (joining the next game when anyone taps "Play again") before
+ * they leave. They also stop when the
  * game is gone or the host removed them. Ctrl+C ends them all.
  */
 import { chromium } from '@playwright/test';
@@ -47,13 +48,19 @@ async function player(browser, library, [name, avatar]) {
   let ended = null;
   // Plays along until the page is back on the start screen (room gone, removed), or until
   // the end screen has shown for a while: then it leaves the room properly, so a later
-  // "Play again" does not wait for it.
+  // "Play again" does not wait for it. When someone opens the next game, it joins.
   let reason = '';
   for (;;) {
     await pause(400 + Math.random() * 400);
     if (await page.locator('#code').count()) {
       reason = (await page.locator('#toast').textContent()) || 'the game is gone';
       break;
+    }
+    const next = page.locator('[data-act="again"][data-next]');
+    if (await next.count()) {
+      await next.click();
+      ended = null;
+      continue;
     }
     ended = (await page.locator('.podium').count()) ? ended || Date.now() : null;
     if (ended && Date.now() - ended > END_STAY_MS) {

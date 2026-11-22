@@ -466,7 +466,7 @@ Status: done (tried on a real iPhone through TestFlight in commit 10).
   through TestFlight (the release commit says so).
 
 ### Commit 10: helpers, docs and the release
-Status: open.
+Status: done except the server deploy, which waits for the operator's confirmation (version 1.0.2, build 10002, is in TestFlight).
 
 - `demo-players.mjs`: wait through the board; on the results, tap "Play again" when
   `data-next` says a new game is open, and also before leaving; their guide updated.
@@ -558,3 +558,6 @@ Status: open.
 | Commit 8: the legal page's "Changes" sentence | Unchanged ("when a change matters for you, the app asks you to accept the new version") | Still true; asking after every update asks more often, never less. |
 | Commit 9: a cloud budget per batch | Besides the 4 s per photo, a batch spends at most 8 s on iCloud previews; photos beyond it are skipped in this batch only | A library mostly in iCloud would otherwise make a batch take very long; skipped photos stay in the draw for the next batches. |
 | Commit 9: the batch timeout | TIMING.previewMs rises from 10 s to 15 s | Room for the local work plus the cloud budget. |
+| Commit 10: the store images | Four photos each (the drawn library fills a 2 x 2 choice), the leaderboard instead of the reveal for "Fast and right wins", and each player picks someone else so one guess is right | The images show the app as it is now, with a ✓ and a ✗ on the board. |
+| Commit 10: what goes to Apple | 1.0.2 is uploaded to TestFlight only; the App Store submission waits until 1.0.0 is live and the operator says go | Apple keeps one version in review at a time, and the release is the operator's call. |
+| Commit 10: the server deploy | Not done yet; it needs the operator's confirmation (critical command), and should go out when 1.0.2 is in his testers' hands | Section 2: 1.0.0 and 1.0.1 keep working with the new server, a little worse. |

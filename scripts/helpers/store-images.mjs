@@ -29,7 +29,7 @@ const BASE = `http://localhost:${PORT}`;
 const SLIDES = [
   { screen: 'guess', title: 'Whose photo is it?', text: 'Random photos from everyone’s phone. Tap who took it.' },
   { screen: 'photos', title: 'Bring your photos', text: 'The app picks a few at random. Tap No for new ones, Yes when you like them.' },
-  { screen: 'reveal', title: 'Fast and right wins', text: 'See who guessed what. Then laugh about it.' },
+  { screen: 'board', title: 'Fast and right wins', text: 'See who guessed what. Then laugh about it.' },
   { screen: 'newgame', title: 'Play it your way', text: 'Classic, or photos that start blurry, zoomed in or pixelated.' },
   { screen: 'yours', title: 'Your photos stay yours', text: 'Nothing is shared until you tap Yes. Each photo is deleted after its round.' },
 ];
@@ -81,6 +81,10 @@ async function takeScreens(browser, library) {
   await host.getByRole('button', { name: /Tricky/ }).click();
   await snap(host, 'newgame');
   await host.getByRole('button', { name: /Classic/ }).click();
+  // Four photos each: the drawn library fills a 2 x 2 choice with big tiles.
+  await host.getByRole('button', { name: 'Custom' }).click();
+  await host.locator('[data-k="photos"][data-v="4"]').click();
+  await host.getByRole('button', { name: 'Done' }).click();
   await host.getByRole('button', { name: 'Start game' }).click();
   await snap(host, 'yours');
   const code = (await host.locator('.code').innerText()).replace(/\s/g, '');
@@ -94,19 +98,20 @@ async function takeScreens(browser, library) {
   const everyone = [host, ...guests];
   for (const page of everyone) {
     await page.getByRole('button', { name: 'Continue' }).click();
-    await page.locator('.grid .tile[style]').nth(4).waitFor();
+    await page.locator('.grid .tile[style]').nth(3).waitFor();
   }
   await snap(host, 'photos');
   for (const page of everyone) await page.getByRole('button', { name: 'Yes' }).click();
   await host.locator('.frame img').waitFor({ timeout: 30000 });
   await guests[0].locator('button.opt').first().click();
   await snap(host, 'guess');
-  for (const page of everyone) {
-    const open = page.locator('button.opt:not([disabled])').first();
-    if (await open.count()) await open.click();
-  }
-  await host.locator('.opt.ok').waitFor();
-  await snap(host, 'reveal');
+  // Everyone picks a different player (Leo already took the first), so exactly one guess
+  // is right and the leaderboard shows both a ✓ with points and a ✗.
+  await host.locator('button.opt').nth(1).click();
+  await guests[1].locator('button.opt').nth(2).click();
+  await host.locator('.lb .row').first().waitFor({ timeout: 20000 });
+  await host.waitForTimeout(1500);
+  await snap(host, 'board');
   for (const page of everyone) await page.context().close();
   return screens;
 }

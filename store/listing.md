@@ -43,14 +43,14 @@ my photos?".
 
     HOW IT WORKS
     1. One person creates a game. Friends join with a four letter code.
-    2. Everyone gets a few random photos from their phone. Don’t like them? Tap No for new ones. Happy? Tap Yes.
+    2. Everyone gets a few random photos from their phone. Don’t like them? Tap No for new ones, or tap one photo to swap just that one. Happy? Tap Yes.
     3. The photos pop up one by one. Tap who took it. Fast and right scores the most.
 
     MADE FOR PARTIES
     • 2 to 12 players, best together in one room
     • Classic, or Tricky: photos start blurry, zoomed in or pixelated
     • Pick rounds, time and points, each option explained in one sentence
-    • Streak bonus, reactions and a podium at the end
+    • A leaderboard after every photo, reactions and a podium at the end
     • Free, no account, no ads
 
     YOUR PHOTOS STAY YOURS
@@ -71,7 +71,7 @@ never other apps' names):
 
 **What’s New** (later versions only): one or two plain sentences about what players notice.
 
-    New photos at once: tap No and the next ones are already there. And the new setting “Which photos” keeps chats, emails and other photos full of text out of the game.
+    New photos at once, and you can swap single photos. A leaderboard after every photo, with Show again for one more look. Everyone can tap Play again, and a game’s code works for a whole day. The new setting “Which photos” keeps chats, emails and other photos full of text out of the game.
 
 **URLs:**
 - Support URL: `https://who-shot-it.nils-plum.workers.dev/legal#imprint`
