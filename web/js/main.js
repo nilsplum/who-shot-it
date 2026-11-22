@@ -20,13 +20,18 @@
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from `session.clock`.
+ * - Hold to look: elements with `data-hold` start an entry of the `HOLDS` table when a
+ *   finger stays on them; it ends when the finger lifts anywhere, and meanwhile the page
+ *   neither scrolls nor opens the phone's long-press menu. The photo it shows is painted
+ *   into `#look` (`views/overlays.js`).
  * - The Android back button closes a sheet, steps back from "New game", asks before
  *   leaving a game, and otherwise puts the app in the background.
  *
  * Invariants:
  * - The app never decides game outcomes: it shows only what the view says, and an
  *   optimistic answer (`session.pick`) is replaced by the room's own as soon as it comes.
- * - All taps go through `data-act` and the `ACTIONS` table; sheets are the only dialogs.
+ * - All taps go through `data-act` and the `ACTIONS` table, all holds through `data-hold`
+ *   and the `HOLDS` table; sheets are the only dialogs.
  */
 
 import { CLOSE } from '../shared/api.js';
@@ -45,7 +50,7 @@ import { homeScreen } from './views/home.js';
 import { landingScreen } from './views/landing.js';
 import { lobbyScreen } from './views/lobby.js';
 import { newGameScreen } from './views/newgame.js';
-import { awayScreen, bannerHtml, countdownHtml, joiningScreen } from './views/overlays.js';
+import { awayScreen, bannerHtml, countdownHtml, joiningScreen, lookHtml } from './views/overlays.js';
 import { inviteLink, sheetScreen } from './views/sheets.js';
 import { welcomeScreen } from './views/welcome.js';
 
@@ -119,6 +124,7 @@ function render() {
   if (changed.includes('stage')) startStage();
   paintSheet(sheetScreen(context()));
   setHtml($('cover'), countdownHtml(session.view, leftNow()));
+  setHtml($('look'), lookHtml(session.look));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
 
@@ -482,9 +488,64 @@ function back() {
   return true;
 }
 
+// ---------- Hold to look ----------
+
+/**
+ * What a held finger does, by the element's `data-hold` (its `data-v` is passed on):
+ * `{ delay, start(value), end() }`. `delay` 0 starts at once (a button made for holding);
+ * a longer delay tells a hold apart from a tap: moving more than HOLD_SLOP px before it
+ * cancels the hold (the page may scroll), and the tap's click after a hold is swallowed.
+ */
+const HOLDS = {};
+const HOLD_SLOP = 10;
+let hold = null;
+let holdEndedAt = -Infinity;
+
+function endHold() {
+  if (!hold) return;
+  clearTimeout(hold.timer);
+  if (hold.started) {
+    hold.kind.end();
+    holdEndedAt = performance.now();
+    render();
+  }
+  hold = null;
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('[data-hold]');
+  const kind = el && !el.disabled && HOLDS[el.dataset.hold];
+  if (!kind || hold) return;
+  const current = { kind, value: el.dataset.v, x: e.clientX, y: e.clientY, started: false, timer: 0 };
+  const begin = () => {
+    if (hold !== current) return;
+    current.started = true;
+    kind.start(current.value);
+    render();
+  };
+  hold = current;
+  if (kind.delay) current.timer = setTimeout(begin, kind.delay);
+  else begin();
+});
+document.addEventListener('pointermove', (e) => {
+  if (hold && !hold.started && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_SLOP) endHold();
+});
+document.addEventListener('pointerup', endHold);
+document.addEventListener('pointercancel', endHold);
+// While a hold shows something the finger may wander: the page must not scroll (which
+// would also cancel the pointer) and no long-press menu may open.
+document.addEventListener('touchmove', (e) => {
+  if (hold && hold.started) e.preventDefault();
+}, { passive: false });
+document.addEventListener('contextmenu', (e) => {
+  if (hold) e.preventDefault();
+});
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
+  // The click that ends a hold is not a tap.
+  if (performance.now() - holdEndedAt < 400) return;
   const action = ACTIONS[el.dataset.act];
   if (action) action(el.dataset.v, el);
 });

@@ -1,6 +1,7 @@
 The native runtime of both store apps (not loaded by web pages), all MIT licensed, unmodified:
 - @capacitor/core, @capacitor/android, @capacitor/ios 8.6.2: https://github.com/ionic-team/capacitor
 - @capacitor/app 8.1.2, @capacitor/share 8.0.3: https://github.com/ionic-team/capacitor-plugins
+- @capacitor/haptics 8.0.2: https://github.com/ionic-team/capacitor-haptics
 
 === @capacitor/core, @capacitor/android, @capacitor/ios
 
@@ -26,7 +27,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-=== @capacitor/app, @capacitor/share
+=== @capacitor/app, @capacitor/haptics, @capacitor/share
 
 Copyright 2020-present Ionic
 https://ionic.io

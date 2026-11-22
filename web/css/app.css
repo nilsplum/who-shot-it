@@ -24,6 +24,8 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; color: var(--ink); font: 600 15px Inter, system-ui, sans-serif; }
+/* No double-tap zoom (taps answer at once instead of waiting for a possible second tap). */
+html { touch-action: manipulation; }
 body { min-height: 100vh; min-height: 100dvh; background: radial-gradient(800px 500px at 0% -10%, var(--glow1) 0, transparent 60%), radial-gradient(700px 450px at 110% 0%, var(--glow2) 0, transparent 55%), var(--bg); background-attachment: fixed; }
 .wrap { max-width: 480px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 button { font: inherit; color: inherit; cursor: pointer; -webkit-user-select: none; user-select: none; }
@@ -159,6 +161,10 @@ button.chip { border: 0; color: inherit; }
 .qr svg { display: block; width: 100%; height: auto; }
 .big-code { font: 800 34px var(--display); letter-spacing: .25em; text-align: center; margin: 0 0 16px; color: var(--y); }
 .btn.danger { background: var(--r); color: var(--white); }
+
+/* Hold to look: the photo over everything while a finger is down (views/overlays.js). */
+.look { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; background: var(--stage); animation: fade .15s; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.look img { width: 100%; height: 100%; object-fit: contain; }
 
 /* Countdown, banner, takeover */
 .cnt { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--veil); font: 800 140px var(--display); color: var(--y); }

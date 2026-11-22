@@ -1,9 +1,9 @@
 /**
  * Everything the app needs from the phone, in one place: photo access, random previews
- * and the chosen photos,
- * keeping the screen on and opening the app's settings (the app's own native plugin
- * `Phone`, `docs/apps.md`), the share sheet, invite links and the Android back button
- * (Capacitor's official App and Share plugins), and where the server is.
+ * and the chosen photos, keeping the screen on and opening the app's settings (the app's
+ * own native plugin `Phone`, `docs/apps.md`), the share sheet, invite links, the Android
+ * back button and vibration (Capacitor's official App, Share and Haptics plugins), and
+ * where the server is.
  *
  * Mechanisms: inside the store apps Capacitor injects `window.Capacitor` with a proxy per
  * native plugin. The same page opened in a plain browser has no `Phone` plugin: it is the
@@ -100,6 +100,21 @@ export function openSettings() {
 export function keepAwake(on) {
   const phone = plugin('Phone');
   if (phone) phone.keepAwake({ on }).catch(() => {});
+}
+
+// ---------- Vibration ----------
+
+/**
+ * The app's only vibration, with two meanings everywhere: 'yes' is one short pulse (a right
+ * guess), 'no' two (a wrong guess, a refused tap). Felt even by someone who cannot see the
+ * screen well. Does nothing without the plugin (the website, the browser tests).
+ */
+export function buzz(kind) {
+  const haptics = plugin('Haptics');
+  if (!haptics) return;
+  const pulse = () => haptics.impact({ style: 'MEDIUM' }).catch(() => {});
+  pulse();
+  if (kind === 'no') setTimeout(pulse, 150);
 }
 
 // ---------- Sharing, invite links, back button ----------

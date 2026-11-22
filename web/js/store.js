@@ -86,6 +86,8 @@ export const session = {
   target: null,
   /** Photo access as the phone last reported it ('full' | 'limited' | 'denied' | 'ask'), or null before asking. */
   access: null,
+  /** The photo shown big while a finger holds it (`main.js`, hold to look), or null. */
+  look: null,
   /** The answer just tapped, shown before the room confirms it: { photo, id }. */
   pick: null,
   /** When the latest view arrived (performance.now()) and its `left`, for local timers. */

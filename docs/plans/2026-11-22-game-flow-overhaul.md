@@ -310,7 +310,7 @@ Status: done.
   settings in the sheet), integration tests that create rooms with `photos: 3`.
 
 ### Commit 3: touch: haptics, hold to look, no double-tap zoom
-Status: open.
+Status: done.
 
 - `package.json`: `@capacitor/haptics` pinned (8.0.2 at planning time; check the newest
   8.x), installed, `npx cap sync` (adds it to the iPhone package list and Android). Its
@@ -534,3 +534,6 @@ Status: open.
 | Commit 2: the settings sheet's own layout | The sheet root carries its name as a class (`sheet-settings`); that sheet is a flex column whose settings scroll and whose footer holds "Done" | Sticky positioning inside a padded scroll box is unreliable, and `:has()` is missing on iOS 15.0 to 15.3 (the app supports 15.0). |
 | Commit 2: Done's green | The same style as "Yes" (`.btn.yes, .btn.done`) | One green action style in the app. |
 | Commit 2: Custom card | Lives in the presets row and is highlighted when no preset matches | The three cards read as one choice; it replaces the old summary line, which the lobby still shows. |
+| Commit 3: the legal page's date | The Licences line names Haptics now; the date (and with it everyone's new consent) changes in commit 7 | The licence list is not something players agree to, and commit 7 changes the privacy text in the same release anyway. |
+| Commit 3: holds without features | The `HOLDS` table starts empty; commits 4 and 6 add the photo choice and Show again | The mechanism is one piece of code; each feature only adds its entry. |
+| Commit 3: the tap after a hold | Clicks within 400 ms after a hold ended are ignored; the timestamp starts at minus infinity | Lifting the finger after a long press would otherwise also count as a tap (a swap); starting at 0 swallowed every tap in the first 0.4 s after the page loaded (caught by the browser tests). |
