@@ -10,33 +10,33 @@
  * to see a photo big ("hold to look", `main.js`): the whole photo on dark, like the stage.
  */
 
-import { esc } from '../ui.js';
+import { SPINNER, esc } from '../ui.js';
 
 export const BANNER_DELAY_MS = 1500;
 
 export function countdownHtml(view, leftMs) {
   if (!view || view.phase !== 'countdown' || leftMs === null) return '';
-  return `<div class="cnt"><span>${Math.max(1, Math.ceil(leftMs / 1000))}</span></div>`;
+  return `<div class="fixed inset-0 z-50 grid place-items-center bg-navy/88 font-display text-9xl font-extrabold text-yellow"><span class="animate-count">${Math.max(1, Math.ceil(leftMs / 1000))}</span></div>`;
 }
 
 export function bannerHtml(session, now) {
   const down = session.code && session.conn === 'down' && now - session.downSince > BANNER_DELAY_MS;
-  return down ? '<div class="banner" role="status">Reconnecting…</div>' : '';
+  return down ? '<div class="fixed inset-x-0 top-0 z-70 animate-fade bg-warning px-3 pt-[calc(--spacing(2)+env(safe-area-inset-top))] pb-2 text-center text-sm text-warning-ink" role="status">Reconnecting…</div>' : '';
 }
 
 /** The photo at `src` over everything while a finger holds it, or nothing. */
 export function lookHtml(src) {
-  return src ? `<div class="look"><img alt="Photo" src="${esc(src)}"></div>` : '';
+  return src ? `<div class="fixed inset-0 z-65 grid animate-fade place-items-center bg-stage pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"><img class="size-full object-contain" alt="Photo" src="${esc(src)}"></div>` : '';
 }
 
 export const joiningScreen = {
   key: 'joining',
-  layout: '<div class="wrap"><div class="away"><div class="spin"></div></div></div>',
+  layout: `<div class="screen"><div class="my-auto">${SPINNER}</div></div>`,
   parts: {},
 };
 
 export const awayScreen = {
   key: 'away',
-  layout: `<div class="wrap"><div class="away"><p>This game is open somewhere else.</p><button class="btn main" data-act="here">Play here</button></div></div>`,
+  layout: `<div class="screen"><div class="my-auto text-center"><p class="mb-4.5 font-display text-3xl font-extrabold">This game is open somewhere else.</p><button class="btn bg-coral text-white" data-act="here">Play here</button></div></div>`,
   parts: {},
 };

@@ -11,5 +11,8 @@ export default defineConfig({
   plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' } })],
   test: {
     include: ['test/unit/**/*.test.js', 'test/integration/**/*.test.js'],
+    // CSS files reach the tests as their text (test/unit/config.test.js reads the theme
+    // and checks the dash rule); without this Vitest hands every CSS file over empty.
+    css: { include: [/\.css\b/] },
   },
 });

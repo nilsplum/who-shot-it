@@ -66,7 +66,8 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `src/game/` | Pure game logic: `rules.js` (state machine and timers), `plan.js` (which photo when), `score.js`, `view.js` (what an app may see), `state.js` (room shape, name filter). No I/O, fully unit-tested. |
 | `src/room.js` | The room: turns messages, uploads and its alarm into events, then persists, deletes unreferenced photos, broadcasts views and sets the next alarm. |
 | `src/worker.js` | Creates rooms (EU only), checks who may call, forwards room requests. Everything else is the website from `web/`. |
-| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
+| `styles/app.css` | The design: Tailwind's theme (every colour, with the dark blue and the yellow as main colours; the type scale, fonts, animations) and the shared `screen`, `btn` and `link`. Built into `web/css/app.css` (git-ignored) by `wrangler dev`/`deploy` and the app release. |
+| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin). |

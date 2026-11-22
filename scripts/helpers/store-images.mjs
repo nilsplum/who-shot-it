@@ -8,13 +8,14 @@
  * `wrangler dev` on a free port), using the end-to-end tests' fake photo plugin
  * (`test/e2e/fake-phone.js`) with drawn stand-in photos (`demo-photos.mjs`), so the
  * images show nobody's private pictures and need no image licence.
- * Colours come from the icon and the app's tokens; the headline font is the app's own.
+ * Colours come from the icon and the app's theme (`colours.mjs`); the headline font is the app's own.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 import { installFakePhone } from '../../test/e2e/fake-phone.js';
+import { colour } from './colours.mjs';
 import { drawLibrary } from './demo-photos.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
@@ -45,8 +46,6 @@ const PHONE = { width: 390, height: 844 };
 
 const icon = fs.readFileSync(path.join(ROOT, 'web/icons/icon.svg'), 'utf8');
 const [from, to] = [...icon.matchAll(/stop-color="(#[0-9a-fA-F]{6})"/g)].map((m) => m[1]);
-const css = fs.readFileSync(path.join(ROOT, 'web/css/app.css'), 'utf8');
-const token = (name) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,6})`))[1];
 const fontData = (file) => fs.readFileSync(path.join(ROOT, 'web/fonts', file)).toString('base64');
 
 async function waitForServer() {
@@ -87,7 +86,7 @@ async function takeScreens(browser, library) {
   await host.getByRole('button', { name: 'Done' }).click();
   await host.getByRole('button', { name: 'Start game' }).click();
   await snap(host, 'yours');
-  const code = (await host.locator('.code').innerText()).replace(/\s/g, '');
+  const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
   const guests = [];
   for (const [name, avatar] of [['Leo', '🐼'], ['Zoe', '🦄']]) {
     const page = await phone(browser, library, name, avatar);
@@ -98,18 +97,18 @@ async function takeScreens(browser, library) {
   const everyone = [host, ...guests];
   for (const page of everyone) {
     await page.getByRole('button', { name: 'Continue' }).click();
-    await page.locator('.grid .tile[style]').nth(3).waitFor();
+    await page.locator('[data-act="swap"]').nth(3).waitFor();
   }
   await snap(host, 'photos');
   for (const page of everyone) await page.getByRole('button', { name: 'Yes' }).click();
-  await host.locator('.frame img').waitFor({ timeout: 30000 });
-  await guests[0].locator('button.opt').first().click();
+  await host.locator('[data-part="stage"] img').waitFor({ timeout: 30000 });
+  await guests[0].locator('[data-act="answer"]').first().click();
   await snap(host, 'guess');
   // Everyone picks a different player (Leo already took the first), so exactly one guess
   // is right and the leaderboard shows both a ✓ with points and a ✗.
-  await host.locator('button.opt').nth(1).click();
-  await guests[1].locator('button.opt').nth(2).click();
-  await host.locator('.lb .row').first().waitFor({ timeout: 20000 });
+  await host.locator('[data-act="answer"]').nth(1).click();
+  await guests[1].locator('[data-act="answer"]').nth(2).click();
+  await host.locator('[data-part="board"] > *').first().waitFor({ timeout: 20000 });
   await host.waitForTimeout(1500);
   await snap(host, 'board');
   for (const page of everyone) await page.context().close();
@@ -123,11 +122,11 @@ function slideHtml(slide, screen, store) {
     @font-face { font-family: B; src: url(data:font/woff2;base64,${fontData('bricolage-grotesque-800.woff2')}); }
     @font-face { font-family: I; src: url(data:font/woff2;base64,${fontData('inter-variable.woff2')}); font-weight: 100 900; }
     body { margin: 0; width: ${store.width}px; height: ${store.height}px; overflow: hidden; background: linear-gradient(160deg, ${from}, ${to});
-      display: flex; flex-direction: column; align-items: center; color: ${token('white')}; font-family: I; }
+      display: flex; flex-direction: column; align-items: center; color: ${colour('white')}; font-family: I; }
     h1 { font: 800 ${Math.round(store.width * 0.095)}px/1.05 B; letter-spacing: -1px; margin: ${Math.round(store.height * 0.06)}px 24px 0; text-align: center; text-wrap: balance; }
     p { font-weight: 600; font-size: ${Math.round(store.width * 0.047)}px; line-height: 1.35; margin: 14px 32px 0; text-align: center; text-wrap: balance; opacity: .92; }
     .phone { margin-top: ${Math.round(store.height * 0.04)}px; width: ${frameWidth}px; border-radius: ${Math.round(frameWidth * 0.12)}px; padding: ${Math.round(frameWidth * 0.03)}px;
-      background: ${token('dark-ink')}; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+      background: ${colour('navy')}; box-shadow: 0 24px 60px color-mix(in srgb, ${colour('stage')} 35%, transparent); }
     .phone img { display: block; width: 100%; border-radius: ${Math.round(frameWidth * 0.095)}px; }
   </style><h1>${slide.title}</h1><p>${slide.text}</p>
   <div class="phone"><img src="data:image/png;base64,${screen.toString('base64')}"></div>`;

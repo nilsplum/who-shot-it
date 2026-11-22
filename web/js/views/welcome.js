@@ -13,23 +13,23 @@
 
 import { LEGAL } from '../../shared/config.js';
 import { serverUrl } from '../api.js';
-import { LOGO, esc } from '../ui.js';
+import { esc, hero, steps } from '../ui.js';
 
 export function welcomeScreen() {
-  const terms = esc(serverUrl('/legal#terms'));
-  const privacy = esc(serverUrl('/legal#privacy'));
+  const link = (path, text) => `<a class="text-ink underline" href="${esc(serverUrl(path))}" target="_blank" rel="noopener">${text}</a>`;
   return {
     key: 'welcome',
-    layout: `<div class="wrap">
-      <div class="hero small">${LOGO}<h1 class="disp">Welcome!</h1></div>
-      <ul class="steps">
-        <li><span>🎂</span>You are ${LEGAL.minAge} or older.</li>
-        <li><span>📷</span>You only share photos the people in them would be okay with.</li>
-        <li><span>🚫</span>Nothing hurtful, sexual or illegal. Anyone can report a photo, and it is deleted at once.</li>
-      </ul>
-      <p class="fine">By playing you agree to the <a href="${terms}" target="_blank" rel="noopener">terms</a>. How we handle your data: <a href="${privacy}" target="_blank" rel="noopener">privacy</a>.</p>
-      <div class="spacer"></div>
-      <button class="btn main" data-act="agree">I agree, let’s play</button>
+    layout: `<div class="screen">
+      <div class="my-auto pb-6">
+        ${hero('Welcome!', { small: true })}
+        ${steps([
+          ['🎂', `You are ${LEGAL.minAge} or older.`],
+          ['📷', 'You only share photos the people in them would be okay with.'],
+          ['🚫', 'Nothing hurtful, sexual or illegal. Anyone can report a photo, and it is deleted at once.'],
+        ])}
+        <p class="text-center text-xs leading-normal font-medium text-muted">By playing you agree to the ${link('/legal#terms', 'terms')}. How we handle your data: ${link('/legal#privacy', 'privacy')}.</p>
+      </div>
+      <button class="btn bg-coral text-white" data-act="agree">I agree, let’s play</button>
     </div>`,
     parts: {},
   };

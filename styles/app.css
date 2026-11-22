@@ -1,0 +1,213 @@
+/*
+ * The design of the app, the website's invite page and the legal page: Tailwind CSS.
+ *
+ * Mechanisms: the views (`web/js/views/`, `web/js/ui.js`) and the two pages
+ * (`web/index.html`, `web/legal.html`) carry Tailwind's utility classes. From them and from
+ * this file, `scripts/helpers/styles.sh` builds `web/css/app.css`, the one stylesheet both
+ * pages load (git-ignored, never edited). Wrangler runs it before every `wrangler dev` and
+ * `wrangler deploy`, and again while `wrangler dev` runs whenever one of the sources
+ * changes (`wrangler.jsonc`, build); `./scripts/release-apps.sh` runs it before it copies
+ * web/ into the apps.
+ *
+ * Invariants:
+ * - This file is the one home of every colour, the type scale, the fonts and the
+ *   animations (the `@theme` blocks). Tailwind's own colours and sizes are switched off,
+ *   so only these exist as classes (`bg-card`, `text-muted`, `text-xl`). Nothing else
+ *   defines a colour: an inline style only points at a token (`--player:
+ *   var(--color-p3)`), the few static files that cannot read CSS repeat a colour under a
+ *   test (`test/unit/config.test.js`), and the drawing scripts read it from here
+ *   (`scripts/helpers/colours.mjs`).
+ * - Tailwind builds only the classes it finds as whole words in the sources below, so a
+ *   view never puts a class together from pieces (`bg-${x}`); it picks between complete
+ *   names.
+ * - Everything is sized in rem, so one rule scales the whole UI on tablets (base layer).
+ * - Fonts are bundled (no third-party requests, see the privacy policy).
+ * - Tailwind's output needs cascade layers (Safari 15.4, Chrome 99), which is why the
+ *   iPhone app requires iOS 15.4 (docs/apps.md). From Safari 16.4 and Chrome 111 on it
+ *   looks exactly as designed; older phones get Tailwind's fallbacks.
+ */
+
+@import 'tailwindcss' source(none);
+@source '../web/js';
+@source '../web/index.html';
+@source '../web/legal.html';
+
+/* A short phone screen (iPhone SE and the like): `short:` tightens what sits above the
+   lobby's photo grid, so the grid keeps room and "Yes" stays on screen. */
+@custom-variant short (@media (max-height: 44rem));
+
+@font-face { font-family: 'Inter'; src: url('/fonts/inter-variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Bricolage Grotesque'; src: url('/fonts/bricolage-grotesque-800.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+
+/*
+ * The colours. `static`: each is a CSS variable at runtime even when no class uses it,
+ * because the player colours are picked in JavaScript (`web/js/ui.js`).
+ */
+@theme static {
+  --color-*: initial;
+
+  /* The two main colours: the dark blue the whole app sits on (also the text on yellow,
+     green and white), and the yellow that marks what matters: "Shot It?", the game code, a
+     choice, the scores, links. */
+  --color-navy: #15121f;
+  --color-yellow: #ffd23f;
+
+  /* Dark blue surfaces on the page, deepest first. */
+  --color-stage: #0b0912; /* behind a photo, the photo held big, the dimmed backdrop (at 70%) */
+  --color-sheet: #1d1830; /* bottom sheets */
+  --color-card: #221d33; /* cards, rows, chips */
+  --color-raised: #2c2643; /* buttons, fields, segments, the timer's track */
+  --color-line: #383151; /* thin borders, the spinner's track */
+  --color-picked: #3a3256; /* a chosen card, under its yellow border */
+  --color-glow-violet: #3a1c4a; /* the two soft lights in the page's background */
+  --color-glow-blue: #12324b;
+
+  /* Text and lines on the dark blue. */
+  --color-ink: #f7f3ff; /* text */
+  --color-muted: #9d93b8; /* quiet text and icons */
+  --color-hint: #6f6690; /* placeholders */
+  --color-line-strong: #5a5080; /* the dashed frame of the photo card in the lobby */
+  --color-white: #fff;
+
+  /* Signals. */
+  --color-coral: #ff5a5f; /* the main action of a screen */
+  --color-green: #3ddc97; /* yes, ready, right */
+  --color-green-dark: #1f3a31; /* behind the right card */
+  --color-red: #ff6b6f; /* wrong, leaving and deleting, a refused swap */
+  --color-red-dark: #40222b; /* behind a wrong pick */
+  --color-warning: #33241f; /* the "Reconnecting…" banner */
+  --color-warning-ink: #ffcfa8;
+  --color-silver: #cfd6e6; /* the podium's second and third place (first is yellow) */
+  --color-bronze: #e0a070;
+
+  /* One colour per player, picked by the avatar (`colourOf` in web/js/ui.js), and the confetti. */
+  --color-p0: #ff5a5f;
+  --color-p1: #ffd23f;
+  --color-p2: #3ddc97;
+  --color-p3: #4cc9f0;
+  --color-p4: #b388ff;
+  --color-p5: #ff8fab;
+  --color-p6: #ff9f1c;
+  --color-p7: #2ec4b6;
+  --color-p8: #f15bb5;
+  --color-p9: #9ef01a;
+  --color-p10: #00bbf9;
+  --color-p11: #e9c46a;
+}
+
+/*
+ * The colour of the player an element belongs to: `--player` on the element (set by
+ * `web/js/ui.js` to one of the player colours) as `border-player` and `bg-player`, and as
+ * `bg-player-fill`, the player's colour mixed into the dark blue (inside an avatar).
+ * `inline`, so it resolves on the element that sets `--player`.
+ */
+@theme inline {
+  --color-player: var(--player);
+  --color-player-fill: color-mix(in srgb, var(--player) 30%, var(--color-navy));
+}
+
+@theme {
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', Inter, system-ui, sans-serif;
+
+  /* The type scale (Tailwind's own is switched off): body text is `text-base`, buttons
+     `text-lg`, names `text-xl`, sheet titles and icons `text-3xl`. Without a line height of
+     their own, sizes keep the line height around them (`normal`, set on the body). */
+  --text-*: initial;
+  --text-xs: 0.8125rem; /* 13px: fine print, quiet lines */
+  --text-sm: 0.875rem; /* 14px: small labels, chips, choices */
+  --text-base: 0.9375rem; /* 15px: body text */
+  --text-md: 1rem; /* 16px */
+  --text-lg: 1.0625rem; /* 17px: buttons */
+  --text-xl: 1.125rem; /* 18px: names, fields, the top bar's title */
+  --text-2xl: 1.25rem; /* 20px: card titles */
+  --text-3xl: 1.375rem; /* 22px: sheet titles, icons, ranks */
+  --text-4xl: 1.625rem; /* 26px: big emojis, the leaderboard's title */
+  --text-5xl: 1.875rem; /* 30px */
+  --text-6xl: 2.125rem; /* 34px: the game code, big icons */
+  --text-7xl: 2.5rem; /* 40px: the app's name */
+  --text-8xl: 3rem; /* 48px */
+  --text-9xl: 8.75rem; /* 140px: the 3-2-1 */
+
+  --ease-bounce: cubic-bezier(0.3, 1.6, 0.5, 1); /* overshoots a little: the reveal, a win */
+  --ease-spring: cubic-bezier(0.3, 1.2, 0.5, 1); /* the leaderboard's rows sliding home */
+
+  --shadow-lift: 0 10px 30px color-mix(in oklab, var(--color-stage) 70%, transparent); /* the logo */
+
+  /* The animations, one per moment; Reduce Motion stops the ones that move things
+     (`motion-reduce:` next to them). */
+  --animate-bob: bob 4s ease-in-out infinite; /* the logo, floating */
+  --animate-spin: spin 0.8s linear infinite; /* waiting */
+  --animate-fade: fade 0.2s; /* a backdrop, banner or photo appearing */
+  --animate-deal: fade 0.3s; /* a photo dealt into the choice */
+  --animate-flip: flip 0.35s ease-out; /* a photo swapped */
+  --animate-pop: pop 0.3s; /* the cross on a refused swap */
+  --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal */
+  --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when I guessed right */
+  --animate-winner: pop 0.6s 0.3s both var(--ease-bounce); /* the winner on the podium */
+  --animate-burst: burst 0.9s ease-out forwards; /* a confetti piece */
+  --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
+  --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
+  --animate-count: count 1s ease-out infinite; /* the 3-2-1 */
+
+  @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fade { from { opacity: 0; transform: scale(0.96); } }
+  @keyframes flip { from { transform: perspective(600px) rotateY(90deg); } to { transform: none; } }
+  @keyframes pop { from { transform: scale(0.9); } to { transform: scale(1); } }
+  @keyframes win { 0% { transform: scale(0.9); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  /* `--x` and `--y` (set on each piece, views/game.js) are where it flies. */
+  @keyframes burst { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(220deg); opacity: 0; } }
+  @keyframes rise { 0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
+  @keyframes slide-up { from { transform: translateY(100%); } }
+  @keyframes count { from { transform: scale(1.4); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+}
+
+@layer base {
+  /* No grey flash on a tap, and no double-tap zoom: a tap answers at once instead of
+     waiting for a possible second tap. */
+  html { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  /* Tablets: the whole UI one size bigger (every size is in rem), so the phone layout
+     fills the bigger screen instead of sitting small in its middle. */
+  @media (min-width: 600px) and (min-height: 860px) {
+    html { font-size: 125%; }
+  }
+  body {
+    min-height: 100dvh;
+    background: radial-gradient(800px 500px at 0% -10%, var(--color-glow-violet), transparent 60%),
+      radial-gradient(700px 450px at 110% 0%, var(--color-glow-blue), transparent 55%), var(--color-navy);
+    background-attachment: fixed;
+    color: var(--color-ink);
+    font: 600 var(--text-base) / normal var(--font-sans);
+  }
+  button { user-select: none; }
+  button:not(:disabled) { cursor: pointer; }
+  /* Players' photos are for looking only: a long press on a photo, or on anything held to
+     show one (`data-hold`, main.js), opens no "Save to Photos" menu and selects nothing. */
+  img, canvas, [data-hold] { -webkit-touch-callout: none; user-select: none; -webkit-user-drag: none; }
+}
+
+/*
+ * The three pieces nearly every screen repeats. Each is one element whose colour or
+ * size a utility next to it may change (`btn bg-coral text-white`, `screen h-dvh`):
+ * utilities always win over these. Pieces made of several elements are built in
+ * `web/js/ui.js` instead.
+ */
+@layer components {
+  /* A screen: one phone-wide column (30rem, centred on wider screens), at least as tall as
+     the screen, clear of the notch and the home indicator inside the apps. A screen whose
+     middle grows into the free space (photo, leaderboard) adds `h-dvh`, its exact height;
+     what does not fit still scrolls the page. */
+  .screen {
+    @apply mx-auto flex min-h-dvh w-full max-w-120 flex-col px-4 pt-[calc(--spacing(4)+env(safe-area-inset-top))] pb-[calc(--spacing(6)+env(safe-area-inset-bottom))];
+  }
+  /* The big button. Its colour comes from the utilities next to it; without them it is the
+     quiet dark one ("No", "Cancel"). */
+  .btn {
+    @apply block w-full rounded-2xl bg-raised p-4 text-center text-lg font-bold active:scale-98 disabled:opacity-35;
+  }
+  /* A quiet text button under the main actions ("Play without photos", "Change", …). */
+  .link {
+    @apply mx-auto mt-1.5 block p-2.5 text-center text-sm text-muted;
+  }
+}

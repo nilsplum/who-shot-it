@@ -4,8 +4,9 @@
 #   ./scripts/dev.sh android    also the app on a connected Android phone or emulator
 #   ./scripts/dev.sh ios        also the app on a connected iPhone or the simulator (Mac with Xcode)
 # With a platform, the app loads the game straight from this computer (Capacitor's live
-# reload), so a change in web/ shows on the phone at once, and it talks to this local
-# server instead of the real one. The phone must be on the same Wi-Fi.
+# reload), so a change in web/ or styles/ shows on the phone at once (wrangler dev rebuilds
+# the stylesheet, wrangler.jsonc), and it talks to this local server instead of the real
+# one. The phone must be on the same Wi-Fi.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/helpers/preflight.sh

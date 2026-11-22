@@ -1,7 +1,9 @@
 /**
  * The shared config (web/shared/config.js) and every file that restates one of its
  * values because it cannot import it: the web page, the legal page, the Capacitor
- * config, the native projects and wrangler.jsonc. A copy that drifts fails here.
+ * config, the native projects and wrangler.jsonc. A copy that drifts fails here. Also the
+ * colours: their one home is the theme in styles/app.css, and the app's code and pages
+ * only name them.
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -12,20 +14,25 @@ import legalHtml from '../../web/legal.html?raw';
 import capacitorConfig from '../../capacitor.config.json?raw';
 import packageJson from '../../package.json?raw';
 import wranglerConfig from '../../wrangler.jsonc?raw';
+import stylesCss from '../../styles/app.css?raw';
 import androidManifest from '../../android/app/src/main/AndroidManifest.xml?raw';
 import androidStrings from '../../android/app/src/main/res/values/strings.xml?raw';
 import androidGradle from '../../android/app/build.gradle?raw';
 import iosInfo from '../../ios/App/App/Info.plist?raw';
 import iosProject from '../../ios/App/App.xcodeproj/project.pbxproj?raw';
 
+/** Every text file of the repo that people write (the built stylesheet web/css/app.css is not one). */
 const texts = import.meta.glob([
-  '../../web/**/*.{js,mjs,html,css,svg}', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
+  '../../web/**/*.{js,mjs,html,css,svg}', '!../../web/css/**', '../../styles/**/*.css', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
   '../../android/app/src/main/java/**/*.java', '../../android/app/src/main/AndroidManifest.xml', '../../android/app/build.gradle',
   '../../ios/App/App/*.swift', '../../ios/App/App/Info.plist', '../../ios/App/App/PrivacyInfo.xcprivacy',
 ], { query: '?raw', import: 'default', eager: true });
 
 /** wrangler.jsonc without its comments (it is JSON with comments). */
 const wrangler = JSON.parse(wranglerConfig.replace(/^\s*\/\/.*$/gm, ''));
+
+/** A colour of the theme (`--color-<name>` in styles/app.css). */
+const colour = (name) => stylesCss.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{3,8});`))[1];
 
 describe('settings', () => {
   test('every default is one of its options', () => {
@@ -114,6 +121,21 @@ describe('values restated outside the config', () => {
     const date = new Date(`${LEGAL.version}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
     expect(legalHtml).toContain(`Last updated: ${date}`);
     expect(legalHtml).toContain(`you must be ${LEGAL.minAge} or older`);
+  });
+});
+
+describe('colours: styles/app.css is their one home', () => {
+  test('the page restates the dark blue as its theme colour', () => {
+    expect(indexHtml).toContain(`<meta name="theme-color" content="${colour('navy')}">`);
+  });
+
+  test('the code and pages of the app define no colour, they only name the theme colours', () => {
+    const files = Object.entries(texts).filter(([file]) => /\/web\/.*\.(js|html)$/.test(file) && !file.includes('/vendor/'));
+    expect(files.length).toBeGreaterThan(20);
+    for (const [file, text] of files) {
+      const own = text.replace(/<meta name="theme-color" content="#[0-9a-fA-F]+">/, '');
+      expect(own.match(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/g), file).toBeNull();
+    }
   });
 });
 

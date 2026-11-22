@@ -131,14 +131,14 @@ function startStage() {
  * Reduce Motion).
  */
 function startBoard() {
-  const rows = [...document.querySelectorAll('.lb .row')];
+  const rows = [...document.querySelectorAll('[data-part="board"] [data-rank]')];
   const quick = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   setTimeout(() => {
     for (const row of rows) {
       if (!row.isConnected) return;
       row.style.setProperty('--shift', 0);
-      row.querySelector('.rk').textContent = row.dataset.rank;
-      const total = row.querySelector('.tot');
+      row.querySelector('[data-cell="rank"]').textContent = row.dataset.rank;
+      const total = row.querySelector('[data-cell="total"]');
       const from = Number(total.dataset.from);
       const to = Number(total.dataset.to);
       const begin = performance.now();
@@ -178,7 +178,7 @@ function frame() {
     else if (v.phase === 'reveal') total = TIMING.revealMs;
     else if (v.phase === 'board' && v.settings.auto) total = TIMING.boardMs;
     const left = leftNow();
-    $('timer').classList.toggle('off', total === null || left === null);
+    bar.toggleAttribute('data-off', total === null || left === null);
     if (total && left !== null) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / total))})`;
   }
   requestAnimationFrame(frame);
@@ -512,9 +512,9 @@ const ACTIONS = {
     send({ type: 'react', emoji });
     floatEmoji(emoji);
   },
-  /** The arrow of the reaction row: one page further, and back to the start at the end. */
+  /** The arrow of the reaction row (right after the row, `ui.reactionsRow`): one page further, and back to the start at the end. */
   reactmore: (value, el) => {
-    const row = el.closest('.reacts').querySelector('.rrow');
+    const row = el.previousElementSibling;
     const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
     row.scrollTo({ left: atEnd ? 0 : row.scrollLeft + row.clientWidth * 0.8 });
   },

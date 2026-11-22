@@ -10,8 +10,10 @@
  */
 
 import { APP, STORES } from '../../shared/config.js';
-import { LOGO, esc } from '../ui.js';
-import { legalLink } from './home.js';
+import { NAME_TITLE, esc, hero } from '../ui.js';
+import { legalFooter } from './home.js';
+
+const SMALL = 'mb-2 block text-center text-sm text-muted';
 
 export function landingScreen(code) {
   const stores = [
@@ -20,17 +22,18 @@ export function landingScreen(code) {
     STORES.android ? `<a class="btn" href="${esc(STORES.android)}" rel="noopener">Google Play (Android)</a>` : '',
   ].join('');
   const open = code
-    ? `<div class="invite"><small>You’re invited to game</small><div class="big-code">${esc(code)}</div>
-        <a class="btn main" href="${esc(`${APP.scheme}://join/${code}`)}">Open in the app</a></div>`
+    ? `<div class="rounded-3xl bg-card px-4 py-4.5 text-center"><small class="${SMALL}">You’re invited to game</small>
+        <div class="mb-3.5 font-display text-6xl font-extrabold tracking-[.25em] text-yellow">${esc(code)}</div>
+        <a class="btn bg-coral text-white" href="${esc(`${APP.scheme}://join/${code}`)}">Open in the app</a></div>`
     : '';
   return {
     key: `landing|${code || ''}`,
-    layout: `<div class="wrap">
-      <div class="hero">${LOGO}<h1 class="disp">Who <span>Shot It?</span></h1>
-        <p class="tagline">The party game with the photos on your phones. Guess whose photo it is!</p></div>
-      <div class="stack">${open}<div class="stores"><small>${code ? 'No app yet? Get it free:' : 'Get the free app:'}</small>${stores}</div></div>
-      <div class="spacer"></div>
-      <div class="foot">${legalLink()}</div>
+    layout: `<div class="screen">
+      <div class="my-auto pt-4">
+        ${hero(NAME_TITLE, { more: '<p class="mx-auto mt-3 max-w-80 leading-snug font-medium text-muted">The party game with the photos on your phones. Guess whose photo it is!</p>' })}
+        <div class="space-y-3">${open}<div class="space-y-2.5"><small class="${SMALL}">${code ? 'No app yet? Get it free:' : 'Get the free app:'}</small>${stores}</div></div>
+      </div>
+      ${legalFooter()}
     </div>`,
     parts: {},
   };

@@ -17,14 +17,17 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 
 Official plugins: `@capacitor/app` (invite links, Android back button, resume) and
 `@capacitor/share` (share sheet). The page reaches every plugin as
-`window.Capacitor.Plugins.<name>` (`web/js/phone.js`); there is no build step.
+`window.Capacitor.Plugins.<name>` (`web/js/phone.js`). The page's scripts have no build
+step; only its stylesheet is built (`scripts/helpers/styles.sh`), which
+`./scripts/release-apps.sh` does before every copy of `web/` into the apps.
 
 The two `PhonePlugin` files are twins: a change to one is made to the other in the same
 commit, and `web/js/phone.js` documents the methods both offer.
 
 **Changes made to Capacitor's generated projects:** Android minimum version 10 (API 29,
 for the photo decoder), no cloud backups, no FileProvider, no Google services, no template
-tests; iPhone only (runs scaled on iPads), portrait only. `npx cap sync` (run by the build
+tests; iPhone only (runs scaled on iPads), portrait only, at least iOS 15.4 (the stylesheet
+needs cascade layers; phones on older iOS keep the last version that ran there). `npx cap sync` (run by the build
 script) copies `web/` in and updates the plugin lists; it never undoes these changes.
 
 **Updating Capacitor:** raise all `@capacitor/*` versions in `package.json` together, then

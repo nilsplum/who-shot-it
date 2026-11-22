@@ -14,8 +14,9 @@
 #                             store/listing.md and send the version to App Review
 #                             (scripts/helpers/app-store.mjs, with the API key in secrets/)
 #
-# Every run first runs all tests, draws the icons from web/icons/icon.svg and copies web/
-# into the native projects (npx cap sync). The version is package.json's "version"; raise
+# Every run first runs all tests, draws the icons from web/icons/icon.svg, builds the
+# stylesheet web/css/app.css (scripts/helpers/styles.sh) and copies web/ into the native
+# projects (npx cap sync). The version is package.json's "version"; raise
 # it before every upload (both stores refuse a version number twice).
 #
 # Signing and uploading: the iPhone app is signed and uploaded with the App Store Connect
@@ -62,6 +63,8 @@ mkdir -p dist
 ./scripts/test.sh
 echo "→ Drawing icons and launch screens"
 node scripts/helpers/app-assets.mjs
+echo "→ Building the stylesheet"
+scripts/helpers/styles.sh
 if [ "$store_images" = true ]; then
   echo "→ Drawing the store screenshots"
   node scripts/helpers/store-images.mjs

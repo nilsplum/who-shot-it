@@ -62,7 +62,7 @@ async function player(browser, library, [name, avatar]) {
       ended = null;
       continue;
     }
-    ended = (await page.locator('.podium').count()) ? ended || Date.now() : null;
+    ended = (await page.locator('[data-act="again"]').count()) ? ended || Date.now() : null;
     if (ended && Date.now() - ended > END_STAY_MS) {
       await page.getByRole('button', { name: 'Leave' }).click();
       reason = 'after the game';
@@ -74,9 +74,10 @@ async function player(browser, library, [name, avatar]) {
       const yes = page.getByRole('button', { name: 'Yes' });
       if (await yes.count() && await yes.isEnabled()) await yes.click();
     }
-    // Read without waiting: a locator would wait for a round number the lobby does not show.
-    const round = await page.evaluate(() => document.querySelector('.rnd')?.textContent || null);
-    const options = page.locator('button.opt:not([disabled])');
+    // Read without waiting: a locator would wait for a photo the lobby does not show. The
+    // round on screen is the one its photo carries (`data-round`, views/game.js).
+    const round = await page.evaluate(() => document.querySelector('[data-round]')?.dataset.round || null);
+    const options = page.locator('[data-act="answer"]:not([disabled])');
     if (round && round !== lastRound && await options.count()) {
       await pause(1500 + Math.random() * 3000);
       const n = await options.count();

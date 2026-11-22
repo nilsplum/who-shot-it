@@ -1,9 +1,9 @@
 /**
  * Draws every app icon and launch screen of both apps, and the store icons and graphic,
- * from the one icon `web/icons/icon.svg` in the app's colours (the tokens in
- * `web/css/app.css`). Run by `./scripts/release-apps.sh` before every build, so the native
- * projects always show the current icon; the output is identical for identical input, so
- * an unchanged icon changes no file.
+ * from the one icon `web/icons/icon.svg` in the app's colours (the theme in
+ * `styles/app.css`, through `colours.mjs`). Run by `./scripts/release-apps.sh` before every
+ * build, so the native projects always show the current icon; the output is identical for
+ * identical input, so an unchanged icon changes no file.
  *
  * Renders with the end-to-end tests' Chromium (Playwright), so it needs no image tool.
  * Writes into the native projects (committed, so Android Studio and Xcode open complete
@@ -16,14 +16,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
+import { colour } from './colours.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
 const at = (...parts) => path.join(ROOT, ...parts);
 
 const icon = fs.readFileSync(at('web/icons/icon.svg'), 'utf8').replace('<svg ', '<svg width="100%" height="100%" ');
-const css = fs.readFileSync(at('web/css/app.css'), 'utf8');
-/** A colour token of the app (`:root` in web/css/app.css), the one home of every colour. */
-const token = (name) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,6})`))[1];
 const font = fs.readFileSync(at('web/fonts/bricolage-grotesque-800.woff2')).toString('base64');
 
 /** The page that draws one image; `only` hides the other layer ('bg' or 'mark'). */
@@ -37,12 +35,12 @@ const page = (body, { background = 'transparent', only = null } = {}) => `<style
 const sized = (share, rounded = false) => `<div style="width:${share * 100}vmin;height:${share * 100}vmin;${rounded ? 'border-radius:22.37%;overflow:hidden;' : ''}">${icon}</div>`;
 
 const fullIcon = page(sized(1));
-const launch = (share) => page(sized(share, true), { background: token('bg') });
+const launch = (share) => page(sized(share, true), { background: colour('navy') });
 /** Google Play's banner: the icon's own background, the icon, the name. */
 const featureGraphic = page(`<div style="position:fixed;inset:0">${icon.replace('<svg ', '<svg preserveAspectRatio="none" ').replace('id="mark"', 'id="mark-hidden" style="display:none"')}</div>
   <div style="position:relative;display:flex;align-items:center;gap:56px">
-    <div style="width:300px;height:300px;border-radius:22.37%;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25)">${icon}</div>
-    <div style="font:800 100px/1 B;color:${token('white')};letter-spacing:-2px">Who<br>Shot It?</div></div>`);
+    <div style="width:300px;height:300px;border-radius:22.37%;overflow:hidden;box-shadow:0 20px 50px color-mix(in srgb, ${colour('stage')} 25%, transparent)">${icon}</div>
+    <div style="font:800 100px/1 B;color:${colour('white')};letter-spacing:-2px">Who<br>Shot It?</div></div>`);
 
 const android = 'android/app/src/main/res';
 const densities = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };

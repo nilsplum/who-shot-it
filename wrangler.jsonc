@@ -10,6 +10,13 @@
   "main": "src/worker.js",
   // Newest date the pinned runtime supports; raise it together with wrangler.
   "compatibility_date": "2026-11-15",
+  // The stylesheet web/css/app.css is built from styles/app.css and the classes in the
+  // pages (Tailwind) before every `wrangler dev` and `wrangler deploy`, and again while
+  // `wrangler dev` runs whenever one of these sources changes.
+  "build": {
+    "command": "scripts/helpers/styles.sh",
+    "watch_dir": ["styles", "web/js", "web/index.html", "web/legal.html"]
+  },
   "assets": {
     "directory": "./web",
     "binding": "ASSETS",
