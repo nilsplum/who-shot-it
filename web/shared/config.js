@@ -172,8 +172,20 @@ export const SETTINGS = [
     help: [['On', 'Right several times in a row? You get extra points.'], ['Off', 'No extra points.']],
   },
   {
-    key: 'fair', label: 'Photo picks', default: true, options: [[true, 'Fair'], [false, 'Random']],
-    help: [['Fair', 'Everyone’s photos come up equally often.'], ['Random', 'Any photo can come up, so some people come up more.']],
+    // The share of the points a right guess on one's own photo earns (the owner always
+    // knows it). The answer still counts as right for the streak and the reveal.
+    key: 'own', label: 'Own photo', default: 80, options: [[80, 'Fewer points'], [0, 'No points'], [100, 'Full points']],
+    help: [
+      ['Fewer points', 'Right on your own photo: 20% fewer points.'],
+      ['No points', 'Your own photo never gives points.'],
+      ['Full points', 'Your own photo counts like any other.'],
+    ],
+  },
+  {
+    // How many of each player's photos come up when not every photo is played (`src/game/plan.js`).
+    // The key stays `fair` (true: Balanced), so stored settings and older apps keep working.
+    key: 'fair', label: 'Photo mix', default: true, options: [[true, 'Balanced'], [false, 'Random']],
+    help: [['Balanced', 'Everyone’s photos come up, some a bit more than others.'], ['Random', 'Pure chance: some come up a lot, others hardly.']],
   },
   {
     key: 'auto', label: 'Next round', default: true, options: [[true, 'Automatic'], [false, 'Host taps']],
@@ -208,6 +220,12 @@ export const LIMITS = {
   textLines: 6,
   /** How many sets of photos the app keeps ready beyond the one on screen, so "No" never waits. */
   setsAhead: 2,
+  /**
+   * "Photo mix: Balanced": each player's photos come up between 60% and 140% of an equal
+   * share of the rounds (rounded; 15 rounds and 4 players: 2 to 5 each), so counting whose
+   * photos were shown never tells whose comes next (`src/game/plan.js`).
+   */
+  balancedSpread: 0.4,
   /** How many single photos a player may swap in one set (tap a photo); a new set starts over. */
   swapsPerSet: 3,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */

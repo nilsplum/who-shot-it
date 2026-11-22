@@ -606,7 +606,7 @@ Status: done.
   release commit; the avatar picker in the previous plan is history.
 
 ### Commit 3: settings: Photo mix (Balanced or Random) and Own photo
-Status: open.
+Status: done.
 
 - `config.js` SETTINGS: `fair` keeps its key and values; label "Photo mix", options
   `[true, 'Balanced']`, `[false, 'Random']`, help: Balanced "Everyone’s photos come up, some a
@@ -941,3 +941,7 @@ fonts, and removes any that look alike on one of them.
 | Commit 2: the avatar sheet | Six columns, and the same shape as the settings sheet (the list scrolls, "Done" stays in reach), one helper `withFooter` for both | 137 avatars are three screens tall; five columns would be four. |
 | Commit 2: the avatar list | 137 (🦑 left out: it looks like 🐙) | Section 11's list, checked: every one a single emoji of Emoji 12.0 or older (a unit test checks the single character). |
 | Commit 2: "2 to 16 players" | Changed in the README and the shared store description now, not in the release commit | The listing's rule: every store sentence is true for the app as it is, so it changes with the feature. |
+| Commit 3: rooms saved before a new setting | `apply` normalizes the room's settings on every event | A room created by the previous server has no `own`; normalizing gives every stored room each current setting's default, so no rule reads an undefined value (now and for any later setting). |
+| Commit 3: more players than rounds | The lower bounds are handed out in the shuffled owners' order until the rounds are full | With 16 players and 15 rounds the lower bounds can add up to more than the rounds; who gets one is then random. |
+| Commit 3: the settings sheet jumped to the top | A long sheet's scrolling box is part of its layout, only the list in it is a part | Found while checking the new row at 320 px: every tap repainted the box and reset its scroll, so a setting low in the list (now eleven) jumped away under the finger. An e2e check opens the "?" of Photo mix and expects it in view (it failed on the old code). |
+| Commit 3: "Fewer points" at 320 px | Wraps to two lines, like "No screenshots" | Short enough on every other phone; a shorter word would say less. |

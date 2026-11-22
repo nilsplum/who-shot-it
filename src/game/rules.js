@@ -33,7 +33,7 @@
  *   being true.
  */
 
-import { EFFECTS, LIMITS, TIMING, normalizeSetting } from '../../web/shared/config.js';
+import { EFFECTS, LIMITS, TIMING, normalizeSetting, normalizeSettings } from '../../web/shared/config.js';
 import { shuffle } from '../../web/shared/random.js';
 import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
@@ -138,7 +138,7 @@ function reveal(room, now) {
     }
     const correct = a.pick === owner;
     p.streak = correct ? p.streak + 1 : 0;
-    const points = pointsFor({ correct, ms: a.ms, streak: p.streak }, s);
+    const points = pointsFor({ correct, ms: a.ms, streak: p.streak, own: p.id === owner }, s);
     p.score += points;
     results[p.id] = { pick: a.pick, points };
     // Stats only count other people's guesses: the owner knows their own photo.
@@ -454,6 +454,9 @@ export function apply(room, event, now, rng) {
   const handler = HANDLERS[event.type];
   if (!handler) return room;
   const next = structuredClone(room);
+  // A room saved by an earlier server version may lack a setting added since; normalizing
+  // gives it every current setting (its default), so no rule ever reads an undefined one.
+  next.settings = normalizeSettings(next.settings);
   // Activity keeps a room alive; timers and lost connections are not activity.
   if (event.type !== 'tick' && event.type !== 'disconnect') next.touchedAt = now;
   handler(next, event, now, rng);

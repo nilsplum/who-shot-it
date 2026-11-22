@@ -47,6 +47,9 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await host.getByRole('button', { name: 'Custom' }).click();
   await host.getByRole('button', { name: 'What does Streak bonus mean?' }).click();
   await expect(host.getByText('You get extra points.')).toBeVisible();
+  // Far down the list: the explanation opens where the finger is (the list keeps its scroll).
+  await host.getByRole('button', { name: 'What does Photo mix mean?' }).click();
+  await expect(host.getByText('Pure chance: some come up a lot, others hardly.')).toBeInViewport();
   await host.locator('[data-k="photos"][data-v="4"]').click();
   await host.locator('[data-k="rounds"][data-v="5"]').click();
   await expect(host.getByRole('button', { name: 'Done' })).toBeInViewport();

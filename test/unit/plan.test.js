@@ -31,14 +31,34 @@ describe('buildPlan', () => {
     expect(buildPlan(players({ a: 2, b: 1 }), settings({ rounds: 10 }), seededRandom(2))).toHaveLength(3);
   });
 
-  test('"Fair" gives every player an equal share when not all photos are played', () => {
-    for (let seed = 1; seed <= 20; seed++) {
-      const plan = buildPlan(players({ a: 10, b: 10, c: 2 }), settings({ rounds: 10 }), seededRandom(seed));
-      const per = (id) => plan.filter((e) => e.owner === id).length;
-      expect(plan).toHaveLength(10);
-      expect(per('c')).toBe(2);
-      expect(Math.abs(per('a') - per('b'))).toBeLessThanOrEqual(1);
+  test('"Balanced" gives everyone 60% to 140% of an equal share, drawn anew each game', () => {
+    // 15 rounds, 4 players: an equal share is 3.75, so 2 to 5 photos each.
+    const seen = new Set();
+    for (let seed = 1; seed <= 60; seed++) {
+      const plan = buildPlan(players({ a: 10, b: 10, c: 10, d: 10 }), settings({ rounds: 15 }), seededRandom(seed));
+      const counts = ['a', 'b', 'c', 'd'].map((id) => plan.filter((e) => e.owner === id).length);
+      expect(plan).toHaveLength(15);
+      for (const n of counts) {
+        expect(n).toBeGreaterThanOrEqual(2);
+        expect(n).toBeLessThanOrEqual(5);
+      }
+      seen.add(counts.join());
     }
+    // Not a fixed split: counting photos must not tell whose comes next.
+    expect(seen.size).toBeGreaterThan(5);
+  });
+
+  test('"Balanced" still fills every round when some players brought only a few photos', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const plan = buildPlan(players({ a: 1, b: 2, c: 30 }), settings({ rounds: 15 }), seededRandom(seed));
+      const per = (id) => plan.filter((e) => e.owner === id).length;
+      expect(plan).toHaveLength(15);
+      expect([per('a'), per('b'), per('c')]).toEqual([1, 2, 12]);
+    }
+    // More players than rounds: still exactly the rounds, nobody twice.
+    const few = buildPlan(players({ a: 3, b: 3, c: 3, d: 3, e: 3 }), settings({ rounds: 4 }), seededRandom(3));
+    expect(few).toHaveLength(4);
+    expect(new Set(few.map((e) => e.owner)).size).toBe(4);
   });
 
   test('"Random" can take anyone\'s photos', () => {

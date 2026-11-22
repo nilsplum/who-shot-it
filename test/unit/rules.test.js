@@ -270,7 +270,7 @@ describe('rounds', () => {
 });
 
 describe('scores and stats', () => {
-  test('speed points, streak bonus, fastest hit (owner excluded), best fooler', () => {
+  test('speed points, the owner\'s share on their own photo, fastest hit (owner excluded), best fooler', () => {
     const d = loadAll(started(['Ann', 'Ben', 'Cleo'], { time: 10, streak: true }));
     const owner = ownerOf(d);
     const others = d.room.players.filter((p) => p.id !== owner);
@@ -278,7 +278,8 @@ describe('scores and stats', () => {
     d.wait(2000).do('answer', { playerId: others[0].id, pick: owner });
     d.do('answer', { playerId: others[1].id, pick: others[0].id });
     const res = d.room.game.results;
-    expect(res[owner].points).toBe(SCORING.max);
+    // "Own photo: Fewer points" (the default): right, at once, but 20% fewer points.
+    expect(res[owner].points).toBe(SCORING.max * 0.8);
     expect(res[others[0].id].points).toBe(Math.round(SCORING.min + (SCORING.max - SCORING.min) * 0.8));
     expect(res[others[1].id].points).toBe(0);
     expect(d.room.game.stats.fastest).toEqual({ id: others[0].id, ms: 2000 });

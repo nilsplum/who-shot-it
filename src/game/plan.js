@@ -6,28 +6,44 @@
  *
  * Invariants:
  * - Rounds = all photos, or the "Rounds" setting if that is smaller.
- * - When not every photo is played, "Photo picks: Fair" takes photos in turns, so every
- *   player's photos come up equally often (within one); "Random" draws from all photos.
+ * - When not every photo is played, "Photo mix: Balanced" gives each player between 60% and
+ *   140% of an equal share (LIMITS.balancedSpread), drawn at random, so counting whose
+ *   photos were already shown never tells whose comes next; "Random" draws from all photos
+ *   alike, so one player may come up a lot and another hardly.
  * - The order avoids the same owner twice in a row whenever the photos allow it, so a
  *   streak of one person's photos never gives the answer away.
  */
 
+import { LIMITS } from '../../web/shared/config.js';
 import { shuffle } from '../../web/shared/random.js';
 
-/** Takes `count` photos in turns: always from an owner with the fewest picks so far. */
-function pickFair(byOwner, count, rng) {
-  const queues = shuffle([...byOwner.entries()], rng).map(([owner, photos]) => ({ owner, photos: shuffle(photos, rng), taken: 0 }));
-  const picked = [];
-  while (picked.length < count) {
-    const open = queues.filter((q) => q.taken < q.photos.length);
-    if (!open.length) break;
-    const fewest = Math.min(...open.map((q) => q.taken));
-    const candidates = open.filter((q) => q.taken === fewest);
-    const q = candidates[Math.floor(rng() * candidates.length)];
-    picked.push({ owner: q.owner, photo: q.photos[q.taken] });
-    q.taken += 1;
+/**
+ * Takes `count` photos for "Balanced": every owner first gets the lower bound of the range
+ * (what their photos allow), then the rest goes out one photo at a time to a random owner
+ * still under the upper bound. Only when nobody under it has photos left (some brought only
+ * a few) do the others go beyond it, so the rounds are always filled.
+ */
+function pickBalanced(byOwner, count, rng) {
+  const owners = shuffle([...byOwner.entries()], rng).map(([owner, photos]) => ({ owner, photos: shuffle(photos, rng), take: 0 }));
+  const share = count / owners.length;
+  const low = Math.round(share * (1 - LIMITS.balancedSpread));
+  const high = Math.round(share * (1 + LIMITS.balancedSpread));
+  let left = count;
+  // With more players than rounds the lower bounds may add up to more than the rounds; the
+  // shuffled order then decides who gets one.
+  for (const o of owners) {
+    o.take = Math.min(low, o.photos.length, left);
+    left -= o.take;
   }
-  return picked;
+  for (const cap of [high, Infinity]) {
+    for (let open = owners.filter((o) => o.take < Math.min(cap, o.photos.length)); left > 0 && open.length;) {
+      const o = open[Math.floor(rng() * open.length)];
+      o.take += 1;
+      left -= 1;
+      if (o.take >= Math.min(cap, o.photos.length)) open = open.filter((x) => x !== o);
+    }
+  }
+  return owners.flatMap((o) => o.photos.slice(0, o.take).map((photo) => ({ owner: o.owner, photo })));
 }
 
 /**
@@ -78,6 +94,6 @@ export function buildPlan(players, settings, rng) {
   const byOwner = new Map(players.filter((p) => p.photos.length).map((p) => [p.id, p.photos]));
   const all = [...byOwner.entries()].flatMap(([owner, photos]) => photos.map((photo) => ({ owner, photo })));
   const count = settings.rounds ? Math.min(settings.rounds, all.length) : all.length;
-  const chosen = count < all.length && settings.fair ? pickFair(byOwner, count, rng) : shuffle(all, rng).slice(0, count);
+  const chosen = count < all.length && settings.fair ? pickBalanced(byOwner, count, rng) : shuffle(all, rng).slice(0, count);
   return arrange(shuffle(chosen, rng), rng);
 }
