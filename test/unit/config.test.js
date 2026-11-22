@@ -82,6 +82,16 @@ describe('avatars and reactions', () => {
     // A reaction rising up the screen must never look like a player; 👑 marks the host, 📷 is Show again.
     for (const e of [...REACTIONS, '👑', '📷']) expect(EMOJIS, e).not.toContain(e);
   });
+
+  test('the app shows no emoji newer than Emoji 12.0, the newest Android 10 can draw', () => {
+    // Most new emojis land in U+1FA70 to U+1FAFF; of those, only these are Emoji 12.0 or older.
+    const old = /[\u{1FA70}-\u{1FA73}\u{1FA78}-\u{1FA7A}\u{1FA80}-\u{1FA82}\u{1FA90}-\u{1FA95}]/u;
+    const files = Object.entries(texts).filter(([file]) => /\/web\/.*\.(js|html)$/.test(file) && !file.includes('/vendor/'));
+    for (const [file, text] of files) {
+      const newer = [...text.matchAll(/[\u{1FA70}-\u{1FAFF}]/gu)].map((m) => m[0]).filter((c) => !old.test(c));
+      expect(newer, file).toEqual([]);
+    }
+  });
 });
 
 test('room codes use only the unambiguous alphabet', () => {

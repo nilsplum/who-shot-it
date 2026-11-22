@@ -38,10 +38,10 @@ const CLIENT_EVENTS = {
   setting: (m) => ({ key: m.key, value: m.value }),
   loaded: (m) => ({ round: m.round }),
   answer: (m) => ({ pick: m.pick }),
-  resolve: () => ({}),
   next: () => ({}),
   again: () => ({}),
-  report: () => ({}),
+  flag: (m) => ({ round: m.round, on: m.on === true }),
+  report: (m) => ({ round: m.round }),
   kick: (m) => ({ target: m.target }),
   peek: (m) => ({ on: m.on === true }),
 };

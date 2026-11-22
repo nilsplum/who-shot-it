@@ -39,7 +39,7 @@ test('the owner and the picks stay hidden until the reveal', () => {
   expect(view.round.myPick).toBeNull();
   expect(viewFor(room, ann, now + 1000).round.myPick).toBe(owner);
   expect(JSON.stringify(view)).not.toContain(`"pick"`);
-  room = apply(room, { type: 'resolve', playerId: ann }, now + 2000, rng);
+  for (const p of room.players) room = apply(room, { type: 'answer', playerId: p.id, pick: owner }, now + 2000, rng);
   const revealed = viewFor(room, idOf(room, 'Ben'), now + 2000);
   expect(revealed.round.owner).toBe(owner);
   expect(revealed.round.results[ann].pick).toBe(owner);
@@ -48,7 +48,7 @@ test('the owner and the picks stay hidden until the reveal', () => {
 test('the leaderboard: everyone sees who holds "Show again" as a shared flag, and the frozen time', () => {
   let room = inShow();
   const now = T0 + TIMING.countdownMs;
-  room = apply(room, { type: 'resolve', playerId: idOf(room, 'Ann') }, now, rng);
+  for (const p of room.players) room = apply(room, { type: 'answer', playerId: p.id, pick: p.id }, now, rng);
   room = apply(room, { type: 'tick' }, now + TIMING.revealMs, rng);
   room = apply(room, { type: 'peek', playerId: idOf(room, 'Ben'), on: true }, now + TIMING.revealMs + 2000, rng);
   const view = viewFor(room, idOf(room, 'Cleo'), now + TIMING.revealMs + 9000);
@@ -64,10 +64,22 @@ test('timers are relative and carry their full length; photo links point at the 
   const view = viewFor(room, idOf(room, 'Ann'), shownAt + 4000);
   // The answer time the players see ends before the room's deadline (its grace for late answers).
   expect(view).toMatchObject({ left: room.settings.time * 1000 - 4000, total: room.settings.time * 1000, paused: false });
-  const revealed = apply(room, { type: 'resolve', playerId: idOf(room, 'Ann') }, shownAt + 5000, rng);
+  let revealed = room;
+  for (const p of room.players) revealed = apply(revealed, { type: 'answer', playerId: p.id, pick: p.id }, shownAt + 5000, rng);
   expect(viewFor(revealed, idOf(room, 'Ann'), shownAt + 6000)).toMatchObject({ left: TIMING.revealMs - 1000, total: TIMING.revealMs });
   // Without a clock the answer time has no timer at all.
   expect(viewFor({ ...room, settings: { ...room.settings, time: 0 } }, idOf(room, 'Ann'), shownAt + 4000)).toMatchObject({ left: null, total: null });
   expect(view.round.photo).toBe(`/api/rooms/ABCD/photos/${room.game.plan[0].photo}`);
   expect(view.round.next).toBe(`/api/rooms/ABCD/photos/${room.game.plan[1].photo}`);
+});
+
+test('a flag: the others learn only that the photo is flagged, the flagger also how long it waits', () => {
+  let room = inShow();
+  const now = T0 + TIMING.countdownMs;
+  room = apply(room, { type: 'flag', playerId: idOf(room, 'Ben'), round: 1, on: true }, now, rng);
+  expect(viewFor(room, idOf(room, 'Ben'), now + 4000).round.flag).toEqual({ mine: true, left: TIMING.flagMs - 4000 });
+  const other = viewFor(room, idOf(room, 'Ann'), now + 4000);
+  expect(other).toMatchObject({ paused: true, round: { flag: { mine: false } } });
+  // Who flagged it is never in a view.
+  expect(Object.keys(other.round.flag).sort()).toEqual(['left', 'mine']);
 });

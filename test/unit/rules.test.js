@@ -25,6 +25,11 @@ function driver(room, now = T0) {
       d.now += ms;
       return d.do('tick');
     },
+    /** Ends the guessing the way a round really ends early: everyone answers (each picks themselves). */
+    reveal() {
+      for (const p of d.room.players) d.do('answer', { playerId: p.id, pick: p.id });
+      return d;
+    },
   };
   return d;
 }
@@ -180,12 +185,14 @@ describe('rounds', () => {
     expect(d.room.phase).toBe('reveal');
   });
 
-  test('without a timer, only answers (or the host) end the round', () => {
+  test('without a timer, only answers end the round (nobody can cut it short)', () => {
     const d = loadAll(started(['Ann', 'Ben'], { time: 0 }));
     expect(d.room.deadline).toBeNull();
-    d.by('Ben', 'resolve');
+    d.by('Ann', 'resolve').wait(TIMING.untimedReferenceMs * 10);
     expect(d.room.phase).toBe('show');
-    d.by('Ann', 'resolve');
+    d.by('Ann', 'answer', { pick: idOf(d.room, 'Ben') });
+    expect(d.room.phase).toBe('show');
+    d.by('Ben', 'answer', { pick: idOf(d.room, 'Ben') });
     expect(d.room.phase).toBe('reveal');
   });
 
@@ -197,8 +204,7 @@ describe('rounds', () => {
   });
 
   test('the reveal is timed, then the leaderboard; the next round comes after it, or when the host taps', () => {
-    const d = loadAll(started());
-    d.by('Ann', 'resolve');
+    const d = loadAll(started()).reveal();
     d.wait(TIMING.revealMs - 1);
     expect(d.room.phase).toBe('reveal');
     d.wait(1);
@@ -206,7 +212,7 @@ describe('rounds', () => {
     d.wait(TIMING.boardMs);
     expect(d.room).toMatchObject({ phase: 'load', game: { round: 2 } });
     const manual = loadAll(started(['Ann', 'Ben', 'Cleo'], { auto: false }));
-    manual.by('Ann', 'resolve').by('Ann', 'next');
+    manual.reveal().by('Ann', 'next');
     expect(manual.room.phase).toBe('reveal');
     manual.wait(TIMING.revealMs).wait(TIMING.boardMs * 10);
     expect(manual.room).toMatchObject({ phase: 'board', deadline: null });
@@ -217,7 +223,7 @@ describe('rounds', () => {
   });
 
   test('"Show again" stops the board\'s clock while anyone holds it, then it runs on from where it stood', () => {
-    const d = loadAll(started()).by('Ann', 'resolve').wait(TIMING.revealMs).wait(1000);
+    const d = loadAll(started()).reveal().wait(TIMING.revealMs).wait(1000);
     expect(d.room.phase).toBe('board');
     d.by('Ben', 'peek', { on: true });
     expect(d.room.game.pausedAt).toBe(d.now);
@@ -237,7 +243,7 @@ describe('rounds', () => {
   });
 
   test('a hold nobody renews ends by itself (a lost connection never stops the game)', () => {
-    const d = loadAll(started()).by('Ann', 'resolve').wait(TIMING.revealMs);
+    const d = loadAll(started()).reveal().wait(TIMING.revealMs);
     d.by('Ben', 'peek', { on: true });
     expect(nextWake(d.room)).toBe(d.now + TIMING.peekHoldMs);
     d.wait(TIMING.peekHoldMs);
@@ -248,7 +254,7 @@ describe('rounds', () => {
     const d = loadAll(started());
     d.by('Ben', 'peek', { on: true });
     expect(d.room.game.peeks).toEqual({});
-    d.by('Ann', 'resolve').wait(TIMING.revealMs);
+    d.reveal().wait(TIMING.revealMs);
     d.do('peek', { playerId: 'nobody', on: true });
     expect(d.room.game.peeks).toEqual({});
     d.by('Ben', 'peek', { on: true }).by('Cleo', 'report');
@@ -259,7 +265,7 @@ describe('rounds', () => {
   });
 
   test('a held board saved by the previous server version runs on with the time it had left', () => {
-    const d = loadAll(started()).by('Ann', 'resolve').wait(TIMING.revealMs).wait(1000);
+    const d = loadAll(started()).reveal().wait(TIMING.revealMs).wait(1000);
     // The previous version kept the remaining time in `paused` and no deadline.
     const g = d.room.game;
     delete g.pausedAt;
@@ -312,7 +318,7 @@ describe('the end and again', () => {
       if (round > 1) loadAll(d);
       expect(referencedPhotoIds(d.room)).toHaveLength(5 - round);
       // The round's photo stays through its reveal and leaderboard ("Show again").
-      d.by('Ann', 'resolve').wait(TIMING.revealMs);
+      d.reveal().wait(TIMING.revealMs);
       expect(referencedPhotoIds(d.room)).toHaveLength(5 - round);
       d.by('Ann', 'next');
     }
@@ -399,12 +405,69 @@ describe('reports and removed players', () => {
     expect(d.room).toMatchObject({ phase: 'load', game: { round: 2 } });
     expect(referencedPhotoIds(d.room)).not.toContain(photo);
     expect(Object.values(d.room.game.results || {})).toEqual([]);
-    loadAll(d).by('Ann', 'resolve');
+    loadAll(d).reveal();
     const revealed = d.room.game.plan[1].photo;
     d.by('Cleo', 'report');
     expect(d.room.phase).toBe('reveal');
     expect(d.room.game.plan[1].photo).toBeNull();
     expect(referencedPhotoIds(d.room)).not.toContain(revealed);
+  });
+
+  test('a flag holds the round: answers keep their time, Cancel lets it run on from where it stood', () => {
+    const d = loadAll(started(['Ann', 'Ben', 'Cleo'], { time: 10 }));
+    const round = d.room.game.round;
+    d.wait(2000).by('Ben', 'flag', { round, on: true });
+    expect(d.room.game.flag).toEqual({ by: idOf(d.room, 'Ben'), until: d.now + TIMING.flagMs });
+    expect(d.room.game.pausedAt).toBe(d.now);
+    // Held for 8 s, longer than the time left: the round does not move on, and an answer
+    // (from an app that still shows the photo) counts as given when the clock stopped.
+    d.wait(8000).by('Ann', 'answer', { pick: idOf(d.room, 'Cleo') });
+    expect(d.room.phase).toBe('show');
+    expect(d.room.game.answers[idOf(d.room, 'Ann')].ms).toBe(2000);
+    // Only the flagger can cancel; then the clock runs on with the 8 s it had left.
+    d.by('Cleo', 'flag', { round, on: false });
+    expect(d.room.game.flag).not.toBeNull();
+    d.by('Ben', 'flag', { round, on: false });
+    expect(d.room.game).toMatchObject({ flag: null, pausedAt: null });
+    expect(d.room.deadline).toBe(d.now + 8000 + TIMING.answerGraceMs);
+    expect(d.room.game.plan[0].photo).toBeTruthy();
+  });
+
+  test('a flag is deleted by Delete, after its time, or when its flagger is gone; one flag at a time', () => {
+    const d = loadAll(started());
+    const first = d.room.game.plan[0].photo;
+    d.by('Ben', 'flag', { round: 1, on: true }).by('Cleo', 'flag', { round: 1, on: true });
+    expect(d.room.game.flag.by).toBe(idOf(d.room, 'Ben'));
+    // A Delete meant for another round (a late tap) changes nothing.
+    d.by('Ben', 'report', { round: 2 });
+    expect(d.room.game.plan[0].photo).toBe(first);
+    d.by('Ben', 'report', { round: 1 });
+    expect(d.room).toMatchObject({ phase: 'load', game: { round: 2, flag: null } });
+    expect(referencedPhotoIds(d.room)).not.toContain(first);
+    // Nobody decides: after TIMING.flagMs it is deleted like a Delete.
+    loadAll(d).by('Cleo', 'flag', { round: 2, on: true });
+    expect(nextWake(d.room)).toBe(d.room.game.flag.until);
+    d.wait(TIMING.flagMs - 1);
+    expect(d.room.game.round).toBe(2);
+    d.wait(1);
+    expect(d.room.game).toMatchObject({ round: 3, flag: null });
+    // On the reveal a flag holds it too; the flagger leaving deletes the photo, the reveal goes on.
+    loadAll(d).reveal().by('Ann', 'flag', { round: 3, on: true });
+    d.wait(TIMING.revealMs * 2);
+    expect(d.room.phase).toBe('reveal');
+    d.by('Ann', 'leave');
+    expect(d.room).toMatchObject({ phase: 'reveal', game: { flag: null, pausedAt: null } });
+    expect(d.room.game.plan[2].photo).toBeNull();
+  });
+
+  test('a flag only on the photo on screen while it is guessed or revealed', () => {
+    const d = started();
+    d.by('Ben', 'flag', { round: 1, on: true });
+    expect(d.room.game.flag).toBeNull();
+    loadAll(d).by('Ben', 'flag', { round: 2, on: true }).do('flag', { playerId: 'nobody', round: 1, on: true });
+    expect(d.room.game.flag).toBeNull();
+    d.reveal().wait(TIMING.revealMs).by('Ben', 'flag', { round: 1, on: true });
+    expect(d.room).toMatchObject({ phase: 'board', game: { flag: null } });
   });
 
   test('only the host removes a player; their photos go and their key cannot rejoin', () => {
@@ -430,7 +493,7 @@ describe('timers', () => {
     check();
     d.by('Ben', 'disconnect');
     check();
-    d.by('Ann', 'resolve');
+    d.reveal();
     check();
   });
 

@@ -11,6 +11,8 @@
  *   player's secret `key` can never leak.
  * - The owner of the photo on screen stays hidden until the reveal, and so do the other
  *   players' picks: before that an app only learns who has answered, and its own pick.
+ * - Who flagged a photo stays hidden: an app only learns that it is flagged, and whether
+ *   by itself (`round.flag.mine`, so it shows the report sheet while the others wait).
  * - The phase's timer is relative: `left` (ms) and `total` (its full length, from
  *   `timerMs`), so a phone's wrong clock never matters and no app needs to know how long a
  *   phase lasts. `paused` says the round's clock stands still (someone holds the round),
@@ -37,7 +39,7 @@ function timer(room, now) {
   return { left: Math.max(0, end - at), total };
 }
 
-function roundView(room, playerId) {
+function roundView(room, playerId, now) {
   const g = room.game;
   const entry = currentEntry(room);
   const next = nextEntry(room);
@@ -55,6 +57,8 @@ function roundView(room, playerId) {
     owner: revealed ? entry.owner : null,
     results: revealed ? g.results : null,
     peek: room.phase === 'board' && Object.keys(g.peeks || {}).length > 0,
+    // `left`: until the flagged photo is deleted by itself (the flagger's sheet counts it down).
+    flag: g.flag ? { mine: g.flag.by === playerId, left: Math.max(0, g.flag.until - now) } : null,
   };
 }
 
@@ -91,7 +95,7 @@ export function viewFor(room, playerId, now) {
     left,
     total,
     paused: isPaused(room),
-    round: inGame(room) ? roundView(room, playerId) : null,
+    round: inGame(room) ? roundView(room, playerId, now) : null,
     final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };
 }

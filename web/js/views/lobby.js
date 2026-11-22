@@ -108,7 +108,7 @@ function mine({ view, session }) {
     const why = limited ? 'Share more photos with this app in your phone’s settings.'
       : filtered ? 'None of the photos here fit “Which photos” in the game settings.'
         : 'This phone has no photos the game can use.';
-    return card('🫥', 'No photos found', why, limited ? mainButton('opensettings', 'Open settings') : '');
+    return card('🔍', 'No photos found', why, limited ? mainButton('opensettings', 'Open settings') : '');
   }
   return `<div class="${PICK}">${SPINNER}</div>`;
 }

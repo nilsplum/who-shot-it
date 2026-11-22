@@ -26,6 +26,11 @@ know about. Kept up to date with every commit.
   back to the top.
 - Commit 4: the bar's jitter came from re-anchoring the countdown on every snapshot; the
   app now keeps one countdown per timer (`web/js/clock.js`).
+- Commit 5: the flagger's report sheet is this phone's own intent; the room's views only
+  close it. If the flagger's app restarts during a flag, the photo is deleted after 15 s
+  (your rule), the sheet does not come back.
+- Commit 5: two icons were Emoji 14 (🫥), an empty box on Android 10 to 12; replaced, and a
+  test now fails on any emoji newer than Emoji 12.0 in the app.
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
@@ -689,7 +694,7 @@ Status: done.
   reveal: the `#tbar` element carries the kind as `data-kind`, set by `timerBar`).
 
 ### Commit 5: flag: hide at once, wait up to 15 s, Delete or Cancel; Reveal now goes
-Status: open.
+Status: done.
 
 - `config.js`: `TIMING.flagMs` 15000, commented (the operator's limit; a flag that ends
   without Cancel deletes the photo).
@@ -972,3 +977,10 @@ fonts, and removes any that look alike on one of them.
 | Commit 4: the app's countdown | A small pure module `web/js/clock.js` with the time source passed in, unit tested; `session.clock` goes | The same countdown is needed again for the flag's automatic deletion (commit 5). |
 | Commit 4: a held board in "Host taps" mode | The clock stops too (there is just no deadline to move) | One rule for every held round; harmless without a deadline. |
 | Commit 4: older apps | `left` and `paused` keep their names and meaning; `total` is new | 1.0.2 reads `left` and `paused` (its bar stops while held); it computes its own lengths. |
+| Commit 5: the report sheet's lifetime | This phone's intent (opened by ⚑, ended by Delete, Cancel, the backdrop or the back button); the room's views only close it | Letting the room's flag reopen it would let a view that crosses a Cancel on the wire open it again; the photo's round, the photo and someone else's flag are all the sheet needs to know. A restarted app does not reopen it; the room deletes the photo after 15 s. |
+| Commit 5: the toast after a deletion by time | Shown when the room had this phone's flag in the previous view and the photo is gone now | While guessing, the deletion also moves the round on, so "same round" alone would miss it. |
+| Commit 5: the sheet's text | "Everyone waits while you decide." | True for every app in the room (an older app keeps showing the photo, but its clock stops too). |
+| Commit 5: the cards while flagged | Disabled for everyone (faded like after a pick) | Nobody answers what they cannot see; the room would count such an answer as given when the clock stopped anyway. |
+| Commit 5: a photo that could not load | The stage says "This photo could not load" and the cards can be used | Finding 4: it spun for the whole round. |
+| Commit 5: Emoji 14 icons | 🫥 replaced (😕 on the stage, 🔍 for "No photos found"); a config test fails on emoji from U+1FA70 to U+1FAFF that are newer than Emoji 12.0 | Android 10 to 12 draw an empty box for them. |
+| Commit 5: the legal page | "Report content" says: tap ⚑, then Delete photo; after 15 s it is deleted anyway. The date stays (22 November 2026 is today and already `LEGAL.version`) | Informational, and true for every app version. |

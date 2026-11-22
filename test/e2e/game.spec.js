@@ -2,7 +2,8 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code,
  * the host removing a player, the photos dealt with "Play with these?", reload, the
- * automatic start, a reported photo, five rounds with their leaderboards (and "Show
+ * automatic start, a flagged photo (hidden from the others, Cancel, then Delete), five
+ * rounds with their leaderboards (and "Show
  * again" held on one phone, seen on another), the end, "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. Then "Which
  * photos" on a phone with screenshots and a chat full of text. Plus the website (the same
@@ -85,9 +86,19 @@ test('friends play a full game and start another one', async ({ browser }) => {
   const everyone = [host, ...guests];
   for (const page of everyone) await choosePhotos(page, 4);
 
-  // Round 1 is reported: the photo goes for everyone and the game moves on.
+  // Round 1 is flagged: the others stop seeing the photo and wait, the flagger sees the
+  // countdown to its deletion. Cancel brings it back; flagged again, Delete deletes it for
+  // everyone and the game moves on.
   await expect(guests[1].getByText('1 / 5', { exact: true })).toBeVisible();
+  const flagged = host.getByText('Someone flagged this photo');
   await guests[1].getByRole('button', { name: 'Report this photo' }).click();
+  await expect(flagged).toBeVisible();
+  await expect(guests[1].getByText(/^Automatic deletion in \d+ s$/)).toBeVisible();
+  await guests[1].getByRole('button', { name: 'Cancel' }).click();
+  await expect(flagged).toHaveCount(0);
+  await expect(host.getByRole('button', { name: 'Report this photo' })).toBeVisible();
+  await guests[1].getByRole('button', { name: 'Report this photo' }).click();
+  await expect(flagged).toBeVisible();
   await guests[1].getByRole('button', { name: 'Delete photo' }).click();
   const bar = host.locator('#tbar');
   for (let round = 2; round <= 5; round++) {

@@ -1,7 +1,8 @@
 /**
  * The bottom sheets: settings (with a "?" explanation per setting), how to play, avatar
  * picker, invite (QR and share), and the confirmations for leaving, reporting a photo
- * and removing a player.
+ * (opened by ⚑: the others wait while it is open, and Delete counts down to the room's own
+ * deletion, `flagLeft` from `main.js`) and removing a player.
  *
  * Mechanisms: `main.js` keeps the open sheet's name in `session.sheet` and paints the
  * result of `sheetScreen` into `#sheet` with the same part mechanism as the screens, so a
@@ -18,7 +19,7 @@
  * explanation is marked with `aria-pressed`/`aria-expanded`, which also gives it its look.
  */
 
-import { APP, SETTINGS } from '../../shared/config.js';
+import { APP, SETTINGS, TIMING } from '../../shared/config.js';
 import { serverUrl } from '../api.js';
 import { qrSvg } from '../qr.js';
 import { esc, steps } from '../ui.js';
@@ -81,9 +82,17 @@ function inviteBody({ view }) {
 const LEAVE = `${title('Leave the game?')}
   ${buttons('<button class="btn bg-red text-white" data-act="leavenow">Leave</button>', '<button class="btn" data-act="close">Stay</button>')}`;
 
-const REPORT = `${title('Report this photo?')}
-  ${text('It is deleted for everyone right away.')}
-  ${buttons('<button class="btn bg-red text-white" data-act="reportnow">Delete photo</button>', '<button class="btn" data-act="close">Cancel</button>')}`;
+/**
+ * The flagged photo: Delete deletes it for everyone, Cancel lets the round go on. Under
+ * "Delete photo" the seconds until the room deletes it by itself (until the room's view
+ * confirms the flag, its full length).
+ */
+function reportBody({ flagLeft }) {
+  const seconds = Math.ceil((flagLeft ?? TIMING.flagMs) / 1000);
+  return `${title('Report this photo?')}
+  ${text('Everyone waits while you decide.')}
+  ${buttons(`<button class="btn bg-red text-white" data-act="reportnow">Delete photo<small class="mt-0.5 block text-xs font-semibold text-white/75">Automatic deletion in ${seconds} s</small></button>`, '<button class="btn" data-act="close">Cancel</button>')}`;
+}
 
 function removeBody({ view, session }) {
   const p = view.players.find((x) => x.id === session.target);
@@ -104,7 +113,7 @@ export function sheetScreen(c) {
     avatar: () => avatarBody(c),
     invite: () => (inRoom ? inviteBody(c) : ''),
     leave: () => LEAVE,
-    report: () => (inRoom ? REPORT : ''),
+    report: () => (inRoom ? reportBody(c) : ''),
     remove: () => (inRoom ? removeBody(c) : ''),
   };
   const body = bodies[name] ? bodies[name]() : '';

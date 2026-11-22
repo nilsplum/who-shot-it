@@ -27,9 +27,10 @@
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
  *             results: { [id]: { pick, points } } | null,
- *             peeks: { [id]: until }, pausedAt: ms | null,
+ *             peeks: { [id]: until }, flag: { by, until } | null, pausedAt: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
- *   (`peeks`: who holds "Show again" and until when. While anyone holds the round, its
+ *   (`peeks`: who holds "Show again" and until when; `flag`: who flagged the photo on
+ *   screen and when it is deleted unless they cancel. While either holds the round, its
  *   clock stands still: `pausedAt` says since when, `rules.js` `settleClock`.)
  */
 

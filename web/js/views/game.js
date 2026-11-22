@@ -1,7 +1,7 @@
 /**
- * A round on screen: the round counter, the timer bar, the photo (with a flag to report
- * it), one card per player to pick from (everyone answers, the owner included, and anyone
- * may pick themselves), who has answered, and the reveal.
+ * A round on screen: the round counter, the timer bar, the photo (with ⚑ to flag it), one
+ * card per player to pick from (everyone answers, the owner included, and anyone may pick
+ * themselves), who has answered, and the reveal.
  *
  * Mechanisms: shown in the `load`, `show` and `reveal` phases. `main.js` preloads the
  * photo (and the next one), tells the room once it is loaded, starts the effect when the
@@ -9,7 +9,9 @@
  * reveal (`phone.buzz`). The bar is a part of its own: on the reveal it changes from the
  * answer time's look to the look time's (`ui.timerBar`). Photo links in the view are server paths; `serverUrl` makes them
  * full addresses. The host can tap a player in the "who has answered" row to remove them
- * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here.
+ * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here. While
+ * someone else flagged the photo (`round.flag`, not mine), the stage says so instead of
+ * showing it and the cards wait; the flagger keeps the photo under the report sheet.
  *
  * Layout: the photo takes all the height the rest leaves free (the screen has its exact
  * height), down to 30% of the screen; with more players than fit, the page scrolls. The
@@ -33,14 +35,22 @@ function bar(view) {
 
 const CENTRED = 'absolute inset-0 grid place-items-center';
 
+/** A short notice in the middle of the stage, in place of the photo. */
+const notice = (icon, title, line = '') =>
+  `<div class="${CENTRED} px-6 text-center"><div><div class="text-6xl leading-none">${icon}</div><b class="mt-3 block text-xl">${title}</b>${line ? `<span class="mt-1 block text-muted">${line}</span>` : ''}</div></div>`;
+
 /**
  * The photo, or a spinner until it is loaded. Pixel mode draws on a canvas. A photo gone
- * during the reveal (reported, or its owner left) leaves a plain sign behind.
+ * during the reveal (reported, or its owner left) leaves a plain sign behind; one flagged by
+ * someone else is hidden while they decide; one that could not load says so.
+ * @param photo this phone's copy of the photo: 'loading' | 'ok' | 'error'
  */
-function stage(view, loaded) {
+function stage(view, photo) {
   const r = view.round;
   if (view.phase === 'reveal' && !r.photo) return `<div class="${CENTRED} text-8xl opacity-50">🚫</div>`;
-  if (view.phase === 'load' || !r.photo || !loaded) return `<div class="${CENTRED}">${SPINNER}</div>`;
+  if (r.flag && !r.flag.mine) return notice('⚑', 'Someone flagged this photo', 'Waiting…');
+  if (r.photo && photo === 'error') return notice('😕', 'This photo could not load');
+  if (view.phase === 'load' || !r.photo || photo !== 'ok') return `<div class="${CENTRED}">${SPINNER}</div>`;
   const src = esc(serverUrl(r.photo));
   const media = view.phase === 'show' && r.mode === 'pixel' ? '<canvas class="size-full object-contain"></canvas>' : `<img class="size-full object-contain" alt="" src="${src}">`;
   // Phase and round in the markup make the reveal repaint the plain photo, ending any effect.
@@ -63,10 +73,11 @@ const LOOK = {
   wrong: 'border-red bg-red-dark',
 };
 
-function pickCard(view, id, { picked, late, hidden }) {
+/** A card to pick; `wait` while someone flagged the photo (nobody answers what they cannot see). */
+function pickCard(view, id, { picked, late, hidden, wait }) {
   const p = player(view, id);
-  const look = picked ? (picked === id ? LOOK.chosen : LOOK.out) : late ? LOOK.out : LOOK.open;
-  return `<button class="${CARD} ${look}" data-act="answer" data-v="${esc(id)}" ${picked || late || hidden ? 'disabled' : ''}>${avatar(p, 'lg')}<span class="${NAME}">${esc(p.name)}</span></button>`;
+  const look = picked ? (picked === id ? LOOK.chosen : LOOK.out) : late || wait ? LOOK.out : LOOK.open;
+  return `<button class="${CARD} ${look}" data-act="answer" data-v="${esc(id)}" ${picked || late || hidden || wait ? 'disabled' : ''}>${avatar(p, 'lg')}<span class="${NAME}">${esc(p.name)}</span></button>`;
 }
 
 /** Ten confetti pieces flying out of a card, each its own direction and colour. */
@@ -88,11 +99,12 @@ function revealCard(view, id) {
   return `<div class="${CARD} ${LOOK.plain}">${avatar(p, 'lg')}<span class="${NAME}">${name}</span></div>`;
 }
 
-/** The cards; until the photo is there they hold their place, invisible and disabled. */
-function cards(view, { picked, late, loaded }) {
+/** The cards; until the photo is there (or could not load) they hold their place, invisible and disabled. */
+function cards(view, { picked, late, photo }) {
   const ids = view.round.options;
-  const hidden = view.phase === 'load' || !loaded;
-  const card = view.phase === 'reveal' ? (id) => revealCard(view, id) : (id) => pickCard(view, id, { picked, late, hidden });
+  const hidden = view.phase === 'load' || photo === 'loading';
+  const wait = Boolean(view.round.flag);
+  const card = view.phase === 'reveal' ? (id) => revealCard(view, id) : (id) => pickCard(view, id, { picked, late, hidden, wait });
   return `<div class="mt-3 grid grid-cols-2 gap-2 ${hidden ? 'invisible' : ''}">${ids.map(card).join('')}</div>`;
 }
 
@@ -103,8 +115,7 @@ function dots(view, host) {
     const a = avatar(p, 'sm', answered.has(p.id) ? '' : 'opacity-25');
     return host && p.id !== view.me.id ? `<button data-act="remove" data-v="${esc(p.id)}" aria-label="${esc(p.name)}: remove from game">${a}</button>` : a;
   };
-  return `<div class="mt-3 flex min-h-6.5 flex-wrap justify-center gap-1.25">${view.players.map(dot).join('')}</div>
-    ${host ? '<button class="link" data-act="resolve">Reveal now</button>' : ''}`;
+  return `<div class="mt-3 flex min-h-6.5 flex-wrap justify-center gap-1.25">${view.players.map(dot).join('')}</div>`;
 }
 
 function after(view, reactions) {
@@ -112,8 +123,8 @@ function after(view, reactions) {
 }
 
 /**
- * @param state { picked: my pick or null, late: time is up, loaded: photo is loaded,
- *                reactions: the reaction emojis }
+ * @param state { picked: my pick or null, late: time is up, photo: this phone's copy of the
+ *                photo ('loading' | 'ok' | 'error'), reactions: the reaction emojis }
  */
 export function gameScreen(c, state) {
   const { view } = c;
@@ -130,7 +141,7 @@ export function gameScreen(c, state) {
     parts: {
       bar: bar(view),
       timer: timerBar(view.phase === 'reveal' ? 'look' : 'answer'),
-      stage: stage(view, state.loaded),
+      stage: stage(view, state.photo),
       opts: cards(view, state),
       dots: dots(view, host),
       after: after(view, state.reactions),

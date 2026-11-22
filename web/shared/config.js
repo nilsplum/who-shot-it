@@ -249,6 +249,12 @@ export const TIMING = {
   /** A "Show again" hold ends by itself this long after the app last renewed it (a lost connection). */
   peekHoldMs: 2500,
   /**
+   * A flagged photo is hidden from the others and the round waits while its flagger decides
+   * (Delete or Cancel), at most this long: then it is deleted, as if Delete was tapped. So
+   * nobody can stop a game, and a flagged photo never comes back by itself.
+   */
+  flagMs: 15000,
+  /**
    * An app keeps its countdown while the room's snapshots describe the same timer and agree
    * within this much; each snapshot arrives with a slightly different network delay, and
    * following every one would make the timer bar jump (`web/js/clock.js`).

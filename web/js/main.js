@@ -23,6 +23,11 @@
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from the round's clock (`clock.js`, synced with every view)
  *   and the timer's length the view carries (`total`).
+ * - The flag: ⚑ flags the photo in the room (the others stop seeing it, the round waits)
+ *   and opens the report sheet on this phone; Delete, Cancel, the backdrop and the back
+ *   button end it (`endFlag`). The sheet is this phone's own intent: the room's views only
+ *   close it (its photo is gone, its round is over, someone else's flag came first), so a
+ *   view that crosses a Cancel on the wire can never reopen it.
  * - Hold to look: elements with `data-hold` start an entry of the `HOLDS` table when a
  *   finger stays on them; it ends when the finger lifts anywhere, and meanwhile the page
  *   neither scrolls nor opens the phone's long-press menu. The photo it shows is painted
@@ -72,6 +77,8 @@ let checkingAccess = false;
 const images = new Map();
 /** The room's timer for the phase on screen, counted down on this phone between views. */
 const roundClock = createClock();
+/** How long this phone's flag still waits before the room deletes the photo by itself. */
+const flagClock = createClock();
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -92,7 +99,7 @@ function myPick(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view };
+  return { device, session, view: session.view, flagLeft: flagClock.left() };
 }
 
 function screen() {
@@ -106,7 +113,7 @@ function screen() {
   if (inLobby(v)) return lobbyScreen(context());
   if (v.phase === 'board') return boardScreen(context(), { reactions: REACTIONS });
   const photo = images.get(v.round.photo);
-  return gameScreen(context(), { picked: myPick(v), late: isLate(v), loaded: Boolean(photo && photo.state === 'ok'), reactions: REACTIONS });
+  return gameScreen(context(), { picked: myPick(v), late: isLate(v), photo: photo ? photo.state : 'loading', reactions: REACTIONS });
 }
 
 function setHtml(el, html) {
@@ -276,12 +283,29 @@ function onMessage(msg) {
   session.view = v;
   // The timer is named by its phase and round: within one, a snapshot never moves it (`clock.js`).
   roundClock.sync(`${v.phase}|${v.round ? v.round.n : ''}`, v.left, v.paused);
+  const flag = v.round && v.round.flag;
+  flagClock.sync(`flag|${v.round ? v.round.n : ''}`, flag && flag.mine ? flag.left : null);
   if (!v.me) return;
   if (previous && previous.hostId !== v.hostId && v.hostId === v.me.id) toast('You’re the host now 👑');
   if (v.phase === 'show' && !session.shownAt[v.round.photo]) session.shownAt[v.round.photo] = performance.now();
   // Sheets that no longer fit close by themselves.
   if (!inLobby(v) && ['settings', 'invite'].includes(session.sheet)) session.sheet = null;
-  if (!inRound(v) && ['leave', 'report'].includes(session.sheet)) session.sheet = null;
+  if (!inRound(v) && session.sheet === 'leave') session.sheet = null;
+  // The report sheet belongs to the photo this phone flagged: it closes when that photo is
+  // gone (deleted by itself after the wait, or by someone), its round is over, or someone
+  // else's flag came first.
+  if (session.sheet === 'report') {
+    const r = v.round;
+    const otherFlag = Boolean(r && r.flag && !r.flag.mine);
+    const still = r && r.n === session.flagged && r.photo && ['show', 'reveal'].includes(v.phase);
+    if (!still || otherFlag) {
+      // The room had this phone's flag and now the photo is gone: it was deleted by itself.
+      const wasMine = Boolean(previous && previous.round && previous.round.flag && previous.round.flag.mine);
+      if (wasMine && !otherFlag) toast('Photo deleted. Thank you!');
+      endFlag(false);
+      session.sheet = null;
+    }
+  }
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
   // The reveal of a round, once: one pulse for a right guess, two for anything else.
@@ -372,9 +396,17 @@ function needName() {
 }
 
 function openSheet(name) {
+  // Closing the report sheet any way but Delete (Cancel, the backdrop, the back button) cancels the flag.
+  if (session.sheet === 'report' && name !== 'report') endFlag(true);
   session.sheet = name;
   session.helpKey = null;
   render();
+}
+
+/** This phone's flag is over; `cancel` tells the room, so the photo comes back for everyone. */
+function endFlag(cancel) {
+  if (cancel && session.flagged !== null) send({ type: 'flag', round: session.flagged, on: false });
+  session.flagged = null;
 }
 
 async function shareInvite() {
@@ -507,7 +539,6 @@ const ACTIONS = {
     send({ type: 'answer', pick: id });
     render();
   },
-  resolve: () => send({ type: 'resolve' }),
   next: () => send({ type: 'next' }),
   again: () => send({ type: 'again' }),
   react: (emoji) => {
@@ -522,9 +553,18 @@ const ACTIONS = {
     const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
     row.scrollTo({ left: atEnd ? 0 : row.scrollLeft + row.clientWidth * 0.8 });
   },
-  report: () => openSheet('report'),
+  /** ⚑: the room hides the photo from the others and holds the round while this phone decides in the report sheet. */
+  report: () => {
+    const v = session.view;
+    if (!v || !v.round || !v.round.photo) return;
+    session.flagged = v.round.n;
+    send({ type: 'flag', round: v.round.n, on: true });
+    openSheet('report');
+  },
+  /** Delete: the photo of the flagged round is deleted for everyone (the room ignores it if that round is over). */
   reportnow: () => {
-    send({ type: 'report' });
+    send({ type: 'report', round: session.flagged });
+    endFlag(false);
     openSheet(null);
     toast('Photo deleted. Thank you!');
   },

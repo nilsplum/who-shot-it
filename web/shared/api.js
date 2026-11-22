@@ -34,9 +34,12 @@ const ROOM_ROUTES = [
  *
  * Messages on the socket are JSON. App to room: `{ type: 'hello', key, name, avatar }`
  * first, then `leave`, `unready`, `setting {key, value}`, `loaded {round}`, `answer {pick}`,
- * `resolve`, `next`, `again`, `report`, `kick {target}`, `peek {on}` ("Show again" held or
- * let go; renewed while held), `react {emoji}`, plus the plain text `ping`. Room to app: `{ type: 'state', view }` (see `src/game/view.js`) and
- * `{ type: 'react', emoji, from }`.
+ * `next`, `again`, `flag {round, on}` (⚑ on the photo of that round, or Cancel),
+ * `report {round}` (Delete on it; apps before the flag send no round), `kick {target}`,
+ * `peek {on}` ("Show again" held or let go; renewed while held), `react {emoji}`, plus the
+ * plain text `ping`. Room to app: `{ type: 'state', view }` (see `src/game/view.js`) and
+ * `{ type: 'react', emoji, from }`. The room ignores what no current app sends any more
+ * (`resolve`, the host's former "Reveal now").
  */
 export const CLOSE = { stale: 4000, replaced: 4001, full: 4003, gone: 4004, left: 4005, removed: 4006 };
 

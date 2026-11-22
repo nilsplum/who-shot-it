@@ -96,8 +96,9 @@ A room keeps its code for 24 hours after its last activity, even when everyone l
 same group can play again the next day; then it is deleted. Photo links work only for the
 current and next round.
 
-**Keeping it friendly.** Anyone can report the photo on screen (⚑): it is deleted for
-everyone at once. The host can remove a player, who cannot rejoin that game. Nicknames with
+**Keeping it friendly.** Anyone can flag the photo on screen (⚑): the others stop seeing
+it and the round waits; Delete photo deletes it for everyone at once, and after 15 s it goes
+by itself. The host can remove a player, who cannot rejoin that game. Nicknames with
 blocked words become "Player".
 
 **In a browser** the same page is the website: `/<CODE>` is the invite page ("Open in the

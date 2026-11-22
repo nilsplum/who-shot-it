@@ -13,7 +13,7 @@
  * - After every event, `settle` runs all due timers and derived transitions until the room
  *   is stable, so no state can wait for a timer that already passed. Consequently
  *   `nextWake` never returns a time in the past for a room `apply` returned.
- * - Host-only events (settings, resolve, next, kick) are ignored from anyone else.
+ * - Host-only events (settings, next, kick) are ignored from anyone else.
  * - "Play again" (`again`) is anyone's and idempotent: the first one on the end screen
  *   opens a new game under the same code (the lobby) and keeps the final standings
  *   (`final`) for everyone else, who stay on their results (`onResults`) until they tap it
@@ -21,14 +21,19 @@
  * - A room is never closed by its players leaving: an empty room goes back to an empty
  *   lobby (no host, no game) and keeps its code until it idles out (TIMING.roomIdleMs).
  * - The round's clock stands still while anyone holds the round ("Show again" on the
- *   board, `peeks`): nothing moves the round on by itself meanwhile, and when it is let go
- *   the clock runs on from where it stood (`settleClock`). Every hold ends by itself
- *   (TIMING.peekHoldMs after its last renewal), so a lost connection can never stop a game.
+ *   board, `peeks`; a flag on the photo, `flag`): nothing moves the round on by itself
+ *   meanwhile, and when it is let go the clock runs on from where it stood (`settleClock`).
+ *   Every hold ends by itself (a peek TIMING.peekHoldMs after its last renewal, a flag after
+ *   TIMING.flagMs), so neither a lost connection nor a player can stop a game.
  * - How long each phase's timer runs comes from one place, `timerMs` (`state.js`), which
  *   the view also hands to the apps.
- * - Any player may report the photo on screen: it is removed for everyone at once (the
- *   app store and EU content rules ask for a report and a block mechanism; the host's
- *   "Remove" is the block, and a removed player's key cannot rejoin the room).
+ * - Any player may flag the photo on screen (`flag`): the others stop seeing it and the
+ *   round waits while the flagger decides; Delete (`report`) removes it for everyone at
+ *   once, Cancel lets the round go on, and a flag that ends any other way (time, the
+ *   flagger gone) deletes it. The app store and EU content rules ask for a report and a
+ *   block mechanism; the host's "Remove" is the block, and a removed player's key cannot
+ *   rejoin the room. `flag` and `report` name the round they mean, so a late tap never hits
+ *   the next photo.
  * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
  *   lobby ("Play again"). The reveal is always timed; the board (the leaderboard between
  *   the photos) is timed when "Next round" is automatic and waits for the host's "Next"
@@ -49,8 +54,8 @@ const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
 /** The round's photo is no longer being guessed (its reveal or its leaderboard). */
 const afterGuessing = (room) => room.phase === 'reveal' || room.phase === 'board';
 const isHost = (room, playerId) => Boolean(playerId) && room.hostId === playerId;
-/** Someone holds the round, so its clock stands still: "Show again" on the leaderboard. */
-const held = (g) => Boolean(g && Object.keys(g.peeks || {}).length);
+/** Someone holds the round, so its clock stands still: "Show again" on the leaderboard, or a flag on the photo. */
+const held = (g) => Boolean(g && (g.flag || Object.keys(g.peeks || {}).length));
 /** The round's clock stands still (`settleClock`); a game saved before `pausedAt` existed has none. */
 const stopped = (g) => Boolean(g && g.pausedAt != null);
 /** `now` plus the phase's timer, or null when the phase has none (`timerMs`). */
@@ -91,7 +96,7 @@ function startGame(room, now, rng) {
   }
   room.game = {
     plan, round: 0, mode: null, zoom: null, options: [], answers: {}, loaded: [], shownAt: null, results: null,
-    peeks: {}, pausedAt: null, stats: { fastest: null, fooled: {} },
+    peeks: {}, flag: null, pausedAt: null, stats: { fastest: null, fooled: {} },
   };
   startRound(room, 1, now, rng);
 }
@@ -123,6 +128,7 @@ function startRound(room, n, now, rng) {
   g.shownAt = null;
   g.results = null;
   g.peeks = {};
+  g.flag = null;
   g.pausedAt = null;
   room.phase = 'load';
   room.deadline = now + TIMING.loadMaxMs;
@@ -178,6 +184,28 @@ function settlePeeks(room, now) {
   for (const [id, until] of Object.entries(g.peeks)) {
     if (until <= now || !playerById(room, id)) delete g.peeks[id];
   }
+}
+
+/**
+ * Deletes the photo on screen for everyone, as a report (Delete) or a flag that ended
+ * without Cancel does: while it is still being guessed the game moves on to the next photo
+ * (nobody scores), during the reveal and the leaderboard it just disappears (and with it
+ * any "Show again").
+ */
+function deletePhoto(room, now, rng) {
+  const g = room.game;
+  currentEntry(room).photo = null;
+  g.flag = null;
+  g.peeks = {};
+  if (!afterGuessing(room)) nextRound(room, now, rng);
+}
+
+/** A flag ends by itself: after TIMING.flagMs, or when its player is gone; either way the photo is deleted. */
+function settleFlag(room, now, rng) {
+  const g = room.game;
+  if (!g || !g.flag) return;
+  if (!inGame(room)) g.flag = null;
+  else if (now >= g.flag.until || !playerById(room, g.flag.by)) deletePhoto(room, now, rng);
 }
 
 /**
@@ -328,10 +356,6 @@ const HANDLERS = {
     g.answers[playerId] = { pick, ms: Math.min(total, Math.max(0, at - g.shownAt)) };
   },
 
-  resolve(room, { playerId }, now) {
-    if (isHost(room, playerId) && room.phase === 'show') reveal(room, now);
-  },
-
   next(room, { playerId }, now, rng) {
     if (isHost(room, playerId) && room.phase === 'board') nextRound(room, now, rng);
   },
@@ -360,16 +384,29 @@ const HANDLERS = {
   },
 
   /**
-   * A player reports the photo on screen. It is deleted at once, for everyone: while it is
-   * still being guessed the game moves on to the next photo (nobody scores), during the
-   * reveal and the leaderboard it just disappears (and with it any "Show again").
+   * ⚑ on the photo, while it is guessed or revealed: `on` flags it (the others stop seeing
+   * it, the round is held), `on: false` from the flagger cancels. One flag at a time; who
+   * flagged stays hidden from the others (`view.js`).
    */
-  report(room, { playerId }, now, rng) {
+  flag(room, { playerId, round, on }, now) {
+    const g = room.game;
     const entry = currentEntry(room);
-    if (!playerById(room, playerId) || !entry || !entry.photo) return;
-    entry.photo = null;
-    room.game.peeks = {};
-    if (!afterGuessing(room)) nextRound(room, now, rng);
+    if (!playerById(room, playerId) || !entry || !entry.photo || round !== g.round) return;
+    if (!on) {
+      if (g.flag && g.flag.by === playerId) g.flag = null;
+    } else if (!g.flag && (room.phase === 'show' || room.phase === 'reveal')) {
+      g.flag = { by: playerId, until: now + TIMING.flagMs };
+    }
+  },
+
+  /**
+   * Delete on a flagged photo (or a report from an app before the flag, which sends no
+   * round): the photo on screen is deleted for everyone at once (`deletePhoto`).
+   */
+  report(room, { playerId, round }, now, rng) {
+    const entry = currentEntry(room);
+    if (!playerById(room, playerId) || !entry || !entry.photo || (round !== undefined && round !== room.game.round)) return;
+    deletePhoto(room, now, rng);
   },
 
   /** The host removes a player (and all their photos) and keeps them out of this room. */
@@ -476,6 +513,7 @@ function settle(room, now, rng) {
   else if (!inLobby(room) && !host.connected && firstConnected && now >= host.goneAt + TIMING.hostGraceMs) room.hostId = firstConnected.id;
 
   settlePeeks(room, now);
+  settleFlag(room, now, rng);
   settleClock(room, now);
   for (let i = 0; i < 100 && transition(room, now, rng); i++);
 }
@@ -507,6 +545,7 @@ export function nextWake(room) {
   // ends (below) wake the room for that.
   if (room.deadline !== null && !stopped(room.game)) times.push(room.deadline);
   if (room.game && room.game.peeks) times.push(...Object.values(room.game.peeks));
+  if (room.game && room.game.flag) times.push(room.game.flag.until);
   const someoneHere = connectedPlayers(room).length > 0;
   for (const p of room.players) {
     if (p.connected || p.goneAt === null) continue;

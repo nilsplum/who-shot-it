@@ -1,8 +1,8 @@
 /**
  * The Worker and the room's Durable Object together, over real HTTP and WebSocket requests
  * in the Workers runtime: who may call the API, creating and joining rooms, uploads, the
- * game flow driven by the alarm, photo access rules, reports and removed players, and
- * deleting everything at the end.
+ * game flow driven by the alarm, photo access rules, flags, reports and removed players,
+ * and deleting everything at the end.
  */
 import { env, exports } from 'cloudflare:workers';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
@@ -318,6 +318,31 @@ describe('reports and removed players', () => {
     const back = await connect(code, 'Ben');
     expect(await back.closedWith()).toBe(CLOSE.removed);
     await ann.until((v) => v.players.length === 1);
+  });
+});
+
+describe('flags', () => {
+  test('a flag holds the round for everyone; without a decision the alarm deletes the photo', async () => {
+    const code = await createRoom({ photos: 4, time: 5 });
+    const ann = await connect(code, 'Ann');
+    const ben = await connect(code, 'Ben');
+    await ann.until((v) => v.players.length === 2);
+    await upload(code, ann.key, JPEGS);
+    await upload(code, ben.key, []);
+    await advance(code, TIMING.countdownMs);
+    await ann.until((v) => v.phase === 'load');
+    for (const p of [ann, ben]) p.send({ type: 'loaded', round: 1 });
+    const show = await ann.until((v) => v.phase === 'show');
+    ben.send({ type: 'flag', round: 1, on: true });
+    // Ann learns only that it is flagged, and her clock stands still; Ben sees it is his.
+    const held = await ann.until((v) => v.paused && v.round.flag);
+    expect(held.round.flag.mine).toBe(false);
+    expect((await ben.until((v) => v.round.flag)).round.flag.mine).toBe(true);
+    // Far past the answer time, the round is still on: only the flag's own end moves it.
+    await advance(code, TIMING.flagMs);
+    await ann.until((v) => v.round.n === 2 && !v.round.flag && !v.paused);
+    expect(await countRows(code, 'photos')).toBe(1);
+    expect((await call(show.round.photo)).status).toBe(404);
   });
 });
 

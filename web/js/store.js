@@ -94,6 +94,8 @@ export const session = {
   helpKey: null,
   /** The player the host is about to remove ('remove' sheet). */
   target: null,
+  /** The round whose photo this phone flagged, while its report sheet is open; else null. */
+  flagged: null,
   /** Photo access as the phone last reported it ('full' | 'limited' | 'denied' | 'ask'), or null before asking. */
   access: null,
   /** The photo shown big while a finger holds it (`main.js`, hold to look), or null. */

@@ -36,7 +36,7 @@ On both: tap Continue and allow photo access. Tap No for other random photos, or
 
 PHOTOS AND SAFETY
 Only photos a player confirms with Yes leave the phone, and only to the players of that one game. Each photo is deleted from our server right after its round.
-Report: the flag on a photo deletes it for everyone at once.
+Report: tap the flag on a photo, then Delete photo: it is deleted for everyone at once.
 Remove: the host taps a player to remove them. They cannot rejoin that game.
 Offensive nicknames are replaced. Everyone accepts the terms (16+) before playing.
 Questions and reports: whoshotit.info@gmail.com`;
