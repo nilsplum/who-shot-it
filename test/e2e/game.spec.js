@@ -7,10 +7,11 @@
  * another), the end, "Play again" from a guest while the others still look at their
  * results, and leaving with the code remembered. A leaderboard that waits for a phone still
  * loading the next photos. A full table of 16 (three phones of the smallest sizes and light
- * bots, `bots.js`) on every screen of a game: nothing scrolls the page, and the reaction row
- * shows whole buttons. Then "Which photos" on a phone with screenshots and a chat full of
- * text, the swaps and the hold in the photo choice, the terms after an update, and the
- * website (the same page in a plain browser): invite page and legal page.
+ * bots, `bots.js`) on every screen of a game: nothing scrolls the page, the lobby's photos
+ * are as wide as No and Yes, and the reaction row shows whole buttons. Then "Which photos"
+ * on a phone with screenshots and a chat full of text, the swaps (the count, the turn, a
+ * refused tap) and the hold in the photo choice, the terms after an update, and the website
+ * (the same page in a plain browser): invite page and legal page.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,11 +34,16 @@ async function join(page, code) {
   await page.getByRole('button', { name: 'Join', exact: true }).click();
 }
 
-/** The first time: "Continue" (the phone's question is answered "Allow all"), then Yes. */
-async function choosePhotos(page, count) {
+/** The first time: "Continue" (the phone's question is answered "Allow all"), and a set of `count` is dealt. */
+async function dealPhotos(page, count) {
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Play with these?' })).toBeVisible();
   await expect(page.locator('[data-act="swap"]')).toHaveCount(count);
+}
+
+/** The photos dealt (`dealPhotos`), then Yes. */
+async function choosePhotos(page, count) {
+  await dealPhotos(page, count);
   await page.getByRole('button', { name: 'Yes' }).click();
   await expect(page.getByText('✓ Ready')).toBeVisible();
 }
@@ -227,6 +233,23 @@ async function fits(page, { paging = false } = {}) {
   await expect.poll(shown, `${where}: and back`).toEqual({ whole: first, cut: 0 });
 }
 
+/** How far the photo grid's outer edges are from No's left and Yes's right edge, in px. */
+const gridEdges = (page) => page.evaluate(() => {
+  const box = (el) => el.getBoundingClientRect();
+  const tiles = [...document.querySelectorAll('[data-act="swap"]')].map(box);
+  const no = box(document.querySelector('[data-act="no"]'));
+  const yes = box(document.querySelector('[data-act="yes"]'));
+  return [Math.round(Math.min(...tiles.map((t) => t.left)) - no.left), Math.round(Math.max(...tiles.map((t) => t.right)) - yes.right)];
+});
+
+/** A colour of the theme (styles/app.css) as the browser reports it. */
+function themeColour(name) {
+  const css = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'styles', 'app.css'), 'utf8');
+  const hex = css.match(new RegExp(`--color-${name}:\\s*#([0-9a-fA-F]{6});`))[1];
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 test('a full table fits the smallest phones: 16 players on every screen of a game', async ({ browser, baseURL }) => {
   // Three phones at common small sizes (Android, iPhone SE, iPhone 15); light bots fill the room.
   const sizes = [{ width: 360, height: 640 }, { width: 375, height: 667 }, { width: 393, height: 852 }];
@@ -247,7 +270,16 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
   const bots = await addBots(baseURL, code, LIMITS.maxPlayers - phones.length);
   try {
     await expect(host.locator('[data-part="chips"] > *')).toHaveCount(LIMITS.maxPlayers);
-    for (const page of phones) await choosePhotos(page, 4);
+    // The lobby: 16 pills above the photos, which are exactly as wide as No and Yes.
+    for (const page of phones) {
+      await dealPhotos(page, 4);
+      await fits(page);
+      await expect.poll(() => gridEdges(page), 'the grid lines up with No and Yes').toEqual([0, 0]);
+    }
+    for (const page of phones) {
+      await page.getByRole('button', { name: 'Yes' }).click();
+      await expect(page.getByText('✓ Ready')).toBeVisible();
+    }
     for (let round = 1; round <= 5; round++) {
       for (const page of phones) await expect(page.getByText(`${round} / 5`, { exact: true })).toBeVisible();
       if (round === 1) {
@@ -313,27 +345,35 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   // Big versions are prepared ahead for photos still waiting in the bucket, only from what
   // the phone stores (no download); the set on screen may download.
   await expect.poll(() => phone.evaluate(() => window.pulled.some((p) => p.download === false))).toBe(true);
-  const swaps = phone.getByText(/^↻ /);
-  await expect(swaps).toHaveText('↻ Tap a photo to swap it: 3 left');
-  const style = async (i) => tiles.nth(i).getAttribute('style');
-  const second = await style(1);
+  // The line under the grid counts the swaps left, in green.
+  const line = phone.getByText(/^Tap to swap/);
+  await expect(line).toHaveText('Tap to swap (3 left), hold to preview');
+  await expect(phone.getByText('(3 left)', { exact: true })).toHaveCSS('color', themeColour('green'));
+  // A tile's photo is its front face; while it turns, the old photo is a second face behind it.
+  const faces = (i) => tiles.nth(i).locator('span');
+  const photoOf = (i) => faces(i).first().getAttribute('style');
+  const second = await photoOf(1);
   for (let left = 2; left >= 0; left--) {
-    const before = await style(0);
+    const before = await photoOf(0);
     await tiles.nth(0).click();
-    await expect.poll(() => style(0)).not.toBe(before);
-    await expect(swaps).toHaveText(left ? `↻ Tap a photo to swap it: ${left} left` : '↻ No swaps left');
+    await expect.poll(() => photoOf(0)).not.toBe(before);
+    await expect(line).toHaveText(`Tap to swap (${left} left), hold to preview`);
+    await expect(faces(0)).toHaveCount(1);
   }
-  expect(await style(1)).toBe(second);
-  // The fourth tap is refused: a short cross on that photo, the photo stays. The set is
-  // painted anew while the marks clear, so the hold below waits until the cross is gone.
-  const kept = await style(0);
+  expect(await photoOf(1)).toBe(second);
+  // At 0 the count is red. The fourth tap is refused: the photo stays and gets no mark, and
+  // the count is drawn anew, so its shake plays again.
+  const zero = phone.getByText('(0 left)', { exact: true });
+  await expect(zero).toHaveCSS('color', themeColour('red'));
+  const shaken = await zero.elementHandle();
+  const kept = await photoOf(0);
   await tiles.nth(0).click();
-  const cross = tiles.nth(0).getByText('✗');
-  await expect(cross).toBeVisible();
-  expect(await style(0)).toBe(kept);
-  // Felt: a light tap for each flip, two firm pulses for the refusal.
+  await expect.poll(() => shaken.evaluate((el) => el.isConnected)).toBe(false);
+  await expect(zero).toBeVisible();
+  expect(await photoOf(0)).toBe(kept);
+  await expect(faces(0)).toHaveCount(1);
+  // Felt: a light tap for each turn, two firm pulses for the refusal.
   await expect.poll(() => phone.evaluate(() => window.felt)).toEqual(['LIGHT', 'LIGHT', 'LIGHT', 'MEDIUM', 'MEDIUM']);
-  await expect(cross).toHaveCount(0);
   // Holding a photo shows it big until the finger lifts (anywhere); it swaps nothing.
   const box = await tiles.nth(1).boundingBox();
   await phone.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -346,10 +386,10 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   await expect(held).toBeVisible();
   await phone.mouse.up();
   await expect(phone.locator('#look img')).toHaveCount(0);
-  expect(await style(1)).toBe(second);
+  expect(await photoOf(1)).toBe(second);
   // "No" deals a new set and resets the swaps.
   await phone.getByRole('button', { name: 'No', exact: true }).click();
-  await expect(swaps).toHaveText('↻ Tap a photo to swap it: 3 left');
+  await expect(line).toHaveText('Tap to swap (3 left), hold to preview');
 });
 
 test('the terms come back after an update: a phone that accepted an older version sees them again', async ({ browser }) => {

@@ -1,8 +1,10 @@
 # Game feel overhaul: layout, flag, timer, photos ahead, leaderboard, podium (plan)
 
-Status: planned on 22 November 2026, not implemented yet. Each commit below is implemented
-with `docs/prompts/implement.md`; after each one its status line here is set to done and
-its decisions are added to the decision log at the end.
+Status: planned on 22 November 2026, being implemented on the branch
+`feat/game-feel-overhaul` (each commit's status line below says how far). Each commit is
+implemented with `docs/prompts/implement.md`; after each one its status line is set to done
+and its decisions are added to the decision log at the end. The branch is merged into `main`
+after the last commit.
 
 ## Operator handoff
 
@@ -38,6 +40,8 @@ know about. Kept up to date with every commit.
 - Commit 6: the vibrations can only be felt on a real phone; please check on both phones
   that they feel right (the 3-2-1 is a 120 ms buzz, a new photo a light tap). The browser
   tests check that each one is played at its moment.
+- Commit 10: the swap turns the tile over in 3D (checked in Chrome); please look at it once
+  on a real iPhone and Android phone, where the web views draw it themselves.
 - Commit 7: the privacy policy now says that once a game starts, the players' apps load its
   photos in the background and keep them in memory only until each one's round is over.
   The page's date stays 22 November 2026 (it is today's); the version 1.0.3 of the release
@@ -625,7 +629,7 @@ changed. A commit that changes the native plugin is tried on both phones
 never do.
 
 ### Commit 1: docs: the plan
-Status: open.
+Status: done.
 
 This document.
 
@@ -859,7 +863,7 @@ Status: done.
   on the last reaction.
 
 ### Commit 10: lobby: the grid edge to edge, smaller pills, the swap line, the real flip
-Status: open.
+Status: done.
 
 - `lobby.js`: the parts of section 4; the grid stretches (`grid-rows-N` and `grid-cols-N`,
   whole class names), tiles `rounded-lg`, gap 4 px, at most 4:3 portrait (container units; iOS
@@ -1033,3 +1037,8 @@ fonts, and removes any that look alike on one of them.
 | Commit 9: the reaction buttons | Each button is a fifth of the row and the whole fifth is the tap target (the round emoji inside) | Five whole buttons on every phone, a bigger target, and the arrow lands on whole buttons by snapping. |
 | Commit 9: confetti at the edge | `#app` clips sideways overflow (`overflow-x: clip`) | In four columns the right card's confetti flies about 40 px past the screen and would let the page scroll sideways; clipping at the root keeps every screen still. iOS 15 ignores `clip` and behaves as before. |
 | Commit 9: the safe area | Checked in the iPhone 17 simulator: the bottom button now sits right above the home indicator, the top bar right under the status bar | `max()` with `env()` works in the apps' web view. |
+| Commit 10: the grid | Rows and columns stretch in a size container; the grid is the box's full width, its height at most `100cqw * 4/3` (a tile at most 3:4 portrait), centred in a taller box; gap 4 px, tiles `rounded-lg`; iOS 15 without container units keeps square tiles | Measured: the grid's edges are exactly No's left and Yes's right edge on 360 x 640, 375 x 667 and 393 x 852 with 16 players (the layout test checks it). |
+| Commit 10: fitting 16 players in the lobby | Compact pills from 7 players (24 px avatar, 13 px text, no vertical padding) and, on short screens only, a grid minimum of 7rem instead of 9rem | Without the smaller minimum the lobby was still 39 px too tall on 360 x 640; the grid is a preview (holding a photo shows it whole). Now nothing scrolls on the three sizes. |
+| Commit 10: the pills | Border always 2 px: green when ready, dashed grey (`line-strong`) while the game waits for the player (not ready, or offline); the ✓ stays for ready | The same "not yet" look as the dashed avatar ring in "who has answered". |
+| Commit 10: the swap counter | "Tap to swap (N left), hold to preview", small; the count's markup carries the number and, at 0, `photos.refusals`, so each change is a new element whose animation plays once (`bump` while counting down, `jiggle` at 0) | No timers and no animation state in the view: the painter's normal repaint replays it. A refusal while swaps are left (the bucket ran dry, rare) only vibrates, since a bump there would look like a count. The animation is named `bump`, not `bounce` (Tailwind's own endless `animate-bounce`). |
+| Commit 10: the turn | The tile is the card (`transform-3d`, keyframes with `perspective()`), the new photo its front face, the old preview a back face turned away (`rotate-y-180`, `backface-hidden`); the old preview's link is released when the turn ends (`settleLater`, timed with the CSS: `ENTRANCE_MS`) | A revoked link would show an empty back face; the big version of the old photo goes at once. Reduce Motion: no turn, the back face stays hidden. The cross on a refused photo and `refused` are gone, as is the `pop` animation it used. |

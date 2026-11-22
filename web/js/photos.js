@@ -17,9 +17,11 @@
  *   The ahead lane (big versions, then previews) starts a job only while the now lane has
  *   nothing more to do, so at most one job of each runs at a time.
  * - `roll` deals a set from the front of the bucket, so its big versions are usually there
- *   already; `swap` replaces one photo with the bucket's next; `holdPhoto` puts a photo's
- *   big version first (the view shows the preview until it is there, then the sharp one
- *   above it); `chosenBlobs` waits for the set's big versions for "Yes", counting them.
+ *   already; `swap` replaces one photo with the bucket's next (the tile turns over, its old
+ *   preview as the back face until the turn is done) or counts a refusal; `holdPhoto` puts
+ *   a photo's big version first (the view shows the preview until it is there, then the
+ *   sharp one above it); `chosenBlobs` waits for the set's big versions for "Yes", counting
+ *   them.
  *
  * Invariants:
  * - Nothing leaves the phone before "Yes": previews and big versions are Blobs in this
@@ -45,11 +47,13 @@ export const photos = {
   /**
    * The set on screen: the bucket's own entries, each with { url (the preview as a link),
    * fullUrl (the big version as a link, once there), anim ('in' | 'flip' while it is dealt
-   * or swapped in), refused (a swap was just refused) } added.
+   * or swapped in), from (while it turns in: the preview it replaced, as a link) } added.
    */
   chosen: [],
   /** Swaps left in this set. */
   swaps: 0,
+  /** Swaps refused so far (it only grows): each one is a new number, so the count's shake plays again (`views/lobby.js`). */
+  refusals: 0,
   /** The set size and the "Which photos" value the set on screen was dealt for (`main.js` compares, to deal anew). */
   size: 0,
   filter: null,
@@ -214,8 +218,7 @@ async function fetchPreviews(count) {
 
 function release(set) {
   for (const c of set) {
-    URL.revokeObjectURL(c.url);
-    if (c.fullUrl) URL.revokeObjectURL(c.fullUrl);
+    for (const url of [c.url, c.fullUrl, c.from]) if (url) URL.revokeObjectURL(url);
   }
 }
 
@@ -227,16 +230,26 @@ function release(set) {
 function slot(entry, anim) {
   return Object.assign(entry, {
     url: URL.createObjectURL(entry.blob), fullUrl: entry.full ? URL.createObjectURL(entry.full) : null,
-    failed: entry.failed === true, anim, refused: false,
+    failed: entry.failed === true, anim, from: null,
   });
 }
 
-/** Clears a short-lived mark on a photo after its animation, then repaints. */
-function unmarkLater(c, key, ms) {
+/**
+ * How long a photo's entrance takes on screen: the deal's fade (0.3 s) and the swap's turn
+ * (0.5 s), the `deal` and `flip` animations in styles/app.css, plus a little slack.
+ */
+const ENTRANCE_MS = { in: 400, flip: 600 };
+
+/**
+ * Ends a photo's entrance once it has played: its mark goes and, after a turn, the old face's
+ * preview is let go (it had to stay loaded while it was visible). Then repaints.
+ */
+function settleLater(c) {
   setTimeout(() => {
-    c[key] = key === 'anim' ? null : false;
+    if (c.from) URL.revokeObjectURL(c.from);
+    Object.assign(c, { anim: null, from: null });
     changed();
-  }, ms);
+  }, ENTRANCE_MS[c.anim]);
 }
 
 // ---------- What main.js calls ----------
@@ -325,32 +338,34 @@ export async function roll(size, filter, onChange) {
   release(old);
   heldId = null;
   Object.assign(photos, { rolling: false, empty: set.length === 0, swaps: LIMITS.swapsPerSet });
-  photos.chosen.forEach((c) => unmarkLater(c, 'anim', 400));
+  photos.chosen.forEach(settleLater);
   poke();
 }
 
 /**
- * Replaces photo `index` of the set on screen with the bucket's next one, at once. Returns
- * false when it is refused (no swaps left, or no photo ready): the photo is then marked
- * `refused` for a moment.
+ * Replaces photo `index` of the set on screen with the bucket's next one, at once: it turns
+ * in over the old one, whose preview stays loaded as the back face until the turn is done
+ * (`from`). Returns false when it is refused (no swaps left, or no photo ready), counted in
+ * `photos.refusals`.
  */
 export function swap(index, onChange) {
   changed = onChange;
   const old = photos.chosen[index];
   if (!old || photos.rolling) return false;
   if (photos.swaps <= 0 || !bucket.length) {
-    old.refused = true;
-    unmarkLater(old, 'refused', 700);
+    photos.refusals += 1;
     changed();
     return false;
   }
   const next = bucket.shift();
   seen.add(next.id);
-  const c = slot(next, 'flip');
+  const c = Object.assign(slot(next, 'flip'), { from: old.url });
   photos.chosen = photos.chosen.map((x, i) => (i === index ? c : x));
-  release([old]);
+  // The old photo's big version goes now; its preview with the turn (`settleLater`), and a
+  // turn it was still in the middle of ends by its own timer.
+  if (old.fullUrl) URL.revokeObjectURL(old.fullUrl);
   photos.swaps -= 1;
-  unmarkLater(c, 'anim', 400);
+  settleLater(c);
   poke();
   return true;
 }

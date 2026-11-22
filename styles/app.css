@@ -66,14 +66,14 @@
   --color-ink: #f7f3ff; /* text */
   --color-muted: #9d93b8; /* quiet text and icons */
   --color-hint: #6f6690; /* placeholders */
-  --color-line-strong: #5a5080; /* the dashed frame of the photo card in the lobby */
+  --color-line-strong: #5a5080; /* dashed lines: the lobby's photo card, a player the game waits for (pill, avatar ring) */
   --color-white: #fff;
 
   /* Signals. */
   --color-coral: #ff5a5f; /* the main action of a screen */
   --color-green: #3ddc97; /* yes, ready, right */
   --color-green-dark: #1f3a31; /* behind the right card */
-  --color-red: #ff6b6f; /* wrong, leaving and deleting, a refused swap */
+  --color-red: #ff6b6f; /* wrong, leaving and deleting, no swaps left */
   --color-red-dark: #40222b; /* behind a wrong pick */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
   --color-warning-ink: #ffcfa8;
@@ -142,8 +142,9 @@
   --animate-spin: spin 0.8s linear infinite; /* waiting */
   --animate-fade: fade 0.2s; /* a backdrop, banner or photo appearing */
   --animate-deal: fade 0.3s; /* a photo dealt into the choice */
-  --animate-flip: flip 0.35s ease-out; /* a photo swapped */
-  --animate-pop: pop 0.3s; /* the cross on a refused swap */
+  --animate-flip: flip 0.5s ease-in-out; /* a photo swapped: the tile turns over like a card (views/lobby.js) */
+  --animate-bump: bump 0.45s var(--ease-bounce); /* the swaps left, each time the number goes down */
+  --animate-jiggle: jiggle 0.5s ease-in-out; /* no swaps left: the count shakes (again on every refused tap) */
   --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal */
   --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when I guessed right */
   --animate-winner: pop 0.6s 0.3s both var(--ease-bounce); /* the winner on the podium */
@@ -155,7 +156,11 @@
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fade { from { opacity: 0; transform: scale(0.96); } }
-  @keyframes flip { from { transform: perspective(600px) rotateY(90deg); } to { transform: none; } }
+  /* The tile starts turned over, its old face (pre-turned, `rotate-y-180`) towards the player,
+     and turns to its new face; the faces hide their back (`backface-hidden`). */
+  @keyframes flip { from { transform: perspective(600px) rotateY(-180deg); } to { transform: perspective(600px) rotateY(0deg); } }
+  @keyframes bump { 40% { transform: scale(1.35); } }
+  @keyframes jiggle { 20% { transform: translateX(-3px) rotate(-8deg); } 40% { transform: translateX(3px) rotate(8deg); } 60% { transform: translateX(-2px) rotate(-5deg); } 80% { transform: translateX(2px) rotate(5deg); } }
   @keyframes pop { from { transform: scale(0.9); } to { transform: scale(1); } }
   @keyframes win { 0% { transform: scale(0.9); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
   /* `--x` and `--y` (set on each piece, views/game.js) are where it flies. */

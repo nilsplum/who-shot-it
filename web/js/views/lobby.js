@@ -10,13 +10,21 @@
  * code opens the invite sheet, tapping the settings summary opens the settings sheet
  * (read-only for everyone but the host), and the host taps a player to remove them.
  *
- * The photos: a square grid (2 x 2 to 5 x 5, by "Photos per player") as big as the room
- * between the players and the buttons allows; on a short screen (`short:`) the code and
- * the gaps above it are smaller to leave it more. Tapping a photo swaps it (`photos.swap`,
- * counted under the grid), holding one shows it big (`main.js`, hold to look); a refused
- * swap shows a cross on that photo, nothing else. While "Yes" works, a bar takes the place
- * of No and Yes and says how far it is (`session.progress`: the big versions getting
- * ready, then sending).
+ * The players: a pill each, its border always 2 px (so nothing shifts): green when ready,
+ * dashed grey while the game waits for them (not ready, or offline), never faded. From
+ * PILLS_COMPACT_FROM players on the pills are compact, so 16 fit above the photos on a small
+ * phone.
+ *
+ * The photos: a grid of 2 x 2 to 5 x 5 places (by "Photos per player") filling the room
+ * between the players and the buttons, exactly as wide as No and Yes; on a short screen
+ * (`short:`) the code and the gaps above it are smaller to leave it more. Tapping a photo
+ * swaps it (`photos.swap`): the tile turns over like a card, the old photo away and the new
+ * one in. The line under the grid counts the swaps left ("(3 left)" in green, bumping as it
+ * goes down, red and shaking at 0 and again on every refused tap); holding a photo shows it
+ * big (`main.js`, hold to look). While "Yes" works, a bar takes the place of No and Yes and
+ * says how far it is (`session.progress`: the big versions getting ready, then sending).
+ * Every wait shows itself: "Picking photos…" under a spinner before the first set, and the
+ * set dimmed under a spinner while No waits for new photos.
  *
  * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so what
  * changes often (the progress, the swap counter) never repaints the grid and its photos.
@@ -36,39 +44,61 @@ export function settingsSummary(s) {
   return [`${s.photos} photos`, s.rounds ? `${s.rounds} rounds` : '', s.time ? `${s.time} s` : '∞', label('mode', s.mode)].filter(Boolean).join(' · ');
 }
 
-/** The grid's columns by its side (whole class names, so Tailwind builds them). */
-const COLUMNS = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5' };
+/** The grid's columns and rows by its side (whole class names, so Tailwind builds them). */
+const SIDES = { 2: 'grid-cols-2 grid-rows-2', 3: 'grid-cols-3 grid-rows-3', 4: 'grid-cols-4 grid-rows-4', 5: 'grid-cols-5 grid-rows-5' };
 
 /**
- * The photos as a square grid of `size` places (the setting). Its box takes the free space
- * (a size container), and the grid is the largest square that fits in it, so "No" and
- * "Yes" stay on screen also on small phones (tiles get smaller; holding one still shows it
- * big). Only below 9rem, with many players on a small phone, does the page scroll instead.
- * Without container units (iOS 15) the grid takes the full width.
+ * The photos as a grid of `size` places (the setting), filling its box: the box takes the
+ * free space (a size container), the grid its full width (as wide as No and Yes) and as much
+ * of its height as keeps a tile at most 3:4 portrait (`100cqw * 4/3`, the gaps aside); in a
+ * taller box it sits in the middle. Its rows and columns stretch, so the tiles take the free
+ * space's shape. Only below 9rem of free height (7rem on a short screen, where 16 players
+ * leave no more) does the page scroll instead. Without container units (iOS 15) the tiles are square and the grid
+ * takes the full width. `busy` dims it under a spinner while "No" waits for new photos.
  */
-function grid(tiles, size) {
-  return `<div class="@container-size grid min-h-36 flex-1 place-items-center"><div class="grid w-full gap-1.5 supports-[width:1cqw]:w-[min(100cqw,100cqh)] ${COLUMNS[Math.ceil(Math.sqrt(size))]}">${tiles.join('')}</div></div>`;
+function grid(tiles, size, busy = false) {
+  const wait = busy ? `<div class="absolute inset-0 grid place-items-center">${SPINNER}</div>` : '';
+  return `<div class="@container-size relative flex min-h-36 flex-1 flex-col justify-center short:min-h-28"><div class="grid w-full gap-1 supports-[width:1cqw]:h-[min(100cqh,calc(100cqw*4/3))] ${SIDES[Math.ceil(Math.sqrt(size))]} ${busy ? 'opacity-40' : ''}">${tiles.join('')}</div>${wait}</div>`;
 }
 
-const TILE = 'relative grid aspect-square place-items-center rounded-xl bg-card bg-cover bg-center bg-no-repeat text-4xl text-white';
-/** How a photo enters the set: dealt in, or flipped in by a swap. */
-const ENTRANCE = { in: 'animate-deal', flip: 'animate-flip' };
+/** A place in the grid; it takes the shape the grid gives it (square without container units, see `grid`). */
+const TILE = 'relative grid place-items-center rounded-lg bg-card text-4xl text-white not-supports-[width:1cqw]:aspect-square';
+/** How a photo enters the set: dealt in (a fade), or turned over by a swap (`transform-3d` keeps its two faces in 3D). */
+const ENTRANCE = { in: 'animate-deal', flip: 'animate-flip transform-3d' };
 
-/** The set on screen as tiles: tap to swap (unless `fixed`), hold to see big. A refused swap rings the photo red with a cross. */
+/**
+ * One face of a tile: the photo filling it. The back face (the photo a swap replaced) is
+ * turned away from the start (`rotate-y-180`), and a face never shows its back, so the turn
+ * shows the old photo until half way, then the new one.
+ */
+const face = (url, back = false) =>
+  `<span class="absolute inset-0 rounded-lg bg-cover bg-center bg-no-repeat backface-hidden ${back ? 'rotate-y-180' : ''}" style="background-image:url('${url}')"></span>`;
+
+/** The set on screen as tiles: tap to swap (unless `fixed`), hold to see big. */
 function chosenTiles(fixed) {
   return photos.chosen.map((c, i) => {
-    const cls = `${TILE} ${ENTRANCE[c.anim] || ''} motion-reduce:animate-none ${c.refused ? 'inset-ring-3 inset-ring-red' : ''}`;
-    const look = `data-hold="tile" data-v="${i}" style="background-image:url('${c.url}')"`;
+    const cls = `${TILE} ${ENTRANCE[c.anim] || ''} motion-reduce:animate-none`;
+    const faces = `${face(c.url)}${c.from ? face(c.from, true) : ''}`;
+    const hold = `data-hold="tile" data-v="${i}"`;
     return fixed
-      ? `<div class="${cls}" ${look} role="img" aria-label="Photo ${i + 1}"></div>`
-      : `<button class="${cls}" data-act="swap" ${look} aria-label="Photo ${i + 1}: tap to swap it">${c.refused ? '<span class="animate-pop text-8xl font-extrabold [text-shadow:0_2px_8px_var(--color-stage)] motion-reduce:animate-none">✗</span>' : ''}</button>`;
+      ? `<div class="${cls}" ${hold} role="img" aria-label="Photo ${i + 1}">${faces}</div>`
+      : `<button class="${cls}" data-act="swap" ${hold} aria-label="Photo ${i + 1}: tap to swap it">${faces}</button>`;
   });
 }
 
-/** How many swaps are left in this set, under the grid. */
+/**
+ * The line under the grid: "Tap to swap (2 left), hold to preview". The count is green and
+ * bumps each time it goes down; at 0 it is red and shakes, again on every refused tap. Its
+ * markup carries the number and, at 0, the refusals so far (`photos.refusals`), so every
+ * change is a new element whose animation plays once, and a repaint with the same markup
+ * changes nothing.
+ */
 function swapsLine() {
   const n = photos.swaps;
-  return `<div class="mt-2.5 text-center text-muted" aria-label="${n} swaps left">↻ ${n ? `Tap a photo to swap it: ${n} left` : 'No swaps left'}</div>`;
+  const count = n
+    ? `<span class="inline-block animate-bump text-green motion-reduce:animate-none" data-n="${n}">(${n} left)</span>`
+    : `<span class="inline-block animate-jiggle text-red motion-reduce:animate-none" data-n="0" data-try="${photos.refusals}">(0 left)</span>`;
+  return `<p class="mt-2 text-center text-xs text-muted">Tap to swap ${count}, hold to preview</p>`;
 }
 
 const withoutPhotos = '<button class="link" data-act="guess">Play without photos</button>';
@@ -108,8 +138,8 @@ function mine({ view, session }) {
       ? '<button class="link" data-act="opensettings">Only some photos are shared. Share all ›</button>'
       : '';
     return {
-      title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold">Play with these?</h2>',
-      pick: grid(chosenTiles(false), view.settings.photos),
+      title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold short:mb-2 short:text-xl">Play with these?</h2>',
+      pick: grid(chosenTiles(false), view.settings.photos, photos.rolling),
       note: swapsLine(),
       actions: actions(session),
       links: `${limited}${withoutPhotos}`,
@@ -129,7 +159,7 @@ function mine({ view, session }) {
         : 'This phone has no photos the game can use.';
     return { ...parts, pick: card('🔍', 'No photos found', why, limited ? mainButton('opensettings', 'Open settings') : '') };
   }
-  return { ...parts, pick: `<div class="${PICK}">${SPINNER}</div>` };
+  return { ...parts, pick: `<div class="${PICK}">${SPINNER}<p class="mt-3 text-sm text-muted">Picking photos…</p></div>` };
 }
 
 /**
@@ -146,10 +176,22 @@ function status({ view }) {
   return '';
 }
 
-/** A player in the lobby: green ring when ready, faded while offline; the host can tap the others to remove them. */
+/** From this many players on, the pills are compact: smaller avatar, text and padding. */
+const PILLS_COMPACT_FROM = 7;
+const PILLS = {
+  roomy: { cls: 'gap-1.75 py-0.5 pr-3 pl-0.5 text-sm', avatar: 'md' },
+  compact: { cls: 'gap-1 pr-2 text-xs', avatar: 'sm' },
+};
+
+/**
+ * A player in the lobby: green border when ready, dashed grey while the game waits for them
+ * (not ready, or offline); the host can tap the others to remove them.
+ */
 function chip(view, p, host) {
-  const inner = `${avatar(p)}<span class="truncate">${esc(p.name)}</span>${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready ? '<span class="text-green">✓</span>' : ''}`;
-  const cls = `flex max-w-[46%] items-center gap-1.75 rounded-full bg-card py-1 pr-3 pl-1 text-sm ${p.ready ? 'inset-ring-2 inset-ring-green' : ''} ${p.connected ? '' : 'opacity-40'}`;
+  const size = view.players.length >= PILLS_COMPACT_FROM ? PILLS.compact : PILLS.roomy;
+  const waiting = !p.ready || !p.connected;
+  const inner = `${avatar(p, size.avatar)}<span class="truncate">${esc(p.name)}</span>${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready ? '<span class="text-green">✓</span>' : ''}`;
+  const cls = `flex max-w-[46%] items-center rounded-full border-2 bg-card ${size.cls} ${waiting ? 'border-dashed border-line-strong' : 'border-green'}`;
   return host && p.id !== view.me.id
     ? `<button class="${cls}" data-act="remove" data-v="${esc(p.id)}" aria-label="${esc(p.name)}: remove from game">${inner}</button>`
     : `<div class="${cls}">${inner}</div>`;
@@ -164,7 +206,7 @@ export function lobbyScreen(c) {
       ${topBar(LEAVE_BUTTON, '', HELP_BUTTON)}
       <button class="mx-auto mt-1.5 mb-2 flex justify-center gap-2 active:scale-97" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span class="grid h-16 w-13.5 place-items-center rounded-2xl bg-yellow font-display text-6xl font-extrabold text-navy short:h-12 short:w-10.5 short:text-4xl">${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>
-      <div class="mt-4.5 mb-1.5 flex flex-wrap justify-center gap-2 short:mt-2.5" data-part="chips"></div>
+      <div class="mt-4.5 mb-1.5 flex flex-wrap justify-center gap-1.5 short:mt-2.5" data-part="chips"></div>
       <div class="mt-4.5 flex flex-1 flex-col short:mt-2.5">
         <div data-part="title"></div>
         <div class="flex flex-1 flex-col" data-part="pick"></div>
