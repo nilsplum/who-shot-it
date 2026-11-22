@@ -2,6 +2,7 @@
  * Talks to App Store Connect through its API, so a release needs no clicking:
  *   node scripts/helpers/app-store.mjs status   builds, TestFlight beta check, public link, versions
  *   node scripts/helpers/app-store.mjs submit   fills the App Store page and sends it to App Review
+ *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
  * `submit` takes every text (name, subtitle, description, keywords, URLs, copyright, review
@@ -219,6 +220,24 @@ async function setPriceAndCountries(app) {
   console.log('✓ free, every country except China mainland');
 }
 
+/**
+ * TestFlight's test information, which Apple's beta check reads: what the app is, where
+ * feedback goes, the privacy policy, and the same contact and notes as the App Review
+ * (a reviewer needs to know that a game takes two phones).
+ */
+async function setTestFlightInfo(app) {
+  const [name, phone, email] = field('App Review contact').split(', ');
+  const [first, ...last] = name.split(' ');
+  const detail = (await get(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
+  await patch('betaAppReviewDetails', detail.id, { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('App Review notes:') });
+  const description = `${field('Subtitle')}: ${field('Promotional text')}`;
+  const attributes = { description, feedbackEmail: email, privacyPolicyUrl: url('Privacy Policy URL'), marketingUrl: url('Marketing URL') };
+  const loc = (await get(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === 'en-US');
+  if (loc) await patch('betaAppLocalizations', loc.id, attributes);
+  else await api('POST', '/v1/betaAppLocalizations', { data: { type: 'betaAppLocalizations', attributes: { locale: 'en-US', ...attributes }, relationships: { app: ref('apps', app.id) } } });
+  console.log('✓ TestFlight test information (description, feedback email, privacy policy, review contact and notes)');
+}
+
 async function sendToReview(app, version) {
   const open = (await get(`/v1/reviewSubmissions?filter[app]=${app.id}&filter[state]=READY_FOR_REVIEW`)).data[0];
   const submission = open || (await api('POST', '/v1/reviewSubmissions', { data: { type: 'reviewSubmissions', attributes: { platform: 'IOS' }, relationships: { app: ref('apps', app.id) } } })).data;
@@ -230,6 +249,7 @@ async function sendToReview(app, version) {
 
 async function submit() {
   const app = await findApp();
+  await setTestFlightInfo(app);
   await setAppDetails(app, await appInfo(app));
   const { version, loc } = await setVersion(app);
   await setReviewDetails(version);
@@ -242,7 +262,8 @@ const command = process.argv[2];
 try {
   if (command === 'status') await status();
   else if (command === 'submit') await submit();
-  else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit');
+  else if (command === 'testflight') await setTestFlightInfo(await findApp());
+  else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit|testflight');
 } catch (error) {
   console.error(`✗ ${error.message}`);
   process.exit(1);
