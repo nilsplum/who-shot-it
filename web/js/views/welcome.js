@@ -1,11 +1,13 @@
 /**
- * The first screen of the app, once: the few rules everyone agrees to before playing
+ * The first screen of the app after every install and update: the few rules everyone
+ * agrees to before playing
  * (minimum age, only photos the people in them would be okay with, nothing hurtful,
  * reports delete at once), with the terms and privacy policy one tap away.
  *
- * Mechanisms: `main.js` shows it while `device.agreed` is not the current
- * `LEGAL.version`, so a change to the terms asks everyone once more. "I agree" stores the
- * version on the phone. The app stores require that players accept the terms before they
+ * Mechanisms: `main.js` shows it while `device.agreed` is not the current `termsToken()`
+ * (the legal date and the app version), so every new app version and every change to the
+ * terms asks everyone once more, without anyone having to remember it. "I agree" stores
+ * the token on the phone. The app stores require that players accept the terms before they
  * can share anything, and the terms are what makes removing content and players fair.
  */
 

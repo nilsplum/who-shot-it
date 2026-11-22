@@ -40,7 +40,7 @@ export const device = {
   name: typeof saved.name === 'string' ? saved.name.slice(0, LIMITS.nameMax) : '',
   avatar: EMOJIS.includes(saved.avatar) ? saved.avatar : EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
   settings: normalizeSettings(saved.settings),
-  /** The terms version (`LEGAL.version`) this phone accepted, or null. */
+  /** The terms token (`termsToken()`: legal date and app version) this phone accepted, or null. */
   agreed: typeof saved.agreed === 'string' ? saved.agreed : null,
   /** The game this phone is in, or null. */
   room: isRoomCode(saved.room) ? saved.room : null,

@@ -10,6 +10,7 @@ import {
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
 import capacitorConfig from '../../capacitor.config.json?raw';
+import packageJson from '../../package.json?raw';
 import wranglerConfig from '../../wrangler.jsonc?raw';
 import androidManifest from '../../android/app/src/main/AndroidManifest.xml?raw';
 import androidStrings from '../../android/app/src/main/res/values/strings.xml?raw';
@@ -79,6 +80,10 @@ describe('values restated outside the config', () => {
     expect(JSON.parse(capacitorConfig).appName).toBe(APP.name);
     expect(androidStrings).toContain(`<string name="app_name">${APP.name}</string>`);
     expect(iosInfo).toMatch(new RegExp(`<key>CFBundleDisplayName</key>\\s*<string>${APP.name.replace('?', '\\?')}</string>`));
+  });
+
+  test('the app version: the terms come back with every new version', () => {
+    expect(APP.version).toBe(JSON.parse(packageJson).version);
   });
 
   test('the app id', () => {

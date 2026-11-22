@@ -440,7 +440,7 @@ Status: done.
   taps Play again; leaving shows the code prefilled).
 
 ### Commit 8: the terms after every install and update
-Status: open.
+Status: done.
 
 - `config.js`: `APP.version` (the app version, restated from `package.json`, pinned by
   `config.test.js`). `main.js` and `welcome.js`: the accepted token is
@@ -554,3 +554,5 @@ Status: open.
 | Commit 7: "Waiting on" | Shown whether or not this player is ready, without this player's own name, and without an ellipsis | Operator's words; listing yourself while choosing photos would be odd. |
 | Commit 7: forgetting the code | The remembered code is cleared when the room is gone or this player was removed | A dead or closed code in the field would only lead to an error. |
 | Commit 7: who hosts after a room was empty | The first player back | Same rule as for a new room. |
+| Commit 8: where the token is built | One function `termsToken()` in `config.js`, used by the gate, "I agree" and the boot rejoin | One definition of what "accepted" means. |
+| Commit 8: the legal page's "Changes" sentence | Unchanged ("when a change matters for you, the app asks you to accept the new version") | Still true; asking after every update asks more often, never less. |

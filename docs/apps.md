@@ -35,8 +35,9 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
 ## Releasing
 
 **Every release:**
-1. Raise `"version"` in `package.json` (for example `1.0.0` to `1.0.1`). The stores refuse a
-   version number twice.
+1. Raise `"version"` in `package.json` (for example `1.0.0` to `1.0.1`) and `APP.version` in
+   `web/shared/config.js` to the same (a test checks it). The stores refuse a version
+   number twice, and every new version asks players to accept the terms once more.
 2. If the server changed: `./scripts/deploy.sh` first. Installed apps update slowly, so the
    server must keep understanding the previous app version.
 3. `./scripts/release-apps.sh` (or `ios` / `android` only). It runs every test, builds,

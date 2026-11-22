@@ -28,6 +28,11 @@ export const APP = {
   id: 'com.hivedone.whoshotit',
   /** Invite links of the form `whoshotit://join/ABCD` open the app straight in a game. */
   scheme: 'whoshotit',
+  /**
+   * The app's version, restated from `package.json` (the page cannot read it; a test keeps
+   * both equal). Every new version asks for the terms once more (`termsToken`).
+   */
+  version: '1.0.1',
 };
 
 export const SERVER = {
@@ -49,14 +54,21 @@ export const SERVER = {
 
 /**
  * The legal texts (`web/legal.html`) as the app needs them: everyone accepts the terms
- * once before playing (`views/welcome.js`), and accepts again when `version` changes. The
- * version is the "Last updated" date of the legal page (pinned by a test); change it only
- * for a change players must agree to again. `minAge` is also the age set in both stores.
+ * before playing (`views/welcome.js`), again after every install and every app update, and
+ * again when `version` changes. The version is the "Last updated" date of the legal page
+ * (pinned by a test). `minAge` is also the age set in both stores.
  */
 export const LEGAL = {
   version: '2026-11-22',
   minAge: 16,
 };
+
+/**
+ * What a phone stores when its player accepts the terms: the legal date and the app
+ * version. A new install starts without it, and an update or a change of the legal page
+ * no longer matches it, so the terms show once more and can never be forgotten.
+ */
+export const termsToken = () => `${LEGAL.version}+${APP.version}`;
 
 /**
  * Words a nickname may not contain (insults, slurs, obscenities; English and German).

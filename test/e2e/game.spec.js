@@ -186,6 +186,18 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   await expect(phone.locator('.swaps')).toHaveText('↻ Tap a photo to swap it: 3 left');
 });
 
+test('the terms come back after an update: a phone that accepted an older version sees them again', async ({ browser }) => {
+  const page = await newPhone(browser);
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('whoshotit', JSON.stringify({ name: 'Ann', agreed: '2026-11-21' })));
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'I agree, let’s play' })).toBeVisible();
+  await page.getByRole('button', { name: 'I agree, let’s play' }).click();
+  await expect(page.locator('#name')).toHaveValue('Ann');
+  await page.reload();
+  await expect(page.locator('#name')).toHaveValue('Ann');
+});
+
 test('in a browser the page is the website: the invite page and the legal page', async ({ page }) => {
   await page.goto('/ABCD');
   await expect(page.getByText('You’re invited to game')).toBeVisible();

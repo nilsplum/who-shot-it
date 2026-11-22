@@ -5,7 +5,8 @@
  * Mechanisms:
  * - Boot: opened in a plain browser (`phone.inApp` is false) this page is the website and
  *   shows only the invite page (`views/landing.js`). In the store apps, the terms come
- *   first once (`views/welcome.js`); then the app rejoins the game this phone was in
+ *   first after every install and update (`views/welcome.js`, `termsToken`); then the app
+ *   rejoins the game this phone was in
  *   (after the app was closed), and an invite link (`phone.onInvite`) turns the home
  *   screen into "Join <CODE>".
  * - Create: "Create game" opens the "New game" step (`session.setup`, presets and
@@ -36,7 +37,7 @@
  */
 
 import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings } from '../shared/config.js';
+import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
 import { createRoom, serverUrl, uploadPhotos } from './api.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
@@ -95,7 +96,7 @@ function context() {
 
 function screen() {
   const v = session.view;
-  if (device.agreed !== LEGAL.version) return welcomeScreen();
+  if (device.agreed !== termsToken()) return welcomeScreen();
   if (!session.code) return session.setup ? newGameScreen(context()) : homeScreen(context());
   if (session.conn === 'replaced') return awayScreen;
   if (!v || !v.me) return joiningScreen;
@@ -394,7 +395,7 @@ function leaveNow() {
 
 const ACTIONS = {
   agree: () => {
-    device.agreed = LEGAL.version;
+    device.agreed = termsToken();
     saveDevice();
     render();
   },
@@ -676,7 +677,7 @@ if (!inApp()) {
   const code = location.pathname.slice(1).toUpperCase();
   paintApp(landingScreen(isRoomCode(code) ? code : null));
 } else {
-  if (device.room && device.name && device.agreed === LEGAL.version) enterRoom(device.room);
+  if (device.room && device.name && device.agreed === termsToken()) enterRoom(device.room);
   onInvite((code) => {
     if (session.code === code) return;
     if (session.code) {
