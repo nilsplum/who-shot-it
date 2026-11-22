@@ -54,7 +54,8 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with
 Xcode 26 or newer (from April 2027 Apple accepts only builds made with Xcode 27 or newer),
-signed in to the Apple developer account (Xcode, Settings, Accounts);
+and either the App Store Connect API key in `secrets/` (below; it signs and uploads, also
+unattended) or Xcode signed in to the Apple developer account (Xcode, Settings, Accounts);
 the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 
 **Keys in `secrets/`** (git-ignored; back the folder up in a password manager):
@@ -64,8 +65,9 @@ the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 - `google-play.json`: the key of the service account that uploads to Google Play.
 - `app-store-connect.p8` and `app-store-connect.json` (`{ "keyId", "issuerId" }`): the App
   Store Connect team API key (Users and Access, Integrations, App Store Connect API, Team
-  Keys, access Admin; the `.p8` can be downloaded only once). It fills in and submits the
-  App Store page. Revoke and replace it there if it ever leaks.
+  Keys, access Admin; the `.p8` can be downloaded only once). It signs and uploads the
+  iPhone app and fills in and submits the App Store page. Revoke and replace it there if it
+  ever leaks.
 
 ## First release (once per store, by hand)
 

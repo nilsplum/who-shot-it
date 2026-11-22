@@ -18,8 +18,10 @@
 # into the native projects (npx cap sync). The version is package.json's "version"; raise
 # it before every upload (both stores refuse a version number twice).
 #
-# Signing and uploading: the iPhone app is signed and uploaded with the Apple account
-# signed in to Xcode (Settings, Accounts) and the team in the iPhone project. The Android
+# Signing and uploading: the iPhone app is signed and uploaded with the App Store Connect
+# API key in secrets/ when it is there (works unattended, even when Xcode's own sign-in has
+# expired), otherwise with the Apple account signed in to Xcode (Settings, Accounts); the
+# team is the one in the iPhone project. The Android
 # app is signed with the upload key in secrets/ (git-ignored; the first Android build
 # creates it: back up secrets/) and uploaded with the Google Play service account key
 # secrets/google-play.json. Google only accepts uploads through its API after the first
@@ -105,11 +107,19 @@ release_android() {
 release_ios() {
   echo "→ iPhone: copying the game into the app"
   npx cap sync ios
+  # The API key (if present) signs in instead of Xcode's account. "${auth[@]+...}" keeps an
+  # empty list working under `set -u` in the bash that ships with macOS.
+  local auth=()
+  if [ -f secrets/app-store-connect.p8 ] && [ -f secrets/app-store-connect.json ]; then
+    auth=(-authenticationKeyPath "$PWD/secrets/app-store-connect.p8"
+      -authenticationKeyID "$(node -p "require('./secrets/app-store-connect.json').keyId")"
+      -authenticationKeyIssuerID "$(node -p "require('./secrets/app-store-connect.json').issuerId")")
+  fi
   echo "→ iPhone: archiving ($version, build $build)"
   rm -rf dist/ios
   xcodebuild -quiet -project ios/App/App.xcodeproj -scheme App -configuration Release \
     -destination 'generic/platform=iOS' -archivePath dist/ios/App.xcarchive -allowProvisioningUpdates \
-    MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" archive
+    ${auth[@]+"${auth[@]}"} MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" archive
   # "upload" sends the signed app straight to App Store Connect; "export" writes App.ipa.
   local destination=export
   [ "$upload" = true ] && destination=upload
@@ -125,7 +135,7 @@ release_ios() {
 PLIST
   echo "→ iPhone: signing and $([ "$upload" = true ] && echo "uploading to App Store Connect" || echo "exporting")"
   xcodebuild -quiet -exportArchive -archivePath dist/ios/App.xcarchive -exportPath dist/ios \
-    -exportOptionsPlist dist/ios/export.plist -allowProvisioningUpdates
+    -exportOptionsPlist dist/ios/export.plist -allowProvisioningUpdates ${auth[@]+"${auth[@]}"}
   if [ "$submit" = true ]; then
     echo "→ iPhone: filling in the App Store page and sending it to App Review"
     node scripts/helpers/app-store.mjs submit --wait
