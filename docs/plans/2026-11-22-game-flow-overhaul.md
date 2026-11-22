@@ -451,7 +451,7 @@ Status: done.
 - Tests: config (the pin), e2e (a stored old token shows the terms again).
 
 ### Commit 9: every photo has the same chance (iPhone)
-Status: open.
+Status: done (tried on a real iPhone through TestFlight in commit 10).
 
 - `PhonePlugin.swift`: in `randomPhotos`, when the local preview is missing, request it
   once more with iCloud download allowed, waiting at most `cloudMs` (from `phone.js`,
@@ -556,3 +556,5 @@ Status: open.
 | Commit 7: who hosts after a room was empty | The first player back | Same rule as for a new room. |
 | Commit 8: where the token is built | One function `termsToken()` in `config.js`, used by the gate, "I agree" and the boot rejoin | One definition of what "accepted" means. |
 | Commit 8: the legal page's "Changes" sentence | Unchanged ("when a change matters for you, the app asks you to accept the new version") | Still true; asking after every update asks more often, never less. |
+| Commit 9: a cloud budget per batch | Besides the 4 s per photo, a batch spends at most 8 s on iCloud previews; photos beyond it are skipped in this batch only | A library mostly in iCloud would otherwise make a batch take very long; skipped photos stay in the draw for the next batches. |
+| Commit 9: the batch timeout | TIMING.previewMs rises from 10 s to 15 s | Room for the local work plus the cloud budget. |

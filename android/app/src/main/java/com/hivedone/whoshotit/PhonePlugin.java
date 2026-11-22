@@ -9,7 +9,10 @@
  *   `side` / `maxSide` pixels on their longest side, re-encoded from their pixels only, so
  *   location and all other metadata never reach JavaScript, and so never the server.
  * - Previews are the phone's own thumbnails (quick, already upright), scaled to fit exactly
- *   like on the iPhone, because the text check is tuned to that size.
+ *   like on the iPhone, because the text check is tuned to that size. Every photo in the
+ *   phone's media store has the same chance; `cloudMs` (the iPhone's limit for previews
+ *   kept only in iCloud) is accepted and unused, since the media store holds only photos
+ *   on the phone (a cloud backup such as Google Photos is not readable by other apps).
  * - Screenshots (anything in a Screenshots folder) are marked, so the game can leave them out.
  * - Access is "limited" when the player shared only some photos (Android 14 and newer,
  *   READ_MEDIA_VISUAL_USER_SELECTED); the game then draws from those.

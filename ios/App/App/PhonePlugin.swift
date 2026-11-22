@@ -8,8 +8,12 @@
 // - Photos are read only on the phone. Previews and photos leave this file as JPEGs at
 //   most `side` / `maxSide` pixels on their longest side, re-encoded from their pixels only,
 //   so location and all other metadata never reach JavaScript, and so never the server.
-// - Previews come from what the phone keeps on the device (never downloaded from iCloud),
-//   so a batch of them is quick; only a chosen photo may download its original.
+// - Every photo of the library has the same chance: previews come from what the phone keeps
+//   on the device, and a photo kept only in iCloud ("Optimize iPhone Storage", mostly older
+//   photos) fetches its small preview from iCloud, at most `cloudMs` per photo and twice
+//   that per batch, so one slow download never holds a batch for long. A photo that does
+//   not arrive in time is only skipped in this batch. A chosen photo may download its
+//   original for the upload.
 // - Hidden photos are never picked. Screenshots are marked, so the game can leave them out.
 // - Without photo access nothing touches the library: that would make iOS ask on its own,
 //   outside the app's "Continue" step.
@@ -61,8 +65,8 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// Up to `count` random photos not in `exclude`, as previews: `{ photos: [{ id, data,
-    /// screenshot }] }` (data: base64 JPEG). Fewer when the library has no more; a photo the
-    /// phone keeps only in iCloud (no preview on the device) is skipped.
+    /// screenshot }] }` (data: base64 JPEG). Fewer when the library has no more. A preview
+    /// that is only in iCloud is fetched within `cloudMs` (and the batch's cloud budget).
     @objc func randomPhotos(_ call: CAPPluginCall) {
         guard readable else {
             call.resolve(["photos": []])
@@ -72,6 +76,7 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
         let exclude = Set((call.getArray("exclude") ?? []).compactMap { $0 as? String })
         let side = CGFloat(call.getInt("side") ?? 480)
         let quality = CGFloat(call.getDouble("quality") ?? 0.7)
+        let cloudSeconds = Double(call.getInt("cloudMs") ?? 4000) / 1000
         work.async {
             let options = PHFetchOptions()
             options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
@@ -79,9 +84,16 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
             let assets = PHAsset.fetchAssets(with: options)
             var skip = exclude
             var photos: [[String: Any]] = []
+            var cloudBudget = cloudSeconds * 2
             while photos.count < count, let asset = Self.pick(from: assets, skipping: skip) {
                 skip.insert(asset.localIdentifier)
-                guard let data = Self.jpeg(asset, side: side, quality: quality, download: false) else { continue }
+                var data = Self.jpeg(asset, side: side, quality: quality, download: false)
+                if data == nil && cloudBudget > 0 {
+                    let started = Date()
+                    data = Self.jpeg(asset, side: side, quality: quality, download: true, within: min(cloudSeconds, cloudBudget))
+                    cloudBudget -= Date().timeIntervalSince(started)
+                }
+                guard let data else { continue }
                 photos.append([
                     "id": asset.localIdentifier,
                     "data": data.base64EncodedString(),
@@ -112,18 +124,29 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// The asset upright, at most `side` pixels on its longest side, as a fresh JPEG (pixels
-    /// only). Blocks the calling queue until the image is there (or nil).
-    private static func jpeg(_ asset: PHAsset, side: CGFloat, quality: CGFloat, download: Bool) -> Data? {
+    /// only). Blocks the calling queue until the image is there (or nil). With `within`, it
+    /// waits at most that many seconds and then cancels the request (a download that does
+    /// not come); the request then runs asynchronously and Photos answers on another queue
+    /// (never this one, so waiting here cannot block the answer).
+    private static func jpeg(_ asset: PHAsset, side: CGFloat, quality: CGFloat, download: Bool, within seconds: Double? = nil) -> Data? {
         let request = PHImageRequestOptions()
-        request.isSynchronous = true
+        request.isSynchronous = seconds == nil
         request.deliveryMode = .highQualityFormat
         request.resizeMode = .exact
         request.isNetworkAccessAllowed = download
         var image: UIImage?
-        PHImageManager.default().requestImage(
+        let arrived = DispatchSemaphore(value: 0)
+        let id = PHImageManager.default().requestImage(
             for: asset, targetSize: CGSize(width: side, height: side),
             contentMode: .aspectFit, options: request
-        ) { result, _ in image = result }
+        ) { result, _ in
+            image = result
+            arrived.signal()
+        }
+        if let seconds, arrived.wait(timeout: .now() + seconds) == .timedOut {
+            PHImageManager.default().cancelImageRequest(id)
+            return nil
+        }
         return image?.jpegData(compressionQuality: quality)
     }
 

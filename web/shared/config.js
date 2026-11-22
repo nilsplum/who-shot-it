@@ -232,8 +232,13 @@ export const TIMING = {
   sweepMs: 30000,
   /** Longest wait for the phone to hand over one photo (an iCloud original may download). */
   photoPickMs: 20000,
-  /** Longest wait for the phone to hand over a batch of previews (they are on the phone). */
-  previewMs: 10000,
+  /**
+   * Longest wait for the phone to hand over a batch of previews: a few seconds of work on
+   * the phone, plus up to two previews fetched from iCloud (`previewCloudMs` each).
+   */
+  previewMs: 15000,
+  /** Longest wait for one preview the iPhone keeps only in iCloud, so every photo can come up. */
+  previewCloudMs: 4000,
 };
 
 /** Points: a right answer earns min..max by speed (or `fixed`), plus a streak bonus. */

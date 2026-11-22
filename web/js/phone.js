@@ -72,11 +72,12 @@ function within(ms, call) {
 /**
  * Up to `count` random photos that are not in `exclude` (ids from earlier calls), as
  * previews to choose from: `[{ id, blob, screenshot }]`. Fewer when the phone has no more
- * (an empty array: every photo the app may see is excluded). Quick: previews come from
- * what the phone keeps on the device.
+ * (an empty array: every photo the app may see is excluded). Every photo has the same
+ * chance: previews come from what the phone keeps on the device, and on the iPhone a photo
+ * kept only in iCloud fetches its preview within `cloudMs`.
  */
 export async function randomPhotos(count, exclude) {
-  const answer = await within(TIMING.previewMs, plugin('Phone').randomPhotos({ count, exclude, side: LIMITS.previewSide, quality: LIMITS.previewQuality }));
+  const answer = await within(TIMING.previewMs, plugin('Phone').randomPhotos({ count, exclude, side: LIMITS.previewSide, quality: LIMITS.previewQuality, cloudMs: TIMING.previewCloudMs }));
   return (answer.photos || []).filter((p) => p.id && p.data).map((p) => ({ id: p.id, blob: jpegBlob(p.data), screenshot: Boolean(p.screenshot) }));
 }
 
