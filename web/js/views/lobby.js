@@ -165,9 +165,9 @@ export function lobbyScreen(c) {
       <button class="mx-auto mt-1.5 mb-2 flex justify-center gap-2 active:scale-97" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span class="grid h-16 w-13.5 place-items-center rounded-2xl bg-yellow font-display text-6xl font-extrabold text-navy short:h-12 short:w-10.5 short:text-4xl">${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>
       <div class="mt-4.5 mb-1.5 flex flex-wrap justify-center gap-2 short:mt-2.5" data-part="chips"></div>
-      <div class="mt-4.5 flex min-h-0 flex-1 flex-col short:mt-2.5">
+      <div class="mt-4.5 flex flex-1 flex-col short:mt-2.5">
         <div data-part="title"></div>
-        <div class="flex min-h-0 flex-1 flex-col" data-part="pick"></div>
+        <div class="flex flex-1 flex-col" data-part="pick"></div>
         <div data-part="note"></div>
         <div data-part="actions"></div>
         <div data-part="links"></div>

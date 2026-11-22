@@ -198,6 +198,22 @@
 }
 
 /*
+ * The distance of a screen's or sheet's content from the top and bottom edge: the larger of a
+ * small margin and the phone's safe area (status bar, notch or Dynamic Island at the top, the
+ * home indicator at the bottom), never both added up. The safe area already keeps content
+ * clear, and adding the margin on top of it left a visible gap: measured 62 px at the top of
+ * an iPhone 17 (✕ then started 78 px down) and 20 px on an iPad, which runs the iPhone app in
+ * a window (36 px above ✕). Outside the apps the safe area is 0 and the margin stays. The
+ * toast and the "Reconnecting…" banner float over the screen and keep their own offsets.
+ */
+@utility pt-safe {
+  padding-top: max(--spacing(4), env(safe-area-inset-top));
+}
+@utility pb-safe {
+  padding-bottom: max(--spacing(6), env(safe-area-inset-bottom));
+}
+
+/*
  * The three pieces nearly every screen repeats. Each is one element whose colour or
  * size a utility next to it may change (`btn bg-coral text-white`, `screen h-dvh`):
  * utilities always win over these. Pieces made of several elements are built in
@@ -205,11 +221,12 @@
  */
 @layer components {
   /* A screen: one phone-wide column (30rem, centred on wider screens), at least as tall as
-     the screen, clear of the notch and the home indicator inside the apps. A screen whose
-     middle grows into the free space (photo, leaderboard) adds `h-dvh`, its exact height;
-     what does not fit still scrolls the page. */
+     the screen, clear of the notch and the home indicator inside the apps (`pt-safe`,
+     `pb-safe`). A game screen adds `h-dvh`, its exact height: its middle (the photo, the
+     lists) gives way, so it fits the smallest phone with a full table and the page never
+     scrolls. The other screens (start, new game) scroll when they do not fit. */
   .screen {
-    @apply mx-auto flex min-h-dvh w-full max-w-120 flex-col px-4 pt-[calc(--spacing(4)+env(safe-area-inset-top))] pb-[calc(--spacing(6)+env(safe-area-inset-bottom))];
+    @apply mx-auto flex min-h-dvh w-full max-w-120 flex-col px-4 pt-safe pb-safe;
   }
   /* The big button. Its colour comes from the utilities next to it; without them it is the
      quiet dark one ("No", "Cancel"). */

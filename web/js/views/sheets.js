@@ -34,7 +34,6 @@ const title = (text) => `<h2 class="mt-0.5 mb-3.5 text-center font-display text-
 const text = (html) => `<p class="mb-3.5 text-center leading-snug text-muted">${html}</p>`;
 /** A sheet's buttons, one under the other. */
 const buttons = (...html) => `<div class="flex flex-col gap-2.5">${html.join('')}</div>`;
-const SAFE_BOTTOM = 'pb-[calc(--spacing(5.5)+env(safe-area-inset-bottom))]';
 
 function settingsBody(c) {
   const inRoom = Boolean(c.view && c.view.me);
@@ -122,12 +121,12 @@ export function sheetScreen(c) {
   // A long sheet is a column: its scrolling box stays (layout), only the list in it is repainted.
   const inner = long
     ? `<div class="-mx-4 min-h-0 flex-1 overflow-auto px-4 pb-2" data-part="list"></div>
-      <div class="pt-3 shadow-[0_-14px_14px_-10px_var(--color-sheet)] ${SAFE_BOTTOM}" data-part="footer"></div>`
+      <div class="pt-3 pb-safe shadow-[0_-14px_14px_-10px_var(--color-sheet)]" data-part="footer"></div>`
     : '';
   return {
     key: `sheet|${name}`,
     layout: `<div class="fixed inset-0 z-40 animate-fade bg-stage/70" data-act="close"></div>
-      <div class="fixed inset-x-0 bottom-0 z-41 mx-auto max-h-[88dvh] max-w-120 animate-slide-up rounded-t-3xl bg-sheet px-4 pt-4.5 ${long ? 'flex flex-col' : `overflow-auto ${SAFE_BOTTOM}`}" role="dialog" aria-label="${esc(APP.name)}" ${long ? '' : 'data-part="body"'}>${inner}</div>`,
+      <div class="fixed inset-x-0 bottom-0 z-41 mx-auto max-h-[88dvh] max-w-120 animate-slide-up rounded-t-3xl bg-sheet px-4 pt-4.5 ${long ? 'flex flex-col' : 'overflow-auto pb-safe'}" role="dialog" aria-label="${esc(APP.name)}" ${long ? '' : 'data-part="body"'}>${inner}</div>`,
     parts: long ? body : { body },
   };
 }

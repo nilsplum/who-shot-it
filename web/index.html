@@ -4,7 +4,9 @@
   app; opened in a browser it is the website: the invite page for "/<CODE>" (served
   through the single-page fallback) and for "/". All UI is drawn by /js/main.js into the
   empty roots below (#look is the photo shown while a finger holds it; #toast is the one
-  toast, ui.js slides it in with data-on). /css/app.css is built from styles/app.css
+  toast, ui.js slides it in with data-on). #app clips what reaches past the screen's side
+  for a moment (the confetti of a right guess on the reveal), so the page never scrolls
+  sideways. /css/app.css is built from styles/app.css
   (scripts/helpers/styles.sh). Scaling is off: double-tap zoom would enlarge the whole UI
   by accident (pinch zoom is off in the apps' web view anyway). The title and descriptions
   restate APP.name for link previews, the
@@ -29,7 +31,7 @@
 <script type="module" src="/js/main.js"></script>
 </head>
 <body>
-<div id="app"></div>
+<div id="app" class="overflow-x-clip"></div>
 <div id="sheet"></div>
 <div id="cover"></div>
 <div id="look"></div>

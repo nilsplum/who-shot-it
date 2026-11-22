@@ -33,7 +33,7 @@ export function endScreen({ view }, reactions) {
   ].filter(Boolean);
   const place = ({ at, n, block }) => {
     const p = ranked[at];
-    return p ? `<li class="max-w-30 flex-1 text-center">${avatar(p, 'xl', `mb-1.5 ${n === 1 ? 'animate-winner motion-reduce:animate-none' : ''}`)}<div class="truncate text-sm">${esc(p.name)}</div><div class="mt-0.5 mb-1.5 text-xs text-yellow">${p.score}</div>
+    return p ? `<li class="max-w-30 flex-1 text-center">${avatar(p, 'xl', { extra: `mb-1.5 ${n === 1 ? 'animate-winner motion-reduce:animate-none' : ''}` })}<div class="truncate text-sm">${esc(p.name)}</div><div class="mt-0.5 mb-1.5 text-xs text-yellow">${p.score}</div>
       <div class="grid place-items-center rounded-t-xl rounded-b-sm font-display text-4xl font-extrabold text-navy ${block}">${n}</div></li>` : '';
   };
   const body = `<div class="my-auto">

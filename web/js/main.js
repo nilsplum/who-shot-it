@@ -617,11 +617,14 @@ const ACTIONS = {
     send({ type: 'react', emoji });
     floatEmoji(emoji);
   },
-  /** The arrow of the reaction row (right after the row, `ui.reactionsRow`): one page further, and back to the start at the end. */
+  /**
+   * The arrow of the reaction row (right after the row, `ui.reactionsRow`): all the way to
+   * the end (the last five reactions), and from there back to the start.
+   */
   reactmore: (value, el) => {
     const row = el.previousElementSibling;
     const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
-    row.scrollTo({ left: atEnd ? 0 : row.scrollLeft + row.clientWidth * 0.8 });
+    row.scrollTo({ left: atEnd ? 0 : row.scrollWidth });
   },
   /** ⚑: the room hides the photo from the others and holds the round while this phone decides in the report sheet. */
   report: () => {

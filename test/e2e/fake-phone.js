@@ -61,9 +61,12 @@ export function installFakePhone(photos) {
   };
 }
 
-/** A new phone: its own browser context (own storage), with the fake plugin and `photos` installed. */
-export async function newPhone(browser, photos = library) {
-  const context = await browser.newContext();
+/**
+ * A new phone: its own browser context (own storage), with the fake plugin and `photos`
+ * installed; `options` are the context's own (a `viewport` for another phone size).
+ */
+export async function newPhone(browser, photos = library, options = {}) {
+  const context = await browser.newContext(options);
   await context.addInitScript(installFakePhone, photos);
   return context.newPage();
 }

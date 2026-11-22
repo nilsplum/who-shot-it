@@ -29,15 +29,28 @@ export const colourOf = (emoji) => `var(--color-p${Math.max(0, EMOJIS.indexOf(em
 
 /** Avatar sizes; the emoji grows with the circle. */
 const AVATAR_SIZES = {
-  sm: 'size-6.5 text-xs', // who has answered
-  md: 'size-8 text-lg', // chips, the ranking under the podium
-  lg: 'size-10 text-3xl', // the cards to pick from, the leaderboard
+  sm: 'size-6 text-xs', // who has answered (16 fit in two rows on the smallest phone), the compact cards
+  md: 'size-8 text-lg', // chips, the ranking under the podium, the cards for 5 to 9 players
+  lg: 'size-10 text-3xl', // the cards for up to 4 players, the leaderboard
   xl: 'size-13 text-4xl', // the podium
 };
 
-/** A round avatar for a player (`{ avatar }`) in their colour; `extra` adds classes (opacity, animation). */
-export const avatar = (player, size = 'md', extra = '') =>
-  `<span class="inline-grid shrink-0 place-items-center rounded-full border-2 border-player bg-player-fill leading-none ${AVATAR_SIZES[size]} ${extra}" style="--player:${colourOf(player.avatar)}">${esc(player.avatar)}</span>`;
+/**
+ * The avatar's ring and fill: the player's colour, or while the game waits for the player (in
+ * "who has answered", not yet answered) a dashed grey ring on the plain card colour. Waiting is
+ * never shown by fading: a faded avatar reads as "gone", a dashed one as "not yet".
+ */
+const AVATAR_RINGS = {
+  on: 'border-solid border-player bg-player-fill',
+  waiting: 'border-dashed border-line-strong bg-card',
+};
+
+/**
+ * A round avatar for a player (`{ avatar }`) in their colour; `waiting` gives it the dashed
+ * ring, `extra` adds classes (margin, animation).
+ */
+export const avatar = (player, size = 'md', { waiting = false, extra = '' } = {}) =>
+  `<span class="inline-grid shrink-0 place-items-center rounded-full border-2 leading-none ${AVATAR_RINGS[waiting ? 'waiting' : 'on']} ${AVATAR_SIZES[size]} ${extra}" style="--player:${colourOf(player.avatar)}">${esc(player.avatar)}</span>`;
 
 /**
  * The bar at the top of a screen: a button on the left (leave, back), a title in the middle
@@ -119,30 +132,40 @@ export function toast(text) {
 }
 
 /**
- * The reaction row, the same on every screen that has one: big emoji buttons in a row that
- * scrolls sideways (most used first), and right after it a small arrow that pages through it
- * (`main.js`, action `reactmore`, scrolls the element before the arrow). Its markup never
+ * The reaction row, the same on every screen that has one: emoji buttons in a row that
+ * scrolls sideways (most used first), and right after it a small arrow (`main.js`, action
+ * `reactmore`, scrolls the element before the arrow) that goes to the end and from there
+ * back to the start. Each button is exactly a fifth of the row (the round emoji in its
+ * middle) and the row snaps to whole buttons, so it always shows five whole ones: never a
+ * button cut off at the edge, and the ten reactions are two pages. Its markup never
  * changes, so a repaint keeps the scroll.
  */
 export function reactionsRow(reactions) {
-  const buttons = reactions.map((e) => `<button class="size-13 shrink-0 rounded-full bg-card text-4xl active:scale-85" data-act="react" data-v="${e}" aria-label="React ${e}">${e}</button>`).join('');
-  return `<div class="flex items-center gap-1.5"><div class="flex flex-1 scroll-smooth gap-2 overflow-x-auto px-0.5 py-1 scrollbar-none [&::-webkit-scrollbar]:hidden">${buttons}</div><button class="h-13 w-8 shrink-0 text-4xl text-muted" data-act="reactmore" aria-label="More reactions">›</button></div>`;
+  const buttons = reactions.map((e) => `<button class="group grid w-1/5 shrink-0 snap-start place-items-center py-1" data-act="react" data-v="${e}" aria-label="React ${e}"><span class="grid aspect-square w-[calc(100%-4px)] max-w-13 place-items-center rounded-full bg-card text-4xl group-active:scale-85">${e}</span></button>`).join('');
+  return `<div class="flex items-center gap-1.5"><div class="flex flex-1 snap-x snap-mandatory scroll-smooth overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">${buttons}</div><button class="h-13 w-8 shrink-0 text-4xl text-muted" data-act="reactmore" aria-label="More reactions">›</button></div>`;
 }
 
 /**
- * Lets `emoji` rise up the screen: from its button in the reaction row when that button is
- * on screen (also for someone else's reaction), else from the bottom middle.
+ * Lets `emoji` rise up the screen from its button in the reaction row (also for someone
+ * else's reaction): from the button's middle, kept inside the row's visible part, so a
+ * button scrolled away (or half way while the row moves) sends it from the nearest edge.
+ * Without a reaction row on screen it rises from the bottom middle.
  */
 export function floatEmoji(emoji) {
   const el = document.createElement('span');
   el.className = 'pointer-events-none fixed z-60 animate-rise text-7xl leading-none';
   el.textContent = emoji;
   const button = [...document.querySelectorAll('[data-act="react"]')].find((b) => b.dataset.v === emoji);
-  const row = button && button.parentElement.getBoundingClientRect();
   const box = button && button.getBoundingClientRect();
-  const visible = box && box.width && box.left >= row.left - 1 && box.right <= row.right + 1;
-  el.style.left = visible ? `${box.left + box.width / 2}px` : '50vw';
-  el.style.top = visible ? `${box.top}px` : 'calc(100vh - 90px)';
+  if (box && box.width) {
+    const row = button.parentElement.getBoundingClientRect();
+    const half = box.width / 2;
+    el.style.left = `${Math.min(Math.max(box.left + half, row.left + half), row.right - half)}px`;
+    el.style.top = `${box.top}px`;
+  } else {
+    el.style.left = '50vw';
+    el.style.top = 'calc(100vh - 90px)';
+  }
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
 }

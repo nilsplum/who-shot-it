@@ -354,7 +354,7 @@ describe('the website', () => {
   test("invite links serve the app's page (it shows the invite in a browser); the legal page is reachable", async () => {
     const invite = await call('/ABCD', { headers: { Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate' } });
     expect(invite.status).toBe(200);
-    expect(await invite.text()).toContain('<div id="app">');
+    expect(await invite.text()).toContain('<div id="app"');
     const legal = await call('/legal');
     expect(await legal.text()).toContain('Imprint (Impressum)');
   });

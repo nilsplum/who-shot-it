@@ -6,18 +6,22 @@
  * Delete), five rounds with their leaderboards (and "Show again" held on one phone, seen on
  * another), the end, "Play again" from a guest while the others still look at their
  * results, and leaving with the code remembered. A leaderboard that waits for a phone still
- * loading the next photos. Then "Which photos" on a phone with screenshots and a chat full
- * of text, the swaps and the hold in the photo choice, the terms after an update, and the
+ * loading the next photos. A full table of 16 (three phones of the smallest sizes and light
+ * bots, `bots.js`) on every screen of a game: nothing scrolls the page, and the reaction row
+ * shows whole buttons. Then "Which photos" on a phone with screenshots and a chat full of
+ * text, the swaps and the hold in the photo choice, the terms after an update, and the
  * website (the same page in a plain browser): invite page and legal page.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { LIMITS, REACTIONS } from '../../web/shared/config.js';
+import { addBots } from './bots.js';
 import { library, newPhone } from './fake-phone.js';
 
-/** Opens the app on a new phone: terms accepted, name typed. */
-async function openApp(browser, name, photos) {
-  const page = await newPhone(browser, photos);
+/** Opens the app on a new phone: terms accepted, name typed; `options` as for `newPhone` (a viewport). */
+async function openApp(browser, name, photos, options) {
+  const page = await newPhone(browser, photos, options);
   await page.goto('/');
   await page.getByRole('button', { name: 'I agree, let’s play' }).click();
   await page.fill('#name', name);
@@ -189,6 +193,89 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
   await expect(host.getByRole('heading', { name: 'Round 1 of 5' })).toBeVisible();
   release();
   await expect(host.getByText('2 / 5', { exact: true })).toBeVisible();
+});
+
+/**
+ * The screen on `page` fits it: the page scrolls neither down nor sideways, and a reaction
+ * row shows its first five reactions whole. With `paging`, its arrow then goes to the last
+ * five (whole again), and from there back to the first.
+ */
+async function fits(page, { paging = false } = {}) {
+  const { width, height } = page.viewportSize();
+  const where = `${width} x ${height}`;
+  const overflow = await page.evaluate(() => [document.documentElement.scrollWidth - innerWidth, document.documentElement.scrollHeight - innerHeight]);
+  expect(overflow, `${where}: the page scrolls`).toEqual([0, 0]);
+  if (!(await page.locator('[data-act="react"]').count())) return;
+  // The reactions inside the row's visible part, and how many are cut by its edge.
+  const shown = () => page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('[data-act="react"]')];
+    const row = buttons[0].parentElement.getBoundingClientRect();
+    const boxes = buttons.map((b) => b.getBoundingClientRect());
+    return {
+      whole: boxes.flatMap((b, i) => (b.left >= row.left - 1 && b.right <= row.right + 1 ? [i] : [])),
+      cut: boxes.filter((b) => b.right > row.left + 1 && b.left < row.right - 1 && (b.left < row.left - 1 || b.right > row.right + 1)).length,
+    };
+  });
+  const first = [0, 1, 2, 3, 4];
+  const last = first.map((i) => REACTIONS.length - 5 + i);
+  await expect.poll(shown, where).toEqual({ whole: first, cut: 0 });
+  if (!paging) return;
+  const arrow = page.getByRole('button', { name: 'More reactions' });
+  await arrow.click();
+  await expect.poll(shown, `${where}: the arrow goes to the end`).toEqual({ whole: last, cut: 0 });
+  await arrow.click();
+  await expect.poll(shown, `${where}: and back`).toEqual({ whole: first, cut: 0 });
+}
+
+test('a full table fits the smallest phones: 16 players on every screen of a game', async ({ browser, baseURL }) => {
+  // Three phones at common small sizes (Android, iPhone SE, iPhone 15); light bots fill the room.
+  const sizes = [{ width: 360, height: 640 }, { width: 375, height: 667 }, { width: 393, height: 852 }];
+  const phones = [];
+  for (const [i, viewport] of sizes.entries()) phones.push(await openApp(browser, ['Ann', 'Ben', 'Cleo'][i], library, { viewport }));
+  const [host, ...guests] = phones;
+  await host.getByRole('button', { name: 'Create game' }).click();
+  // No clock and "Host taps": each screen stays until the test moves on.
+  await host.getByRole('button', { name: 'Custom' }).click();
+  await host.locator('[data-k="photos"][data-v="4"]').click();
+  await host.locator('[data-k="rounds"][data-v="5"]').click();
+  await host.locator('[data-k="time"][data-v="0"]').click();
+  await host.locator('[data-k="auto"][data-v="false"]').click();
+  await host.getByRole('button', { name: 'Done' }).click();
+  await host.getByRole('button', { name: 'Start game' }).click();
+  const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
+  for (const page of guests) await join(page, code);
+  const bots = await addBots(baseURL, code, LIMITS.maxPlayers - phones.length);
+  try {
+    await expect(host.locator('[data-part="chips"] > *')).toHaveCount(LIMITS.maxPlayers);
+    for (const page of phones) await choosePhotos(page, 4);
+    for (let round = 1; round <= 5; round++) {
+      for (const page of phones) await expect(page.getByText(`${round} / 5`, { exact: true })).toBeVisible();
+      if (round === 1) {
+        // Guessing: 16 cards, the photo and "who has answered" all on screen. Ben's own dot
+        // has the dashed ring until he answers.
+        for (const page of phones) await fits(page);
+        const ring = (page, i) => page.locator('[data-part="dots"] > * > *').nth(i).evaluate((el) => getComputedStyle(el).borderTopStyle);
+        expect(await ring(guests[0], 1)).toBe('dashed');
+        await guests[0].locator('[data-act="answer"]').first().click();
+        await expect.poll(() => ring(guests[0], 1)).toBe('solid');
+      }
+      for (const page of phones) {
+        if (round > 1 || page !== guests[0]) await page.locator('[data-act="answer"]').first().click();
+      }
+      await expect(host.locator('[aria-label$=": their photo"]')).toHaveCount(1);
+      if (round === 1) for (const page of phones) await fits(page);
+      await expect(host.getByRole('heading', { name: `Round ${round} of 5` })).toBeVisible();
+      if (round === 1) for (const page of phones) await fits(page, { paging: true });
+      await host.getByRole('button', { name: 'Next' }).click();
+    }
+    const podium = (page) => page.getByRole('list', { name: 'Podium' }).getByRole('listitem');
+    for (const page of phones) {
+      await expect(podium(page)).toHaveCount(3);
+      await fits(page, { paging: true });
+    }
+  } finally {
+    bots.close();
+  }
 });
 
 test('"Which photos" leaves out photos full of text, and screenshots if asked', async ({ browser }) => {

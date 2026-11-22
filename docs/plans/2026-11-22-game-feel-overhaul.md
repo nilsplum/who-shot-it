@@ -830,7 +830,7 @@ Status: done.
   `download`.
 
 ### Commit 9: screens that fit: safe area, the guessing screen for up to 16, the bottom row, the reaction row
-Status: open.
+Status: done.
 
 - `styles/app.css`: `pt-safe` and `pb-safe` (`max(margin, env(safe-area-inset-*))`), used by
   `.screen` and the sheets (`SAFE_BOTTOM` goes); the toast and the banner keep their own
@@ -1020,3 +1020,10 @@ fonts, and removes any that look alike on one of them.
 | Commit 8: when the bucket starts | Once the terms are accepted and the app may read photos (never with a question: asking stays with "Continue"); it survives leaving a room, access changes drop it | Reading photos before the terms are accepted would be wrong, and a new access may mean other photos. |
 | Commit 8: the photo held big | Layers: the preview, and the big version above it once there (`heldLayers`, `lookHtml`); the tests find it as the image named "Photo" | It is never empty and gets sharp in place, without inline handlers (the CSP forbids them). |
 | Commit 8: a name clash | The export is `holdPhoto` | `main.js` has its own `hold` (the hold-to-look state); the clash stopped the whole page from loading, which is why the first test run hung. |
+| Commit 9: the lobby with 16 players | Not yet fitting on the two smallest sizes (the page scrolls, as before this plan); the layout test checks the lobby once the pills are compact (commit 10) | What makes the lobby fit is the pills and the stretching grid, both commit 10. Found and fixed here: commit 8's parts split had let the grid's box shrink below its minimum, so the photos overlapped No and Yes on small phones; the grid keeps its minimum again. |
+| Commit 9: the layout test | Three phones (360 x 640, 375 x 667, 393 x 852) and 13 bots in one game, instead of one phone resized | The reveal lasts 3.5 s, too short to check three sizes one after another reliably; three phones also see each screen at the same moment. No clock and "Host taps" keep the other screens still. |
+| Commit 9: the cards | `DENSITIES` in `views/game.js`: up to 4 two columns (as before), 5 to 9 three, 10 to 16 four compact (48 px, border 2 px); below 7.5rem a card stacks avatar and name, the ✓/✗ moves to the card's top corner | Measured with 16 players: the photo keeps 242 px on 360 x 640 (38 %), 269 px on 375 x 667, the same size on the guess and the reveal. |
+| Commit 9: "who has answered" | 24 px avatars, 4 px gap, two rows for 16 on phones (16 in one row need 444 px; the plan's "one row on most phones" was wrong); waiting is a dashed grey ring on the card colour | Grey dashed against the players' colours reads as "not yet" at 24 px; dashed in the player's colour was too close to solid. |
+| Commit 9: the reaction buttons | Each button is a fifth of the row and the whole fifth is the tap target (the round emoji inside) | Five whole buttons on every phone, a bigger target, and the arrow lands on whole buttons by snapping. |
+| Commit 9: confetti at the edge | `#app` clips sideways overflow (`overflow-x: clip`) | In four columns the right card's confetti flies about 40 px past the screen and would let the page scroll sideways; clipping at the root keeps every screen still. iOS 15 ignores `clip` and behaves as before. |
+| Commit 9: the safe area | Checked in the iPhone 17 simulator: the bottom button now sits right above the home indicator, the top bar right under the status bar | `max()` with `env()` works in the apps' web view. |

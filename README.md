@@ -71,7 +71,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. `scripts/helpers/listing.mjs` is the one reader: the iOS upload, the image scripts and the preview (`./scripts/dev.sh store`) all use it, so the preview shows what both stores get. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
-| `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin). |
+| `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin and light bots that fill a table of 16). |
 
 **A game's life.** A new player accepts the terms once (16+, only photos everyone in them
 would be okay with). "Create game", pick Classic or Tricky (or tune the settings), "Start
