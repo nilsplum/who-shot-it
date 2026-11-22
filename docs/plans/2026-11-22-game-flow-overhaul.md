@@ -412,7 +412,7 @@ Status: done.
   on another phone).
 
 ### Commit 7: play again, 24 hour codes, the code remembered
-Status: open.
+Status: done.
 
 - `rules.js`: `endGame` saves `room.final` (each player's id, name, avatar, score, plus
   the stats). `again` from anyone: in `end`, `toLobby` and mark every other player
@@ -550,3 +550,7 @@ Status: open.
 | Commit 6: renewal limit | The room ignores a renewal less than 500 ms after the last one from the same socket | Renewals come once a second; anything faster is waste, and every renewal is broadcast. |
 | Commit 6: the timer while paused | The view says `paused`, and the apps stop counting down | Otherwise the bar would keep shrinking on the phones while the room's clock stands still. |
 | Commit 6: "Next ›" on the reveal | Gone; the host's "Next" lives on the board in "Host taps" mode | The reveal is 3.5 s; one waiting point is enough. |
+| Commit 7: the end screen's data | One field `final` (the last game's players with their scores, the fastest guess, the best fooler) for the `end` phase and for whoever is still on the results; the old `stats` goes | One source for the same screen in both situations. |
+| Commit 7: "Waiting on" | Shown whether or not this player is ready, without this player's own name, and without an ellipsis | Operator's words; listing yourself while choosing photos would be odd. |
+| Commit 7: forgetting the code | The remembered code is cleared when the room is gone or this player was removed | A dead or closed code in the field would only lead to an error. |
+| Commit 7: who hosts after a room was empty | The first player back | Same rule as for a new room. |

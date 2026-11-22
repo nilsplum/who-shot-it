@@ -14,6 +14,12 @@
  *   is stable, so no state can wait for a timer that already passed. Consequently
  *   `nextWake` never returns a time in the past for a room `apply` returned.
  * - Host-only events (settings, resolve, next, kick) are ignored from anyone else.
+ * - "Play again" (`again`) is anyone's and idempotent: the first one on the end screen
+ *   opens a new game under the same code (the lobby) and keeps the final standings
+ *   (`final`) for everyone else, who stay on their results (`onResults`) until they tap it
+ *   too (they join) or leave; the new game waits for them like for anyone not ready.
+ * - A room is never closed by its players leaving: an empty room goes back to an empty
+ *   lobby (no host, no game) and keeps its code until it idles out (TIMING.roomIdleMs).
  * - "Show again" (`peek`) holds expire by themselves (`peeks`, TIMING.peekHoldMs after the
  *   last renewal), and while any is active the board's clock stands still (`paused` keeps
  *   the remaining time), so a lost connection can never stop a game.
@@ -21,9 +27,10 @@
  *   app store and EU content rules ask for a report and a block mechanism; the host's
  *   "Remove" is the block, and a removed player's key cannot rejoin the room).
  * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
- *   lobby. The reveal is always timed; the board (the leaderboard between the photos) is
- *   timed when "Next round" is automatic and waits for the host's "Next" otherwise. A
- *   countdown falls back to the lobby whenever "everyone is ready" stops being true.
+ *   lobby ("Play again"). The reveal is always timed; the board (the leaderboard between
+ *   the photos) is timed when "Next round" is automatic and waits for the host's "Next"
+ *   otherwise. A countdown falls back to the lobby whenever "everyone is ready" stops
+ *   being true.
  */
 
 import { EFFECTS, LIMITS, TIMING, normalizeSetting } from '../../web/shared/config.js';
@@ -171,6 +178,12 @@ function nextRound(room, now, rng) {
 function endGame(room) {
   room.phase = 'end';
   room.deadline = null;
+  // The final standings outlive the game: whoever is still on the end screen after
+  // someone opened the next game keeps seeing them.
+  room.final = {
+    players: room.players.map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, score: p.score })),
+    stats: room.game ? room.game.stats : { fastest: null, fooled: {} },
+  };
 }
 
 /**
@@ -214,7 +227,6 @@ const HANDLERS = {
     if (room.players.length >= LIMITS.maxPlayers) return;
     const id = makeId(rng);
     room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now }));
-    room.hadPlayers = true;
     if (!room.hostId) room.hostId = id;
   },
 
@@ -304,8 +316,14 @@ const HANDLERS = {
     }
   },
 
+  /** "Play again": opens the next game for everyone, or joins it when it is open already. */
   again(room, { playerId }, now) {
-    if (isHost(room, playerId) && room.phase === 'end') toLobby(room, now);
+    const p = playerById(room, playerId);
+    if (!p) return;
+    if (room.phase === 'end') {
+      toLobby(room, now);
+      for (const q of room.players) q.onResults = q.id !== p.id;
+    } else if (inLobby(room)) p.onResults = false;
   },
 
   /**
@@ -402,16 +420,19 @@ function settle(room, now, rng) {
       if (!p.connected && p.goneAt !== null && now >= p.goneAt + TIMING.lobbyDropMs) removePlayer(room, p.id, now, rng);
     }
   }
-  // The last player is gone: the room and everything in it is deleted. A new room that
-  // nobody has joined yet stays until it idles out.
-  if (room.hadPlayers && room.players.length === 0) {
-    room.closed = true;
-    return;
+  // The last player is gone: an empty lobby keeps the code for whoever comes back with it.
+  if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final)) {
+    toLobby(room, now);
+    room.hostId = null;
+    room.final = null;
   }
+  // The final standings go once nobody looks at them any more.
+  if (room.final && room.phase !== 'end' && !room.players.some((p) => p.onResults)) room.final = null;
 
   // The host role: always held by a player, handed on in join order when the host leaves.
-  // During a game (and on the end screen) the host is needed for "Next" and "Play again",
-  // so an offline host also hands over after a short grace while someone else is here. In
+  // During a game (and on the end screen) the host is needed for "Next" (and the settings
+  // of the next game), so an offline host also hands over after a short grace while
+  // someone else is here. In
   // the lobby the host keeps the role until dropped, so a short trip to the phone's
   // settings (photo access) never costs it.
   const host = playerById(room, room.hostId);

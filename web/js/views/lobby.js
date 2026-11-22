@@ -94,13 +94,16 @@ function mine({ view, session }) {
   return '<div class="pick"><div class="spin"></div></div>';
 }
 
+/**
+ * The quiet line at the bottom: who the game is waiting on (not ready, still on the last
+ * game's results, or offline), whether or not this player is ready already.
+ */
 function status({ view }) {
-  if (!view.me.ready) return '';
   const ps = view.players;
   if (ps.length < 2) return '<div class="status">Waiting for friends…</div>';
-  const waiting = ps.filter((p) => !p.ready || !p.connected);
-  if (waiting.length) return `<div class="status">Waiting for ${waiting.map((p) => esc(p.name)).join(', ')}…</div>`;
-  if (!ps.some((p) => p.photoCount > 0)) return '<div class="status">Someone needs photos.</div>';
+  const waiting = ps.filter((p) => p.id !== view.me.id && (!p.ready || !p.connected));
+  if (waiting.length) return `<div class="status quiet">Waiting on ${waiting.map((p) => esc(p.name)).join(', ')}</div>`;
+  if (view.me.ready && !ps.some((p) => p.photoCount > 0)) return '<div class="status">Someone needs photos.</div>';
   return '';
 }
 

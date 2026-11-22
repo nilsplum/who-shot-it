@@ -15,13 +15,15 @@
  *   state no longer references, the Durable Object deletes (`referencedPhotoIds`).
  * - `banned` holds the keys of players the host removed, so they cannot rejoin this
  *   room; like every key it never leaves the server.
+ * - `final` (the last game's standings) exists only while someone is on the end screen.
  *
  * Room shape:
- *   { code, createdAt, touchedAt, closed, hadPlayers, hostId, settings, phase, deadline,
- *     players: [Player], banned: [key], game: Game | null }
+ *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline,
+ *     players: [Player], banned: [key], game: Game | null, final: Final | null }
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, photos: [id],
- *             score, streak }
+ *             score, streak, onResults }   (onResults: still on the last game's end screen)
+ *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: [id], shownAt,
  *             results: { [id]: { pick, points } } | null,
@@ -55,7 +57,6 @@ export function newRoom(code, now, settings) {
     createdAt: now,
     touchedAt: now,
     closed: false,
-    hadPlayers: false,
     hostId: null,
     settings: normalizeSettings(settings),
     phase: 'lobby',
@@ -63,6 +64,7 @@ export function newRoom(code, now, settings) {
     players: [],
     banned: [],
     game: null,
+    final: null,
   };
 }
 
@@ -79,6 +81,7 @@ export function newPlayer({ id, key, name, avatar, now }) {
     photos: [],
     score: 0,
     streak: 0,
+    onResults: false,
   };
 }
 

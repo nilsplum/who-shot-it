@@ -1,9 +1,10 @@
 /**
  * The start screen: name, avatar, create a game or join one.
  *
- * Mechanisms: shown in the app while the player is in no game. Opened through an invite
- * link (`phone.onInvite`), it becomes a one-tap join screen for that code, with creating
- * a new game as a small link below. "Create game" leads to the "New game" step
+ * Mechanisms: shown in the app while the player is in no game. The code field holds the
+ * last game's code (`device.lastRoom`), so the same group is one tap away. Opened through
+ * an invite link (`phone.onInvite`), it becomes a one-tap join screen for that code, with
+ * creating a new game as a small link below. "Create game" leads to the "New game" step
  * (`views/newgame.js`). Actions (`data-act`) are handled in `main.js`.
  */
 
@@ -19,7 +20,7 @@ export function homeScreen({ device, session }) {
   const actions = invite
     ? `<button class="btn main" data-act="join">Join ${esc(invite)}</button>`
     : `<button class="btn main" data-act="create">Create game</button>
-       <div class="joinrow"><input type="text" id="code" maxlength="${LIMITS.codeLength}" placeholder="CODE" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="go" aria-label="Game code"><button class="btn join" data-act="join">Join</button></div>`;
+       <div class="joinrow"><input type="text" id="code" maxlength="${LIMITS.codeLength}" placeholder="CODE" value="${esc(device.lastRoom || '')}" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="go" aria-label="Game code"><button class="btn join" data-act="join">Join</button></div>`;
   return {
     key: `home|${invite || ''}`,
     layout: `<div class="wrap">

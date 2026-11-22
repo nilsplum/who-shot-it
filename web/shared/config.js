@@ -54,7 +54,7 @@ export const SERVER = {
  * for a change players must agree to again. `minAge` is also the age set in both stores.
  */
 export const LEGAL = {
-  version: '2026-11-21',
+  version: '2026-11-22',
   minAge: 16,
 };
 
@@ -206,8 +206,12 @@ export const TIMING = {
   hostGraceMs: 8000,
   /** A player offline this long in the lobby is removed, so the others can start. */
   lobbyDropMs: 60000,
-  /** A room with no activity for this long is deleted with everything in it. */
-  roomIdleMs: 2 * 60 * 60 * 1000,
+  /**
+   * A room with no activity for this long is deleted with everything in it. Until then its
+   * code keeps working, even when everyone left, so the same group can play again the next
+   * morning (the privacy policy promises this upper limit).
+   */
+  roomIdleMs: 24 * 60 * 60 * 1000,
   /** Apps ping this often; the room answers without waking up. */
   pingMs: 15000,
   /** A socket without a ping for this long is treated as gone. */

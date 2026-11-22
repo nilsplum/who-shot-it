@@ -99,8 +99,9 @@ function screen() {
   if (!session.code) return session.setup ? newGameScreen(context()) : homeScreen(context());
   if (session.conn === 'replaced') return awayScreen;
   if (!v || !v.me) return joiningScreen;
+  // The end screen also for whoever is still on their results while the next game fills.
+  if (v.phase === 'end' || v.me.onResults) return endScreen(context(), REACTIONS);
   if (inLobby(v)) return lobbyScreen(context());
-  if (v.phase === 'end') return endScreen(context(), REACTIONS);
   if (v.phase === 'board') return boardScreen(context(), { reactions: REACTIONS });
   const photo = images.get(v.round.photo);
   return gameScreen(context(), { picked: myPick(v), late: isLate(v), loaded: Boolean(photo && photo.state === 'ok'), reactions: REACTIONS });
@@ -196,17 +197,20 @@ function openSocket(code) {
 function enterRoom(code) {
   Object.assign(session, { code, invite: null, setup: false, view: null, conn: 'connecting', sheet: null });
   device.room = code;
+  device.lastRoom = code;
   saveDevice();
   openSocket(code);
   keepAwake(true);
   render();
 }
 
-function exitRoom(message) {
+/** Back to the start screen; `forget` also clears the remembered code (that game is gone or closed to us). */
+function exitRoom(message, { forget = false } = {}) {
   if (socket) socket.end();
   socket = null;
   Object.assign(session, { code: null, view: null, sheet: null, pick: null, conn: 'connecting', shownAt: {} });
   device.room = null;
+  if (forget) device.lastRoom = null;
   saveDevice();
   resetPhotos();
   keepAwake(false);
@@ -233,8 +237,8 @@ function onEnd(code) {
     session.conn = 'replaced';
     render();
   } else if (code === CLOSE.full) exitRoom('This game is full.');
-  else if (code === CLOSE.removed) exitRoom('The host removed you from this game.');
-  else if (code === CLOSE.gone) exitRoom(session.view ? 'This game is over.' : 'No game with this code.');
+  else if (code === CLOSE.removed) exitRoom('The host removed you from this game.', { forget: true });
+  else if (code === CLOSE.gone) exitRoom(session.view ? 'This game is over.' : 'No game with this code.', { forget: true });
 }
 
 /** Preloads the photo on screen and the next one; acknowledges the current one once. */
@@ -305,7 +309,7 @@ function photoSettings(v) {
 /** Deals a fresh set when the lobby needs one and the app may read photos. */
 function dealIfNeeded() {
   const v = session.view;
-  if (!v || !v.me || !inLobby(v) || v.me.ready || session.uploading) return;
+  if (!v || !v.me || !inLobby(v) || v.me.ready || v.me.onResults || session.uploading) return;
   if (session.access === null) {
     checkAccess();
     return;

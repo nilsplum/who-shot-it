@@ -301,11 +301,23 @@ describe('the end and again', () => {
     }
     expect(d.room.phase).toBe('end');
     expect(referencedPhotoIds(d.room)).toEqual([]);
+    expect(d.room.final.players.map((p) => p.score)).toEqual(d.room.players.map((p) => p.score));
+    // Anyone opens the next game; the others stay on their results until they tap too.
     d.by('Ben', 'again');
-    expect(d.room.phase).toBe('end');
-    d.by('Ann', 'again');
     expect(d.room).toMatchObject({ phase: 'lobby', game: null });
     expect(d.room.players.every((p) => p.score === 0 && !p.ready)).toBe(true);
+    expect(d.room.players.map((p) => [p.name, p.onResults])).toEqual([['Ann', true], ['Ben', false]]);
+    expect(d.room.final).toBeTruthy();
+    d.by('Ben', 'again');
+    expect(d.room.players.map((p) => p.onResults)).toEqual([true, false]);
+    // The next game waits for whoever is still on the results.
+    d.by('Ben', 'ready', { photos: ['b9'] });
+    expect(d.room.phase).toBe('lobby');
+    d.by('Ann', 'again');
+    expect(d.room.players.every((p) => !p.onResults)).toBe(true);
+    expect(d.room.final).toBeNull();
+    d.by('Ann', 'ready', { photos: [] });
+    expect(d.room.phase).toBe('countdown');
   });
 });
 
@@ -341,12 +353,15 @@ describe('leaving and connections', () => {
     expect(game.room.players).toHaveLength(3);
   });
 
-  test('a game with fewer than two players left ends; an empty room closes', () => {
+  test('a game with fewer than two players left ends; an empty room keeps its code as an empty lobby', () => {
     const d = started(['Ann', 'Ben']);
     d.by('Ben', 'leave');
     expect(d.room.phase).toBe('end');
     d.by('Ann', 'leave');
-    expect(d.room.closed).toBe(true);
+    expect(d.room).toMatchObject({ closed: false, phase: 'lobby', hostId: null, game: null, final: null, players: [] });
+    // The next morning: the same code, a fresh lobby, the first one back hosts.
+    d.wait(TIMING.roomIdleMs - 1000).do('join', { key: 'key-Ann-0000000000', name: 'Ann', avatar: '🦊' });
+    expect(d.room).toMatchObject({ closed: false, phase: 'lobby', hostId: idOf(d.room, 'Ann') });
   });
 
   test('a room with no activity closes after the idle time', () => {

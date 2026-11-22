@@ -49,16 +49,20 @@ function roundView(room, playerId) {
   };
 }
 
-/** Fastest right guess and best fooler (most wrong guesses on their photos) of the game. */
-function statsView(room) {
-  const { fastest, fooled } = room.game.stats;
+/**
+ * The last game's end screen: its players with their final scores, the fastest right
+ * guess and the best fooler (most wrong guesses on their photos).
+ */
+function finalView(final) {
+  const { fastest, fooled } = final.stats;
   let fooler = null;
-  for (const p of room.players) {
+  for (const p of final.players) {
     const count = fooled[p.id] || 0;
     if (count > 0 && (!fooler || count > fooler.count)) fooler = { id: p.id, count };
   }
   return {
-    fastest: fastest && playerById(room, fastest.id) ? { id: fastest.id, ms: fastest.ms } : null,
+    players: final.players.map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, score: p.score })),
+    fastest: fastest && final.players.some((p) => p.id === fastest.id) ? { id: fastest.id, ms: fastest.ms } : null,
     fooler,
   };
 }
@@ -70,13 +74,13 @@ export function viewFor(room, playerId, now) {
     phase: room.phase,
     hostId: room.hostId,
     settings: room.settings,
-    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length } : null,
+    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length, onResults: me.onResults } : null,
     players: room.players.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
     })),
     left: msLeft(room, now),
     paused: Boolean(room.game && room.phase === 'board' && room.game.paused !== null),
     round: inGame(room) ? roundView(room, playerId) : null,
-    stats: room.phase === 'end' && room.game ? statsView(room) : null,
+    final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };
 }

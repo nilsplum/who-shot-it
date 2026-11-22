@@ -136,6 +136,7 @@ button.chip { border: 0; color: inherit; }
 .pick + .btn { margin-top: 10px; }
 .status { text-align: center; color: var(--mut); margin-top: 16px; font-size: 15px; }
 .status b { color: var(--g); }
+.status.quiet { font-size: 13px; margin-top: 10px; }
 
 /* Sheets */
 .dim { position: fixed; inset: 0; background: var(--dim); z-index: 40; animation: fade .2s; }

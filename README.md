@@ -77,18 +77,22 @@ game": a 4-letter code (no look-alike letters). Friends join with the code, a sh
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
 lobby → 3-2-1 once everyone (at least two) is ready → per round *load* (everyone has the
-photo) → *show* → *reveal* → *end* → "Play again". Apps get a full snapshot after every
-change, with the photo's owner hidden until the reveal.
+photo) → *show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo
+to everyone and stops the clock) → *end*. "Play again" is anyone's: the first tap opens the
+next game under the same code, the others join it when they are done looking at the
+results. Apps get a full snapshot after every change, with the photo's owner hidden until
+the reveal.
 
 **Photos.** With the player's permission, the app picks n random photos on the phone and
 shows small previews; a few sets wait ready, so No shows others at once. The host's "Which
 photos" decides what may come up: all, little text (default: photos with 6 or more lines of
 text, like chats and emails, stay out) or no screenshots either; the check runs on the
 phone. Yes uploads exactly the photos shown, shrunk to at most 1080 px JPEG without
-location data. A photo is deleted right after its round, and also when reported, on
-"Change", "Leave", removal, a new photo count, the game's end and when the room closes (last
-player gone, or 2 hours without activity). Photo links work only for the current and next
-round.
+location data. A photo is deleted right after its round (its reveal and leaderboard), and
+also when reported, on "Change", "Leave", removal, a new photo count and at the game's end.
+A room keeps its code for 24 hours after its last activity, even when everyone left, so the
+same group can play again the next day; then it is deleted. Photo links work only for the
+current and next round.
 
 **Keeping it friendly.** Anyone can report the photo on screen (⚑): it is deleted for
 everyone at once. The host can remove a player, who cannot rejoin that game. Nicknames with

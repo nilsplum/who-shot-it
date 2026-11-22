@@ -3,7 +3,8 @@
  * the terms, the "New game" step with a preset and the settings "?", joining by code,
  * the host removing a player, the photos dealt with "Play with these?", reload, the
  * automatic start, a reported photo, five rounds with their leaderboards (and "Show
- * again" held on one phone, seen on another), the end and "Play again". Then "Which
+ * again" held on one phone, seen on another), the end, "Play again" from a guest while the
+ * others still look at their results, and leaving with the code remembered. Then "Which
  * photos" on a phone with screenshots and a chat full of text. Plus the website (the same
  * page in a plain browser): invite page and legal page.
  */
@@ -107,12 +108,20 @@ test('friends play a full game and start another one', async ({ browser }) => {
   }
 
   for (const page of everyone) await expect(page.locator('.podium .pod')).toHaveCount(3);
-  await expect(guests[0].getByRole('button', { name: 'Play again' })).toHaveCount(0);
+  // Play again is everyone's: a guest opens the next game, the others keep their results
+  // until they join it, and the lobby quietly says who it is waiting on.
+  await guests[0].getByRole('button', { name: 'Play again' }).click();
+  await expect(guests[0].locator('.q')).toHaveText('Play with these?');
+  await expect(guests[0].locator('.grid .tile[style]')).toHaveCount(4);
+  await expect(host.locator('.podium .pod')).toHaveCount(3);
+  await expect(guests[0].locator('.status')).toHaveText('Waiting on Ann, Cleo');
   await host.getByRole('button', { name: 'Play again' }).click();
-  for (const page of everyone) {
-    await expect(page.locator('.q')).toHaveText('Play with these?');
-    await expect(page.locator('.grid .tile[style]')).toHaveCount(4);
-  }
+  await expect(host.locator('.q')).toHaveText('Play with these?');
+  await expect(guests[0].locator('.status')).toHaveText('Waiting on Ann, Cleo');
+  // Leaving from the results: the start screen already holds the code.
+  await guests[1].getByRole('button', { name: 'Leave' }).click();
+  await expect(guests[1].locator('#code')).toHaveValue(code);
+  await expect(guests[0].locator('.status')).toHaveText('Waiting on Ann');
 });
 
 test('"Which photos" leaves out photos full of text, and screenshots if asked', async ({ browser }) => {

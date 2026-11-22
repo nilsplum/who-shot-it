@@ -1,21 +1,25 @@
 /**
  * The end screen: podium, fastest right guess, best fooler, the rest of the ranking,
- * reactions and (for the host) "Play again".
+ * reactions and "Play again" for everyone.
  *
- * Mechanisms: shown in the `end` phase. "Play again" returns everyone to the lobby,
- * where each player gets a fresh random set of photos (`main.js`, `photos.spent`).
- * All photos of the game are already deleted on the server at this point.
+ * Mechanisms: shown in the `end` phase, and to every player still on their results after
+ * someone else opened the next game (`me.onResults`); it draws from the room's final
+ * standings (`view.final`), so it stays the same while the next game fills. "Play again"
+ * opens the next game under the same code, or joins it when it is open already; there each
+ * player gets a fresh random set of photos (`main.js`, `photos.spent`). `data-next` marks
+ * that the next game is open (on the button, for the demo players and the tests; nothing visible). All
+ * photos of the game are already deleted on the server at this point.
  */
 
 import { avatar, esc, reactionsRow } from '../ui.js';
 
 export function endScreen({ view }, reactions) {
-  const host = view.hostId === view.me.id;
-  const ranked = view.players.slice().sort((a, b) => b.score - a.score);
+  const final = view.final || { players: [], fastest: null, fooler: null };
+  const ranked = final.players.slice().sort((a, b) => b.score - a.score);
   const top = ranked.slice(0, 3);
   const podium = [[top[1], 'p2', 2], [top[0], 'p1', 1], [top[2], 'p3', 3]].filter(([p]) => p);
-  const name = (id) => esc((view.players.find((p) => p.id === id) || {}).name || '');
-  const { fastest, fooler } = view.stats || {};
+  const name = (id) => esc((final.players.find((p) => p.id === id) || {}).name || '');
+  const { fastest, fooler } = final;
   const facts = [
     fastest ? `⚡ ${name(fastest.id)}: ${(fastest.ms / 1000).toFixed(1)} s` : '',
     fooler ? `🎭 ${name(fooler.id)}: fooled ${fooler.count}×` : '',
@@ -35,7 +39,7 @@ export function endScreen({ view }, reactions) {
     </div>`,
     parts: {
       body,
-      again: host ? '<button class="btn main" data-act="again">Play again</button>' : '',
+      again: `<button class="btn main" data-act="again"${view.phase === 'end' ? '' : ' data-next="1"'}>Play again</button>`,
     },
   };
 }

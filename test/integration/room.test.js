@@ -210,11 +210,15 @@ describe('a full game', () => {
       }
     }
     const end = await ann.until((v) => v.phase === 'end');
-    expect(end.stats).toBeTruthy();
+    expect(end.final.players).toHaveLength(2);
     expect(await countRows(code, 'photos')).toBe(0);
 
+    // Play again: Ann opens the next game, Ben keeps his results until he joins it.
     ann.send({ type: 'again' });
-    await ben.until((v) => v.phase === 'lobby' && !v.me.ready);
+    const waiting = await ben.until((v) => v.phase === 'lobby' && v.me.onResults);
+    expect(waiting.final.players).toHaveLength(2);
+    ben.send({ type: 'again' });
+    await ben.until((v) => v.phase === 'lobby' && !v.me.onResults && !v.final);
   });
 
   test('the alarm runs the timers: answer time and automatic next round', async () => {
@@ -264,7 +268,7 @@ describe('reactions', () => {
 });
 
 describe('leaving and closing', () => {
-  test('leaving deletes the player\'s photos; the last one out deletes the room', async () => {
+  test('leaving deletes the player\'s photos; the last one out leaves the code open for coming back', async () => {
     const code = await createRoom();
     const ann = await connect(code, 'Ann');
     const ben = await connect(code, 'Ben');
@@ -278,7 +282,9 @@ describe('leaving and closing', () => {
     ann.send({ type: 'leave' });
     await ann.closedWith();
     const again = await connect(code, 'Ann');
-    expect(await again.closedWith()).toBe(CLOSE.gone);
+    const view = await again.until((v) => v.me);
+    expect(view).toMatchObject({ phase: 'lobby', hostId: view.me.id });
+    expect(view.players).toHaveLength(1);
   });
 
   test('a room nobody uses is deleted after the idle time', async () => {

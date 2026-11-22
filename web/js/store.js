@@ -8,8 +8,9 @@
  * Invariants:
  * - Local storage holds only what the game needs on this phone (privacy policy, "On
  *   your phone"): name, avatar, the settings for the next game, which version of the
- *   terms was accepted, and the current game with its player key (so the app lands back
- *   in the game after it was closed). Nothing else; storage that fails is ignored,
+ *   terms was accepted, the current game with its player key (so the app lands back in
+ *   the game after it was closed), and the code of the last game (it fills the code field,
+ *   so joining the same group again is one tap). Nothing else; storage that fails is ignored,
  *   everything still works while the app runs, it is just not remembered.
  * - The player key is this phone's secret identity in one game (`keyFor`): made with the
  *   crypto random source when the phone joins a game, kept for that game only (also
@@ -43,6 +44,8 @@ export const device = {
   agreed: typeof saved.agreed === 'string' ? saved.agreed : null,
   /** The game this phone is in, or null. */
   room: isRoomCode(saved.room) ? saved.room : null,
+  /** The code of the last game this phone was in (kept after leaving), or null. */
+  lastRoom: isRoomCode(saved.lastRoom) ? saved.lastRoom : null,
   /** The player key, and the game it belongs to. */
   key: isKey(saved.key) && isRoomCode(saved.keyRoom) ? saved.key : null,
   keyRoom: isKey(saved.key) && isRoomCode(saved.keyRoom) ? saved.keyRoom : null,
