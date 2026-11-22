@@ -94,7 +94,7 @@ async function takeScreens(browser, library) {
   const everyone = [host, ...guests];
   for (const page of everyone) {
     await page.getByRole('button', { name: 'Continue' }).click();
-    await page.locator('.grid div[style]').nth(4).waitFor();
+    await page.locator('.grid .tile[style]').nth(4).waitFor();
   }
   await snap(host, 'photos');
   for (const page of everyone) await page.getByRole('button', { name: 'Yes' }).click();

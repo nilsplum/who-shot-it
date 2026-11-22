@@ -9,6 +9,11 @@
  * (server rule `canStart`); the 3-2-1 is an overlay (`views/overlays.js`). Tapping the
  * code opens the invite sheet, tapping the settings summary opens the settings sheet
  * (read-only for everyone but the host), and the host taps a player to remove them.
+ *
+ * The photos: a square grid (2 x 2 to 5 x 5, by "Photos per player") as big as the room
+ * between the players and the buttons allows. Tapping a photo swaps it (`photos.swap`,
+ * counted under the grid), holding one shows it big (`main.js`, hold to look); a refused
+ * swap shows a cross on that photo, nothing else.
  */
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
@@ -25,12 +30,26 @@ export function settingsSummary(s) {
   return [`${s.photos} photos`, s.rounds ? `${s.rounds} rounds` : '', s.time ? `${s.time} s` : '∞', label('mode', s.mode)].filter(Boolean).join(' · ');
 }
 
-function grid(tiles) {
-  return `<div class="grid n${tiles.length}">${tiles.join('')}</div>`;
+/** The photos as a square grid of `size` places (the setting), in a box that fills the free space. */
+function grid(tiles, size) {
+  return `<div class="gridbox"><div class="grid" style="--cols:${Math.ceil(Math.sqrt(size))}">${tiles.join('')}</div></div>`;
 }
 
-function chosenTiles() {
-  return photos.chosen.map((c) => (c.url ? `<div style="background-image:url('${c.url}')"></div>` : '<div class="ld"></div>'));
+/** The set on screen as tiles: tap to swap (unless `fixed`), hold to see big. */
+function chosenTiles(fixed) {
+  return photos.chosen.map((c, i) => {
+    const cls = `tile ${c.anim || ''} ${c.refused ? 'no' : ''}`;
+    const look = `data-hold="tile" data-v="${i}" style="background-image:url('${c.url}')"`;
+    return fixed
+      ? `<div class="${cls}" ${look} role="img" aria-label="Photo ${i + 1}"></div>`
+      : `<button class="${cls}" data-act="swap" ${look} aria-label="Photo ${i + 1}: tap to swap it">${c.refused ? '<span class="x">✗</span>' : ''}</button>`;
+  });
+}
+
+/** How many swaps are left in this set, under the grid. */
+function swapsLine() {
+  const n = photos.swaps;
+  return `<div class="swaps" aria-label="${n} swaps left">↻ ${n ? `Tap a photo to swap it: ${n} left` : 'No swaps left'}</div>`;
 }
 
 const withoutPhotos = '<button class="link" data-act="guess">Play without photos</button>';
@@ -45,16 +64,16 @@ function mine({ view, session }) {
   if (me.ready) {
     // Without the local previews (the app was closed meanwhile), neutral tiles stand in.
     const tiles = photos.chosen.length === me.photoCount && photos.chosen.every((c) => c.url)
-      ? chosenTiles()
-      : Array.from({ length: me.photoCount }, () => '<div>📷</div>');
-    return `${me.photoCount ? grid(tiles) : ''}<div class="status"><b>✓ Ready</b></div><button class="link" data-act="unready">Change</button>`;
+      ? chosenTiles(true)
+      : Array.from({ length: me.photoCount }, () => '<div class="tile">📷</div>');
+    return `${me.photoCount ? grid(tiles, view.settings.photos) : ''}<div class="status"><b>✓ Ready</b></div><button class="link" data-act="unready">Change</button>`;
   }
   if (photos.chosen.length) {
     const busy = session.uploading;
     const limited = session.access === 'limited'
       ? '<button class="link" data-act="opensettings">Only some photos are shared. Share all ›</button>'
       : '';
-    return `<div class="q">Play with these?</div>${grid(chosenTiles())}
+    return `<div class="q">Play with these?</div>${grid(chosenTiles(false), view.settings.photos)}${swapsLine()}
       <div class="yn"><button class="btn" data-act="no" ${busy || photos.rolling ? 'disabled' : ''}>No</button><button class="btn yes ${busy ? 'busy' : ''}" data-act="yes" ${photos.rolling || busy ? 'disabled' : ''}>Yes</button></div>
       ${limited}${withoutPhotos}`;
   }
@@ -99,7 +118,7 @@ export function lobbyScreen(c) {
   const host = view.hostId === view.me.id;
   return {
     key: `lobby|${view.code}`,
-    layout: `<div class="wrap">
+    layout: `<div class="wrap fit">
       <div class="top"><button class="icon" data-act="leave" aria-label="Leave">✕</button><span></span><button class="icon qmark" data-act="help" aria-label="How to play">?</button></div>
       <button class="code" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span>${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>

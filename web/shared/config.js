@@ -169,6 +169,8 @@ export const LIMITS = {
   textLines: 6,
   /** How many sets of photos the app keeps ready beyond the one on screen, so "No" never waits. */
   setsAhead: 2,
+  /** How many single photos a player may swap in one set (tap a photo); a new set starts over. */
+  swapsPerSet: 3,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */
   photoMaxBytes: 1_500_000,
   /** Largest WebSocket message the room accepts from an app (all of them are tiny). */

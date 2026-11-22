@@ -39,8 +39,8 @@ import { APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, nor
 import { createRoom, serverUrl, uploadPhotos } from './api.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
-import { askPhotoAccess, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
-import { chosenBlobs, photos, resetPhotos, roll } from './photos.js';
+import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
+import { chosenBlobs, photos, resetPhotos, roll, swap } from './photos.js';
 import { createPainter } from './render.js';
 import { device, keyFor, saveDevice, session } from './store.js';
 import { floatEmoji, toast } from './ui.js';
@@ -440,6 +440,10 @@ const ACTIONS = {
     roll(size, filter, render);
   },
   yes: () => readyWith(chosenBlobs),
+  swap: (index) => {
+    if (session.uploading) return;
+    if (!swap(Number(index), render)) buzz('no');
+  },
   unready: () => send({ type: 'unready' }),
   answer: (id) => {
     const v = session.view;
@@ -494,29 +498,48 @@ function back() {
  * What a held finger does, by the element's `data-hold` (its `data-v` is passed on):
  * `{ delay, start(value), end() }`. `delay` 0 starts at once (a button made for holding);
  * a longer delay tells a hold apart from a tap: moving more than HOLD_SLOP px before it
- * cancels the hold (the page may scroll), and the tap's click after a hold is swallowed.
+ * cancels the hold (the page may scroll), and lifting the finger from the held element
+ * is not also a tap on it (its click is swallowed; taps elsewhere still count).
  */
-const HOLDS = {};
+const HOLDS = {
+  /** A photo of the choice in the lobby: the sharp upload version once it is there. */
+  tile: {
+    delay: 350,
+    start: (index) => {
+      const c = photos.chosen[Number(index)];
+      session.look = c ? c.fullUrl || c.url : null;
+    },
+    end: () => {
+      session.look = null;
+    },
+  },
+};
 const HOLD_SLOP = 10;
 let hold = null;
-let holdEndedAt = -Infinity;
+/** The element a hold just ended on (`data-hold` and `data-v`, as repaints replace nodes), and until when its click is swallowed. */
+let heldLast = null;
 
 function endHold() {
   if (!hold) return;
   clearTimeout(hold.timer);
   if (hold.started) {
     hold.kind.end();
-    holdEndedAt = performance.now();
+    heldLast = { name: hold.name, value: hold.value, until: performance.now() + 400 };
     render();
   }
   hold = null;
+}
+
+function isHeldClick(target) {
+  const el = target.closest('[data-hold]');
+  return Boolean(heldLast && el && performance.now() < heldLast.until && el.dataset.hold === heldLast.name && el.dataset.v === heldLast.value);
 }
 
 document.addEventListener('pointerdown', (e) => {
   const el = e.target.closest('[data-hold]');
   const kind = el && !el.disabled && HOLDS[el.dataset.hold];
   if (!kind || hold) return;
-  const current = { kind, value: el.dataset.v, x: e.clientX, y: e.clientY, started: false, timer: 0 };
+  const current = { kind, name: el.dataset.hold, value: el.dataset.v, x: e.clientX, y: e.clientY, started: false, timer: 0 };
   const begin = () => {
     if (hold !== current) return;
     current.started = true;
@@ -544,8 +567,8 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
-  // The click that ends a hold is not a tap.
-  if (performance.now() - holdEndedAt < 400) return;
+  // Lifting the finger from a held photo is not a tap on it.
+  if (isHeldClick(e.target)) return;
   const action = ACTIONS[el.dataset.act];
   if (action) action(el.dataset.v, el);
 });

@@ -328,7 +328,7 @@ Status: done.
 - Tests: none for haptics (native); the overlay is covered in commit 4's e2e test.
 
 ### Commit 4: choosing photos: square grid, swap one, hold to look
-Status: open.
+Status: done.
 
 - `lobby.js` and CSS: the grid gets `--cols` = `Math.ceil(Math.sqrt(size))`; it is a
   square sized to the free space (`.mine` takes the remaining height; the grid is
@@ -536,4 +536,7 @@ Status: open.
 | Commit 2: Custom card | Lives in the presets row and is highlighted when no preset matches | The three cards read as one choice; it replaces the old summary line, which the lobby still shows. |
 | Commit 3: the legal page's date | The Licences line names Haptics now; the date (and with it everyone's new consent) changes in commit 7 | The licence list is not something players agree to, and commit 7 changes the privacy text in the same release anyway. |
 | Commit 3: holds without features | The `HOLDS` table starts empty; commits 4 and 6 add the photo choice and Show again | The mechanism is one piece of code; each feature only adds its entry. |
-| Commit 3: the tap after a hold | Clicks within 400 ms after a hold ended are ignored; the timestamp starts at minus infinity | Lifting the finger after a long press would otherwise also count as a tap (a swap); starting at 0 swallowed every tap in the first 0.4 s after the page loaded (caught by the browser tests). |
+| Commit 3: the tap after a hold | Lifting the finger from a held element is not a tap on it; corrected in commit 4 to swallow only the click on that same element (matched by `data-hold` and `data-v`, since repaints replace nodes) | A global 400 ms window first swallowed every tap after page load, then the "No" tapped right after looking at a photo (both caught by the browser tests). |
+| Commit 4: sizing the square grid | The grid sits in a box that takes the free height (container query units, `min(100cqw, 100cqh)`); the lobby page gets the screen's exact height (`.wrap.fit`) | Container units need a container with a definite height; with only a minimum height they measure 0 (the tiles had no size). Content that does not fit still scrolls. On iOS 15 without container units the grid takes the full width. |
+| Commit 4: tiles as buttons | Each photo of the choice is a button (tap to swap, `data-hold` to look); the "Ready" grid uses plain tiles that can only be held | Buttons are reachable for screen readers and get the standard tap behaviour. |
+| Commit 4: refused swap | Also when the deck has no photo ready (a nearly empty library) | Same feedback for every "not possible", no new message. |

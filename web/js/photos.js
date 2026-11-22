@@ -12,6 +12,9 @@
  *   next set at once, and the deck refills in the background.
  * - The set on screen shows the previews. Its photos for upload (`phone.photo`) are
  *   prepared one by one right away, so "Yes" (`chosenBlobs`) usually uploads at once.
+ * - `swap` replaces one photo of the set with the next one from the deck, at most
+ *   LIMITS.swapsPerSet times per set; a refused swap marks the photo for a moment
+ *   (`refused`), the view shows a cross and `main.js` vibrates.
  *
  * Invariants:
  * - Nothing leaves the phone before "Yes": previews and photos are local Blobs. Only the
@@ -31,8 +34,14 @@ import { photo, randomPhotos } from './phone.js';
 import { grayOf, textLines } from './textcheck.js';
 
 export const photos = {
-  /** The set on screen: { id, url, full } per photo; `full` is the upload, once asked for. */
+  /**
+   * The set on screen, per photo: { id, url (the preview), full (the upload, a promise once
+   * asked for), fullUrl (the upload as a link, once it is there), anim ('in' | 'flip' while
+   * it is being dealt or swapped in), refused (a swap was just refused) }.
+   */
   chosen: [],
+  /** Swaps left in this set. */
+  swaps: 0,
   /** The set size and the "Which photos" value the current set and deck were made for. */
   size: 0,
   filter: null,
@@ -59,7 +68,34 @@ let filling = null;
 let wanted = 0;
 
 function release(set) {
-  set.forEach((c) => URL.revokeObjectURL(c.url));
+  for (const c of set) {
+    URL.revokeObjectURL(c.url);
+    if (c.fullUrl) URL.revokeObjectURL(c.fullUrl);
+  }
+}
+
+/** A photo of the set on screen, from a checked preview; `anim` is its entrance. */
+function slot(preview, anim) {
+  return { id: preview.id, url: URL.createObjectURL(preview.blob), full: null, fullUrl: null, anim, refused: false };
+}
+
+/** Clears a short-lived mark on a photo after its animation, then repaints. */
+function unmarkLater(c, key, ms, onChange) {
+  setTimeout(() => {
+    c[key] = key === 'anim' ? null : false;
+    onChange();
+  }, ms);
+}
+
+/** Asks the phone for one photo's upload, and keeps a link to it for holding it big. */
+function prepareOne(c) {
+  if (!c.full) {
+    c.full = photo(c.id).catch(() => null);
+    c.full.then((blob) => {
+      if (blob && photos.chosen.includes(c)) c.fullUrl = URL.createObjectURL(blob);
+    });
+  }
+  return c.full;
 }
 
 function dropDeck(filter) {
@@ -76,7 +112,7 @@ export function resetPhotos() {
   photos.chosen = [];
   dropDeck(null);
   seen = new Set();
-  Object.assign(photos, { size: 0, spent: false, rolling: false, empty: false });
+  Object.assign(photos, { size: 0, swaps: 0, spent: false, rolling: false, empty: false });
   photos.rollId += 1;
 }
 
@@ -153,8 +189,7 @@ function refill(target) {
 async function prepare(id) {
   for (const c of photos.chosen) {
     if (id !== photos.rollId) return;
-    if (!c.full) c.full = photo(c.id).catch(() => null);
-    await c.full;
+    await prepareOne(c);
   }
 }
 
@@ -184,12 +219,40 @@ export async function roll(size, filter, onChange) {
   const set = deck.splice(0, size);
   set.forEach((c) => seen.add(c.id));
   const old = photos.chosen;
-  photos.chosen = set.map((c) => ({ id: c.id, url: URL.createObjectURL(c.blob), full: null }));
+  photos.chosen = set.map((c) => slot(c, 'in'));
   release(old);
-  Object.assign(photos, { rolling: false, empty: set.length === 0 });
+  Object.assign(photos, { rolling: false, empty: set.length === 0, swaps: LIMITS.swapsPerSet });
+  photos.chosen.forEach((c) => unmarkLater(c, 'anim', 400, onChange));
   onChange();
   prepare(id);
   refill(size * LIMITS.setsAhead).catch(() => {});
+}
+
+/**
+ * Replaces photo `index` of the set on screen with the next one from the deck, at once.
+ * Returns false when it is refused (no swaps left, or no photo ready): the photo is then
+ * marked `refused` for a moment.
+ */
+export function swap(index, onChange) {
+  const old = photos.chosen[index];
+  if (!old || photos.rolling) return false;
+  if (photos.swaps <= 0 || !deck.length) {
+    old.refused = true;
+    unmarkLater(old, 'refused', 700, onChange);
+    onChange();
+    return false;
+  }
+  const next = deck.shift();
+  seen.add(next.id);
+  const c = slot(next, 'flip');
+  photos.chosen = photos.chosen.map((x, i) => (i === index ? c : x));
+  release([old]);
+  photos.swaps -= 1;
+  unmarkLater(c, 'anim', 400, onChange);
+  onChange();
+  prepareOne(c);
+  refill(photos.size * LIMITS.setsAhead).catch(() => {});
+  return true;
 }
 
 /**
@@ -198,8 +261,7 @@ export async function roll(size, filter, onChange) {
  */
 export async function chosenBlobs() {
   const set = photos.chosen;
-  set.forEach((c) => { if (!c.full) c.full = photo(c.id).catch(() => null); });
-  const blobs = (await Promise.all(set.map((c) => c.full))).filter(Boolean);
+  const blobs = (await Promise.all(set.map(prepareOne))).filter(Boolean);
   if (set.length && !blobs.length) throw new Error('unreadable');
   return blobs;
 }
