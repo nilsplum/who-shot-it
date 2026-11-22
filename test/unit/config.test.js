@@ -23,7 +23,7 @@ import iosProject from '../../ios/App/App.xcodeproj/project.pbxproj?raw';
 
 /** Every text file of the repo that people write (the built stylesheet web/css/app.css is not one). */
 const texts = import.meta.glob([
-  '../../web/**/*.{js,mjs,html,css,svg}', '!../../web/css/**', '../../styles/**/*.css', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.md', '../../*.md', '../../scripts/**/*.{sh,mjs}',
+  '../../web/**/*.{js,mjs,html,css,svg}', '!../../web/css/**', '../../styles/**/*.css', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.js', '../../*.md', '../../scripts/**/*.{sh,mjs}',
   '../../android/app/src/main/java/**/*.java', '../../android/app/src/main/AndroidManifest.xml', '../../android/app/build.gradle',
   '../../ios/App/App/*.swift', '../../ios/App/App/Info.plist', '../../ios/App/App/PrivacyInfo.xcprivacy',
 ], { query: '?raw', import: 'default', eager: true });

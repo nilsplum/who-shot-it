@@ -1,8 +1,10 @@
 /**
- * Draws the store screenshots into `store/images/app-store/` and `store/images/google-play/`:
- * each one a short headline, one plain sentence and the matching app screen in a phone
- * frame, in the order a new player needs to understand the game (store/listing.md). Run by
- * `./scripts/release-apps.sh --store-images` when the app's look changes; uploaded by hand.
+ * Draws the store screenshots into the files `listing.mjs` names (IMAGES, in `store/images/`:
+ * `ios_screenshot-*` and `android_screenshot-*`, at each store's size): each one a short
+ * headline, one plain sentence and the matching app screen in a phone frame. The captions
+ * and their order are the listing's (`screenshots` in store/android_ios_listing.js). Run by
+ * `./scripts/release-apps.sh --store-images` when the app's look or a caption changes; the
+ * iPhone's are uploaded by `app-store.mjs`, the Android's by hand.
  *
  * The app screens are real: three phones play a game against a local server (its own
  * `wrangler dev` on a free port), using the end-to-end tests' fake photo plugin
@@ -17,30 +19,18 @@ import { chromium } from '@playwright/test';
 import { installFakePhone } from '../../test/e2e/fake-phone.js';
 import { colour } from './colours.mjs';
 import { drawLibrary } from './demo-photos.mjs';
+import { IMAGES, LISTINGS } from './listing.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
-const OUT = path.join(ROOT, 'store', 'images');
 const PORT = 8797;
 const BASE = `http://localhost:${PORT}`;
 
-/**
- * The captions, in order: what the game is, where the photos come from, the fun part,
- * the options, and the answer to "who sees my photos?". Short, plain, no dashes.
- */
-const SLIDES = [
-  { screen: 'guess', title: 'Whose photo is it?', text: 'Random photos from everyone’s phone. Tap who took it.' },
-  { screen: 'photos', title: 'Bring your photos', text: 'The app picks a few at random. Tap No for new ones, Yes when you like them.' },
-  { screen: 'board', title: 'Fast and right wins', text: 'See who guessed what. Then laugh about it.' },
-  { screen: 'newgame', title: 'Play it your way', text: 'Classic, or photos that start blurry, zoomed in or pixelated.' },
-  { screen: 'yours', title: 'Your photos stay yours', text: 'Nothing is shared until you tap Yes. Each photo is deleted after its round.' },
-];
-
-/** The stores' sizes: App Store 6.9 inch iPhone (1290 x 2796), Google Play phone (1080 x 2160). */
-const STORES = [
-  { dir: 'app-store', width: 430, height: 932 },
-  { dir: 'google-play', width: 360, height: 720 },
-];
+/** Every image is laid out at a third of its size and taken three times as sharp. */
 const SCALE = 3;
+/** Each store's captions, files and layout size (listing.mjs). */
+const STORES = Object.entries(IMAGES).map(([platform, { screenshots }]) => ({
+  platform, slides: LISTINGS[platform].screenshots, files: screenshots.files, width: screenshots.width / SCALE, height: screenshots.height / SCALE,
+}));
 /** The app screens are taken at this phone size, then shown in the frame. */
 const PHONE = { width: 390, height: 844 };
 
@@ -139,20 +129,20 @@ try {
   await waitForServer();
   const browser = await chromium.launch();
   const screens = await takeScreens(browser, await drawLibrary(browser));
+  const images = path.join(ROOT, 'store', 'images');
   for (const store of STORES) {
-    const dir = path.join(OUT, store.dir);
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.mkdirSync(dir, { recursive: true });
+    // The old screenshots go first, so a caption taken out of the listing leaves no file behind.
+    for (const file of fs.readdirSync(images)) if (file.startsWith(`${store.platform}_screenshot-`)) fs.rmSync(path.join(images, file));
     const page = await browser.newPage({ viewport: { width: store.width, height: store.height }, deviceScaleFactor: SCALE });
-    for (const [i, slide] of SLIDES.entries()) {
+    for (const [i, slide] of store.slides.entries()) {
       await page.setContent(slideHtml(slide, screens[slide.screen], store));
       await page.waitForTimeout(200);
-      await page.screenshot({ path: path.join(dir, `${i + 1}-${slide.screen}.png`) });
+      await page.screenshot({ path: path.join(ROOT, store.files[i]) });
     }
     await page.close();
   }
   await browser.close();
-  console.log(`✓ Store screenshots in store/images/ (${STORES.map((s) => s.dir).join(', ')})`);
+  console.log(`✓ Store screenshots in store/images/ (${STORES.map((s) => `${s.platform}_screenshot-*`).join(', ')})`);
 } finally {
   server.kill();
 }

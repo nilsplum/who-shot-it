@@ -54,10 +54,10 @@ including reporting a photo and removing a player. What worked:
 7. In the first round tap the flag on the photo, then **Delete photo**.
 8. Play until the podium, wait three seconds, stop the recording.
 9. Send it to the Mac (Photos, Share, AirDrop). Cut out waiting time and anything that is
-   not the app, and save the result as `store/review-video.mp4` (git-ignored: it shows your
-   phone and your photos).
+   not the app, and save the result as `store/ios_review-video.mp4` (git-ignored: it shows
+   your phone and your photos).
 10. `node scripts/helpers/app-store.mjs submit` attaches it and sends the version to App
-    Review. The notes Apple reads are in `store/listing.md` (App Review notes): when the
+    Review. The notes Apple reads are in `store/ios_listing.js` (`reviewNotes`): when the
     video shows something different (for example what was cut), the first note says so.
 
 ## When something does not work

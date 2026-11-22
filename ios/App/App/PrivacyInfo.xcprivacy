@@ -3,8 +3,9 @@
   The app's privacy manifest for Apple: no tracking; collected only for the game itself
   (and kept only while a game lasts): the photos a player confirms with Yes, and the
   nickname with a random per-game key ("User ID" in Apple's terms). It must match the App
-  Privacy answers in App Store Connect and the privacy policy (web/legal.html). The app's
-  own code uses none of Apple's "required reason" APIs; Capacitor ships its own manifest.
+  Privacy answers in App Store Connect (`privacy` in store/ios_listing.js) and the privacy
+  policy (web/legal.html). The app's own code uses none of Apple's "required reason" APIs;
+  Capacitor ships its own manifest.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

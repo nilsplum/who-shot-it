@@ -10,5 +10,5 @@ secrets/
 # The app's stylesheet: built from styles/app.css by scripts/helpers/styles.sh, never edited.
 web/css/app.css
 
-# The screen recording for App Review (store/listing.md): it shows a real phone and its photos.
-store/review-video.mp4
+# The screen recording for App Review (`reviewVideo` in store/ios_listing.js): it shows a real phone and its photos.
+store/ios_review-video.mp4

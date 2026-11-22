@@ -7,7 +7,9 @@
  *
  * Renders with the end-to-end tests' Chromium (Playwright), so it needs no image tool.
  * Writes into the native projects (committed, so Android Studio and Xcode open complete
- * projects) and into `store/images/` (committed; uploaded by hand on the store pages).
+ * projects) and into the store images `listing.mjs` names (IMAGES, in `store/images/`;
+ * committed: the Android ones are uploaded by hand, the iPhone store takes its icon from the
+ * app, and `./scripts/dev.sh store` shows them all).
  *
  * The icon has two layers, `#bg` and `#mark`: iPhone icons use both; Android's adaptive
  * icon gets them as separate images (background and foreground), with the mark inside the
@@ -17,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 import { colour } from './colours.mjs';
+import { IMAGES } from './listing.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
 const at = (...parts) => path.join(ROOT, ...parts);
@@ -36,7 +39,7 @@ const sized = (share, rounded = false) => `<div style="width:${share * 100}vmin;
 
 const fullIcon = page(sized(1));
 const launch = (share) => page(sized(share, true), { background: colour('navy') });
-/** Google Play's banner: the icon's own background, the icon, the name. */
+/** The Android store's banner (its feature graphic): the icon's own background, the icon, the name. */
 const featureGraphic = page(`<div style="position:fixed;inset:0">${icon.replace('<svg ', '<svg preserveAspectRatio="none" ').replace('id="mark"', 'id="mark-hidden" style="display:none"')}</div>
   <div style="position:relative;display:flex;align-items:center;gap:56px">
     <div style="width:300px;height:300px;border-radius:22.37%;overflow:hidden;box-shadow:0 20px 50px color-mix(in srgb, ${colour('stage')} 25%, transparent)">${icon}</div>
@@ -63,10 +66,9 @@ const targets = [
     [`${android}/drawable-port-${d}/splash.png`, w, h, launch(0.3)],
     [`${android}/drawable-land-${d}/splash.png`, h, w, launch(0.3)],
   ]),
-  // Store listings (uploaded by hand, see store/listing.md).
-  ['store/images/app-store-icon-1024.png', 1024, 1024, fullIcon],
-  ['store/images/google-play-icon-512.png', 512, 512, fullIcon],
-  ['store/images/google-play-feature-graphic-1024x500.png', 1024, 500, featureGraphic],
+  // The stores' icons and banner, at the sizes the stores ask for (listing.mjs).
+  ...[[IMAGES.ios.icon, fullIcon], [IMAGES.android.icon, fullIcon], [IMAGES.android.featureGraphic, featureGraphic]]
+    .map(([image, html]) => [image.file, image.width, image.height, html]),
 ];
 
 const browser = await chromium.launch();

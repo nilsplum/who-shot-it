@@ -3,7 +3,10 @@
 Everything for Android is built and tested: `./scripts/release-apps.sh android` builds the
 signed app and uploads it. What is left are the Google Play account and the one-time forms.
 Follow the steps in order; each says where to click and what to enter. The answers match
-the app and the privacy policy; the texts and images come from `store/listing.md`.
+the app and the privacy policy; the texts and images come from the Android listing
+(`store/android_ios_listing.js`, `store/android_listing.js` and `store/images/android_*`).
+`./scripts/dev.sh store` (Android) shows the page they make, and is the easiest place to
+copy the texts from.
 
 ## 1. The developer account (once)
 
@@ -40,12 +43,12 @@ All apps, Create app: name `Who Shot It? Photo Party Game`, default language Eng
 | Content rating | Fill in the questionnaire (category: game). Users share content with each other: yes (photos, only with the players in a private game). No violence, no gambling, no purchases. |
 | Target audience | 16 to 17 and 18 and over only (the terms say 16+). Not designed for children. |
 | News app, health, financial features, government app | No. |
-| Data safety | As in `docs/apps.md` (Store forms): photos, name (nickname), device or other IDs (the random per-game key); collected, not shared, required, for app functionality; encrypted in transit; deletion by email. |
-| Photo and video permissions | Declare READ_MEDIA_IMAGES with the text in `docs/apps.md` (Google, photo and video permissions declaration). |
+| Data safety | As `dataSafety` in `store/android_listing.js` says (each data type also: not processed ephemerally, required, for app functionality). |
+| Photo and video permissions | Declare READ_MEDIA_IMAGES with `photoPermission` from `store/android_listing.js`. |
 
-Main store listing: name, short and full description, icon, banner and phone screenshots
-from `store/listing.md` and `store/images/`. Category Game, Trivia. Contact email
-whoshotit.info@gmail.com, website `https://who-shot-it.nils-plum.workers.dev`.
+Main store listing: name, short and full description, icon, banner (feature graphic) and
+phone screenshots, category, tags, contact email and website, all from the Android listing
+(above).
 
 Countries: Production, Countries / regions, add all.
 

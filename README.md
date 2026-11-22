@@ -27,7 +27,7 @@ room, stored in the EU.
 |---|---|
 | `./scripts/setup.sh` | Installs the pinned dependencies and the test browser. Run once and after dependency changes. |
 | `./scripts/test.sh` | All tests: unit + integration (inside the Workers runtime), then phone-sized browsers playing a full game with a stand-in photo library. `--no-e2e` skips the browsers. |
-| `./scripts/dev.sh [android\|ios]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. |
+| `./scripts/dev.sh [android\|ios\|store]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. `store`: both store pages as players will see them, at `http://localhost:8788`. |
 | `./scripts/deploy.sh` | Checks, runs every test, deploys the server to Cloudflare. |
 | `./scripts/release-apps.sh [android] [ios]` | Runs every test, builds the signed apps and uploads them to App Store Connect and Google Play; `--submit` also fills in the App Store page and sends it to App Review (`--no-upload`: only build into `dist/`). |
 
@@ -42,8 +42,8 @@ deploys only if every test passes. Keep Cloudflare's cookie-setting extras (Bot 
 Web Analytics, Zaraz) off: the privacy policy promises no cookies and no analytics.
 
 **Apps:** raise `"version"` in `package.json`, run `./scripts/release-apps.sh --submit`. It
-uploads both apps and sends them to review; both go live by themselves after approval. Store setup, the first release by hand, and the answers for the store forms:
-[docs/apps.md](docs/apps.md).
+uploads both apps and sends them to review; both go live by themselves after approval. Store setup and the first release by hand:
+[docs/apps.md](docs/apps.md); everything the stores get (texts, images, form answers): `store/`.
 
 **The server's address** is `SERVER.origin` in `web/shared/config.js` (and `wrangler.jsonc`;
 a test keeps them in step): for now `who-shot-it.<subdomain>.workers.dev`. The apps have it
@@ -69,6 +69,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `styles/app.css` | The design: Tailwind's theme (every colour, with the dark blue and the yellow as main colours; the type scale, fonts, animations) and the shared `screen`, `btn` and `link`. Built into `web/css/app.css` (git-ignored) by `wrangler dev`/`deploy` and the app release. |
 | `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `photos.js` (the dealt set and the previews kept ready), `textcheck.js` (counts lines of text on a preview), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
+| `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. Read for every script by `scripts/helpers/listing.mjs`. |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin). |
 

@@ -47,7 +47,7 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
    signs and uploads:
    - **iPhone:** to App Store Connect. About 15 minutes later the build is in TestFlight
      (install it on your iPhone with Apple's TestFlight app). With `--submit` the script
-     then fills in the App Store page from `store/listing.md` and sends the version to
+     then fills in the App Store page from the listings in `store/` and sends the version to
      App Review; it goes live by itself after approval. `node scripts/helpers/app-store.mjs
      status` shows where things stand (builds, TestFlight beta check, review).
    - **Android:** to Google Play, released on the production track: Google reviews it
@@ -78,51 +78,34 @@ the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 **App Store:** in App Store Connect create the app (Apps, +, New App: iOS, name
 `Who Shot It?`, language English, bundle ID `com.hivedone.whoshotit`, SKU `whoshotit`).
 Two settings have no API and are made by hand once: **App Privacy** (Apps, the app, left
-column App Privacy, Get Started: "Yes, we collect data", tick Photos or Videos and User ID,
-each for App Functionality only, not linked, no tracking, Publish) and the **EU trader
-status** (Business, Agreements, Compliance, Digital Services Act, Complete Compliance
-Requirements). Then `./scripts/release-apps.sh ios --submit` does the rest.
+column App Privacy, Get Started: "Yes, we collect data", tick the data types of `privacy` in
+`store/ios_listing.js`, each for App Functionality only, not linked, no tracking, Publish)
+and the **EU trader status** (Business, Agreements, Compliance, Digital Services Act,
+Complete Compliance Requirements). Then `./scripts/release-apps.sh ios --submit` does the
+rest.
 
 **App Review asks new apps for a screen recording** ("Guideline 2.1, Information Needed"):
 made on an iPhone with the TestFlight build, from launching the app through a whole game,
 including reporting a photo and removing a player; one phone and the test players are
 enough ([guides/demo-players.md](guides/demo-players.md), step by step). The answers to
-its other questions are the review notes in `store/listing.md`. The video is
-`store/review-video.mp4` (git-ignored); `node scripts/helpers/app-store.mjs submit`
+its other questions are the review notes in `store/ios_listing.js`. The video is
+`store/ios_review-video.mp4` (git-ignored); `node scripts/helpers/app-store.mjs submit`
 attaches it to every submission and sends a rejected version back to App Review.
 
 **Google Play:** step by step in [guides/android.md](guides/android.md) (account, forms,
 the first upload by hand, the key for automatic uploads).
 
-## Store listing
+## Store listings
 
-The texts, icons and screenshots for both store pages: [store/listing.md](../store/listing.md).
-
-## Store forms (answers that match the app and the privacy policy)
-
-**Links for both stores:** privacy policy `https://<server>/legal#privacy`, terms
-`https://<server>/legal#terms`, support and imprint `https://<server>/legal#imprint`. Put
-the imprint link in the store description too.
-
-**Apple, App Privacy:** Data used to track you: none. Data collected, not linked to you,
-for App Functionality only: *Photos or Videos*, *User ID*. (Matches `PrivacyInfo.xcprivacy`.)
-
-**Google, Data safety:** Collected (not shared, not processed ephemerally, required, for
-App functionality): *Photos*; *Name* (the nickname); *Device or other IDs* (the random
-per-game key). Encrypted in transit: yes. Deletion: by email (the data is gone after a day
-at the latest anyway).
-
-**Age:** 16+ everywhere (the terms say 16). Apple: answer the questionnaire (user-generated
-content: yes; contests: yes; everything else: no), then override the rating to 16+. Google:
-target audience 16 and older, no children.
-
-**Google, photo and video permissions declaration (READ_MEDIA_IMAGES):**
-> Who Shot It? is a party game whose core feature is guessing whose photo it is. For each
-> game the app picks random photos from the player's whole library on the device; the
-> player sees them and confirms or redraws. A picker cannot provide random photos from the
-> whole library, which is the point of the game. Only photos the player confirms leave the
-> device; they are shown to the players in that private game and deleted after their round.
-
-**Review notes and contact (both stores):** in [store/listing.md](../store/listing.md).
-
-**Screenshots:** use only your own photos, or photos of people who agreed.
+Everything the stores get, texts, images and the answers for their forms, lives in
+`store/`, and the file names say who gets it: `android_ios_` both stores, `ios_` only the
+iPhone store, `android_` only the Android store.
+[android_ios_listing.js](../store/android_ios_listing.js) has the name, description, links
+and screenshot captions; [ios_listing.js](../store/ios_listing.js) the subtitle, keywords,
+categories, privacy label and review notes;
+[android_listing.js](../store/android_listing.js) the short description, tags, Data safety
+and the photo permission declaration; `store/images/` the icons, banner and screenshots.
+`scripts/helpers/listing.mjs` reads them for every script, so the upload and the preview
+show the same. `./scripts/dev.sh store` shows both store pages as players will see them and
+lists anything a store would refuse (a text over its limit, a missing image); the tests
+fail on the same. The age is LEGAL.minAge (the terms' age) on both stores.

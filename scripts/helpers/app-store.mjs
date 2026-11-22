@@ -5,15 +5,18 @@
  *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
- * `submit` takes every text (name, subtitle, description, keywords, URLs, copyright, review
- * contact and notes) from `store/listing.md`, the screenshots from `store/images/app-store/`,
- * the screen recording for App Review from `store/review-video.mp4` (git-ignored; skipped if
- * missing), and the version from `package.json`; it attaches the uploaded build with that version and
- * sets categories, content rights, age rating, price (free) and countries. Running it again
- * updates the same version until Apple reviews it; after a rejection it sends the same
- * submission back, with the rejection marked as answered. Once a version is live, the next
- * run starts the new one (with "What's New"); while one is with Apple, it refuses. Two settings have no API and are made by
- * hand once (store/listing.md): App Privacy and the EU trader status; until then Apple
+ * `submit` takes the iPhone listing from `listing.mjs` (LISTINGS.ios and IMAGES.ios, from
+ * `store/android_ios_listing.js`, `store/ios_listing.js` and `store/images/ios_*`): every
+ * text, the links, copyright, categories, review contact and notes, the screenshots and the
+ * screen recording for App Review (git-ignored; skipped if missing); the version from
+ * `package.json` and the age from LEGAL.minAge. It refuses while `problems` finds anything
+ * (a text over its limit, a missing image), so what `./scripts/dev.sh store` shows is what
+ * Apple gets. It attaches the uploaded build with that version and sets content rights,
+ * age rating, price (free) and countries. Running it again updates the same version until
+ * Apple reviews it; after a rejection it sends the same submission back, with the rejection
+ * marked as answered. Once a version is live, the next run starts the new one (with "What's
+ * New"); while one is with Apple, it refuses. Two settings have no API and are made by hand
+ * once (store/ios_listing.js): App Privacy and the EU trader status; until then Apple
  * refuses the submission and this script prints Apple's reason.
  *
  * Signs in with the team API key in `secrets/` (`app-store-connect.p8` and
@@ -23,6 +26,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { LEGAL } from '../../web/shared/config.js';
+import { IMAGES, LISTINGS, problems } from './listing.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -31,8 +36,11 @@ const VERSION = JSON.parse(read('package.json')).version;
 const BUILD = String(VERSION.split('.').map(Number).reduce((n, part, i) => n + part * [10000, 100, 1][i], 0));
 /** `--wait`: the build was just uploaded, so wait until Apple has processed it. */
 const WAIT = process.argv.includes('--wait');
+/** Everything the iPhone store gets (store/android_ios_listing.js and store/ios_listing.js). */
+const listing = LISTINGS.ios;
+const contact = listing.reviewContact;
 /** The screen recording App Review asks new apps for (git-ignored: it shows a real phone). */
-const REVIEW_VIDEO = path.join(ROOT, 'store/review-video.mp4');
+const REVIEW_VIDEO = path.join(ROOT, listing.reviewVideo);
 
 // ---------- The API ----------
 
@@ -66,29 +74,6 @@ const get = (url) => api('GET', url);
 const patch = (type, id, attributes, relationships) => api('PATCH', `/v1/${type}/${id}`, { data: { type, id, ...(attributes ? { attributes } : {}), ...(relationships ? { relationships } : {}) } });
 const ref = (type, id) => ({ data: { type, id } });
 
-// ---------- The texts (store/listing.md) ----------
-
-const listing = read('store/listing.md');
-
-/**
- * The indented block under a bold label in store/listing.md, without the indentation: the
- * label's own lines are skipped, then indented lines (and blank lines between them) are
- * collected until the text goes on unindented.
- */
-function field(label) {
-  const start = listing.indexOf(`**${label}**`);
-  if (start < 0) throw new Error(`store/listing.md has no "${label}"`);
-  const block = [];
-  for (const line of listing.slice(start).split('\n')) {
-    if (line.startsWith('    ')) block.push(line.slice(4));
-    else if (block.length && line.trim() === '') block.push('');
-    else if (block.length) break;
-  }
-  return block.join('\n').trim();
-}
-const url = (label) => listing.match(new RegExp(`${label}: \`([^\`]+)\``))[1];
-const copyright = listing.match(/\*\*Copyright:\*\* `([^`]+)`/)[1];
-
 // ---------- status ----------
 
 async function findApp() {
@@ -116,7 +101,10 @@ async function status() {
 
 // ---------- submit ----------
 
-/** Age rating answers (Apple's questionnaire): user content and contests yes, nothing else; 16+ like the terms. */
+/**
+ * Age rating answers (Apple's questionnaire): user content and contests yes, nothing else;
+ * raised to the terms' minimum age (LEGAL.minAge), which Apple offers as 13+, 16+ or 18+.
+ */
 const AGE_RATING = {
   advertising: false, ageAssurance: false, datingAndRelationships: false, gambling: false, healthOrWellnessTopics: false,
   lootBox: false, messagingAndChat: false, parentalControls: false, sharedLocation: false, socialMedia: false,
@@ -126,7 +114,7 @@ const AGE_RATING = {
   matureOrSuggestiveThemes: 'NONE', medicalOrTreatmentInformation: 'NONE', profanityOrCrudeHumor: 'NONE',
   sexualContentGraphicAndNudity: 'NONE', sexualContentOrNudity: 'NONE', violenceCartoonOrFantasy: 'NONE',
   violenceRealistic: 'NONE', violenceRealisticProlongedGraphicOrSadistic: 'NONE',
-  ageRatingOverrideV2: 'SIXTEEN_PLUS',
+  ageRatingOverrideV2: { 13: 'THIRTEEN_PLUS', 16: 'SIXTEEN_PLUS', 18: 'EIGHTEEN_PLUS' }[LEGAL.minAge],
 };
 
 async function appInfo(app) {
@@ -136,13 +124,14 @@ async function appInfo(app) {
 
 async function setAppDetails(app, info) {
   await patch('apps', app.id, { contentRightsDeclaration: 'USES_THIRD_PARTY_CONTENT' });
-  const loc = (await get(`/v1/appInfos/${info.id}/appInfoLocalizations`)).data.find((l) => l.attributes.locale === 'en-US');
-  await patch('appInfoLocalizations', loc.id, { name: field('Name'), subtitle: field('Subtitle'), privacyPolicyUrl: url('Privacy Policy URL') });
+  const loc = (await get(`/v1/appInfos/${info.id}/appInfoLocalizations`)).data.find((l) => l.attributes.locale === listing.locale);
+  await patch('appInfoLocalizations', loc.id, { name: listing.name, subtitle: listing.subtitle, privacyPolicyUrl: listing.privacyPolicyUrl });
+  const { primary, subcategories: [one, two], secondary } = listing.categories;
   await patch('appInfos', info.id, null, {
-    primaryCategory: ref('appCategories', 'GAMES'),
-    primarySubcategoryOne: ref('appCategories', 'GAMES_TRIVIA'),
-    primarySubcategoryTwo: ref('appCategories', 'GAMES_CASUAL'),
-    secondaryCategory: ref('appCategories', 'ENTERTAINMENT'),
+    primaryCategory: ref('appCategories', primary),
+    primarySubcategoryOne: ref('appCategories', one),
+    primarySubcategoryTwo: ref('appCategories', two),
+    secondaryCategory: ref('appCategories', secondary),
   });
   const age = (await get(`/v1/appInfos/${info.id}/ageRatingDeclaration`)).data;
   await patch('ageRatingDeclarations', age.id, AGE_RATING);
@@ -171,23 +160,23 @@ async function setVersion(app) {
     await new Promise((resolve) => setTimeout(resolve, 60_000));
   }
   if (!builds.length) throw new Error(`Build ${VERSION} (${BUILD}) is not uploaded or not processed yet: ./scripts/release-apps.sh ios, then wait about 15 minutes.`);
-  await patch('appStoreVersions', version.id, { versionString: VERSION, copyright, releaseType: 'AFTER_APPROVAL' }, { build: ref('builds', builds[0].id) });
-  const loc = (await get(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).data.find((l) => l.attributes.locale === 'en-US');
+  await patch('appStoreVersions', version.id, { versionString: VERSION, copyright: listing.copyright, releaseType: 'AFTER_APPROVAL' }, { build: ref('builds', builds[0].id) });
+  const loc = (await get(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).data.find((l) => l.attributes.locale === listing.locale);
   await patch('appStoreVersionLocalizations', loc.id, {
-    description: field('Description:'), keywords: field('Keywords'), promotionalText: field('Promotional text'),
-    marketingUrl: url('Marketing URL'), supportUrl: url('Support URL'),
-    ...(update ? { whatsNew: field('What’s New') } : {}),
+    description: listing.description, keywords: listing.keywords, promotionalText: listing.promotionalText,
+    marketingUrl: listing.website, supportUrl: listing.supportUrl,
+    ...(update ? { whatsNew: listing.whatsNew } : {}),
   });
   console.log(`✓ version ${VERSION} with build ${BUILD}, description, keywords, promotional text, URLs, copyright${update ? ', what’s new' : ''}`);
   return { version, loc };
 }
 
 async function setReviewDetails(version) {
-  const [name, phone, email] = field('App Review contact').split(', ');
-  const [first, ...last] = name.split(' ');
-  // Apple's questions answered first, then the same test steps TestFlight's beta review gets.
-  const notes = `${field('App Review notes')}\n\n${field('How to test')}`;
-  const attributes = { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes };
+  // The notes answer Apple's questions first, then give the test steps TestFlight's beta review gets too.
+  const attributes = {
+    contactFirstName: contact.firstName, contactLastName: contact.lastName, contactPhone: contact.phone, contactEmail: contact.email,
+    demoAccountRequired: false, notes: listing.reviewNotes,
+  };
   const existing = (await get(`/v1/appStoreVersions/${version.id}/appStoreReviewDetail`)).data;
   const detail = existing
     ? (await patch('appStoreReviewDetails', existing.id, attributes)).data
@@ -214,7 +203,7 @@ async function upload(type, attributes, relationships, bytes) {
  */
 async function setReviewVideo(detail) {
   if (!fs.existsSync(REVIEW_VIDEO)) {
-    console.log('… no store/review-video.mp4, so no screen recording attached (docs/apps.md, First release)');
+    console.log(`… no ${listing.reviewVideo}, so no screen recording attached (docs/apps.md, First release)`);
     return;
   }
   const bytes = fs.readFileSync(REVIEW_VIDEO);
@@ -230,14 +219,13 @@ async function setReviewVideo(detail) {
 }
 
 async function setScreenshots(loc) {
-  const dir = path.join(ROOT, 'store/images/app-store');
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
+  const { files } = IMAGES.ios.screenshots;
   const type = 'APP_IPHONE_67';
   let set = (await get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets`)).data.find((s) => s.attributes.screenshotDisplayType === type);
   if (!set) set = (await api('POST', '/v1/appScreenshotSets', { data: { type: 'appScreenshotSets', attributes: { screenshotDisplayType: type }, relationships: { appStoreVersionLocalization: ref('appStoreVersionLocalizations', loc.id) } } })).data;
   for (const old of (await get(`/v1/appScreenshotSets/${set.id}/appScreenshots`)).data) await api('DELETE', `/v1/appScreenshots/${old.id}`);
   for (const file of files) {
-    await upload('appScreenshots', { fileName: file }, { appScreenshotSet: ref('appScreenshotSets', set.id) }, fs.readFileSync(path.join(dir, file)));
+    await upload('appScreenshots', { fileName: path.basename(file) }, { appScreenshotSet: ref('appScreenshotSets', set.id) }, fs.readFileSync(path.join(ROOT, file)));
   }
   console.log(`✓ ${files.length} screenshots (iPhone 6.9 inch)`);
 }
@@ -270,15 +258,16 @@ async function setPriceAndCountries(app) {
  * as notes (a reviewer needs to know that a game takes two phones).
  */
 async function setTestFlightInfo(app) {
-  const [name, phone, email] = field('App Review contact').split(', ');
-  const [first, ...last] = name.split(' ');
   const detail = (await get(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
-  await patch('betaAppReviewDetails', detail.id, { contactFirstName: first, contactLastName: last.join(' '), contactPhone: phone, contactEmail: email, demoAccountRequired: false, notes: field('How to test') });
-  const description = `${field('Subtitle')}: ${field('Promotional text')}`;
-  const attributes = { description, feedbackEmail: email, privacyPolicyUrl: url('Privacy Policy URL'), marketingUrl: url('Marketing URL') };
-  const loc = (await get(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === 'en-US');
+  await patch('betaAppReviewDetails', detail.id, {
+    contactFirstName: contact.firstName, contactLastName: contact.lastName, contactPhone: contact.phone, contactEmail: contact.email,
+    demoAccountRequired: false, notes: listing.howToTest,
+  });
+  const description = `${listing.subtitle}: ${listing.promotionalText}`;
+  const attributes = { description, feedbackEmail: contact.email, privacyPolicyUrl: listing.privacyPolicyUrl, marketingUrl: listing.website };
+  const loc = (await get(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === listing.locale);
   if (loc) await patch('betaAppLocalizations', loc.id, attributes);
-  else await api('POST', '/v1/betaAppLocalizations', { data: { type: 'betaAppLocalizations', attributes: { locale: 'en-US', ...attributes }, relationships: { app: ref('apps', app.id) } } });
+  else await api('POST', '/v1/betaAppLocalizations', { data: { type: 'betaAppLocalizations', attributes: { locale: listing.locale, ...attributes }, relationships: { app: ref('apps', app.id) } } });
   console.log('✓ TestFlight test information (description, feedback email, privacy policy, review contact and notes)');
 }
 
@@ -295,6 +284,10 @@ async function sendToReview(app, version) {
 }
 
 async function submit() {
+  // A listing a store would refuse stops here, before anything at Apple changes.
+  const found = problems((file) => fs.existsSync(path.join(ROOT, file)));
+  if (found.length) throw new Error(`The listing is not ready (./scripts/dev.sh store shows it):\n  ${found.join('\n  ')}`);
+  if (!AGE_RATING.ageRatingOverrideV2) throw new Error(`Apple has no ${LEGAL.minAge}+ rating (13, 16 or 18): LEGAL.minAge in web/shared/config.js`);
   const app = await findApp();
   await setTestFlightInfo(app);
   await setAppDetails(app, await appInfo(app));

@@ -9,9 +9,9 @@
 #   --no-upload               only build: dist/who-shot-it-<version>.aab and dist/ios/App.ipa
 #   --android-track internal  release to Google Play's internal test track instead
 #   --store-images            also redraw the store screenshots in store/images/ (when the
-#                             app's look changed)
-#   --submit                  after the iPhone upload, fill in the App Store page from
-#                             store/listing.md and send the version to App Review
+#                             app's look or a caption changed)
+#   --submit                  after the iPhone upload, fill in the App Store page from the
+#                             listings in store/ and send the version to App Review
 #                             (scripts/helpers/app-store.mjs, with the API key in secrets/)
 #
 # Every run first runs all tests, draws the icons from web/icons/icon.svg, builds the
@@ -152,4 +152,4 @@ PLIST
 for p in "${platforms[@]}"; do
   "release_$p"
 done
-echo "✓ Store icons and images: store/images/ (texts: store/listing.md)"
+echo "✓ Everything the stores get is in store/; see both store pages: ./scripts/dev.sh store"
