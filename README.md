@@ -108,8 +108,9 @@ only until its round is over.
 
 **Keeping it friendly.** Anyone can flag the photo on screen (⚑): the others stop seeing
 it and the round waits; Delete photo deletes it for everyone at once, and after 15 s it goes
-by itself. The host can remove a player, who cannot rejoin that game. Nicknames with
-blocked words become "Player".
+by itself. The host can remove a player, who cannot rejoin that game. A player who is
+offline shows red on every phone and anyone can remove them (they may join again); the room
+never removes anyone by itself. Nicknames with blocked words become "Player".
 
 **In a browser** the same page is the website: `/<CODE>` is the invite page ("Open in the
 app", store links), `/legal` the legal texts.

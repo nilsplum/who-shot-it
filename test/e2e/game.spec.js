@@ -1,7 +1,8 @@
 /**
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
- * the terms, the "New game" step with a preset and the settings "?", joining by code, the
- * host removing a player, the photos dealt with "Play with these?", reload, the automatic
+ * the terms, the "New game" step with a preset and the settings "?", joining by code, a
+ * phone going offline (its red pill, removed by a guest), the host removing a player, the
+ * photos dealt with "Play with these?", reload, the automatic
  * start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
  * Delete), five rounds with their leaderboards (one ending in the new order, "Show again"
  * held on one phone and seen on another, FINAL ROUND before the last photo), the podium's
@@ -74,12 +75,24 @@ test('friends play a full game and start another one', async ({ browser }) => {
   const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
 
   const guests = [];
-  for (const name of ['Ben', 'Cleo', 'Dan']) {
+  for (const name of ['Ben', 'Cleo', 'Dan', 'Eve']) {
     const page = await openApp(browser, name);
     await join(page, code);
     guests.push(page);
   }
   const chips = host.locator('[data-part="chips"] > *');
+  await expect(chips).toHaveCount(5);
+
+  // Eve's phone goes away. Nobody is removed for that by the room: her pill turns red on
+  // every phone, and anyone (here Ben, not the host) may take her off; she could join again.
+  const eve = guests.pop();
+  await eve.close();
+  const away = guests[0].getByRole('button', { name: 'Eve is offline: remove from game' });
+  await expect(away).toContainText('Offline, tap to remove');
+  expect(await styleOf(guests[0], '[aria-label="Eve is offline: remove from game"]', 'borderTopColor')).toBe(themeColour('red'));
+  await away.click();
+  await expect(guests[0].getByText('They can join again with the code.')).toBeVisible();
+  await guests[0].getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(chips).toHaveCount(4);
 
   // The host removes Dan, who cannot come back.

@@ -8,12 +8,13 @@
  * settings" leads to the switch. The game starts by itself when everyone is ready
  * (server rule `canStart`); the 3-2-1 is an overlay (`views/overlays.js`). Tapping the
  * code opens the invite sheet, tapping the settings summary opens the settings sheet
- * (read-only for everyone but the host), and the host taps a player to remove them.
+ * (read-only for everyone but the host), and tapping a player opens "Remove?" (the host may
+ * remove anyone, everyone a player who is offline; nobody is removed for being offline).
  *
  * The players: a pill each, its border always 2 px (so nothing shifts): green when ready,
- * dashed grey while the game waits for them (not ready, or offline), never faded. From
- * PILLS_COMPACT_FROM players on the pills are compact, so 16 fit above the photos on a small
- * phone.
+ * dashed grey while the game waits for them to be ready, red and glowing slowly with
+ * "Offline, tap to remove" while they are offline, never faded. From PILLS_COMPACT_FROM
+ * players on the pills are compact, so 16 fit above the photos on a small phone.
  *
  * The photos: a grid of 2 x 2 to 5 x 5 places (by "Photos per player") filling the room
  * between the players and the buttons, exactly as wide as No and Yes; on a short screen
@@ -32,7 +33,7 @@
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
 import { photos } from '../photos.js';
-import { HELP_BUTTON, LEAVE_BUTTON, SPINNER, avatar, esc, progress, topBar } from '../ui.js';
+import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, progress, topBar } from '../ui.js';
 
 const label = (key, value) => {
   const setting = SETTINGS.find((s) => s.key === key);
@@ -185,16 +186,23 @@ const PILLS = {
 };
 
 /**
- * A player in the lobby: green border when ready, dashed grey while the game waits for them
- * (not ready, or offline); the host can tap the others to remove them.
+ * A player's pill, its look by how the game stands with them: ready (green), not ready
+ * (dashed grey), offline (the red warning light, `ui.OFFLINE_LOOK`, with "Offline, tap to
+ * remove" under the name). A player this phone may remove (`ui.canRemove`: the host anyone
+ * else, everyone an offline player) is a button that opens the "Remove?" sheet.
  */
-function chip(view, p, host) {
+function chip(view, p) {
   const size = view.players.length >= PILLS_COMPACT_FROM ? PILLS.compact : PILLS.roomy;
-  const waiting = !p.ready || !p.connected;
-  const inner = `${avatar(p, size.avatar)}<span class="truncate">${esc(p.name)}</span>${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready ? '<span class="text-green">✓</span>' : ''}`;
-  const cls = `flex max-w-[46%] items-center rounded-full border-2 bg-card ${size.cls} ${waiting ? 'border-dashed border-line-strong' : 'border-green'}`;
-  return host && p.id !== view.me.id
-    ? `<button class="${cls}" data-act="remove" data-v="${esc(p.id)}" aria-label="${esc(p.name)}: remove from game">${inner}</button>`
+  const offline = !p.connected;
+  const look = offline ? OFFLINE_LOOK : p.ready ? 'border-green bg-card' : 'border-dashed border-line-strong bg-card';
+  const name = offline
+    ? `<span class="flex min-w-0 flex-col leading-tight"><span class="truncate">${esc(p.name)}</span><small class="truncate text-2xs text-red">Offline, tap to remove</small></span>`
+    : `<span class="truncate">${esc(p.name)}</span>`;
+  const inner = `${avatar(p, size.avatar)}${name}${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready && !offline ? '<span class="text-green">✓</span>' : ''}`;
+  const cls = `flex max-w-[46%] items-center rounded-full border-2 ${size.cls} ${look}`;
+  const label = offline ? `${esc(p.name)} is offline: remove from game` : `${esc(p.name)}: remove from game`;
+  return canRemove(view, p)
+    ? `<button class="${cls}" data-act="remove" data-v="${esc(p.id)}" aria-label="${label}">${inner}</button>`
     : `<div class="${cls}">${inner}</div>`;
 }
 
@@ -219,7 +227,7 @@ export function lobbyScreen(c) {
     </div>`,
     parts: {
       cfg: `<button class="mx-auto block rounded-full border border-line bg-card px-3.5 py-1.75 text-xs ${host ? 'text-ink' : 'text-muted'}" data-act="settings">${esc(settingsSummary(view.settings))}${host ? ' ⚙︎' : ''}</button>`,
-      chips: view.players.map((p) => chip(view, p, host)).join(''),
+      chips: view.players.map((p) => chip(view, p)).join(''),
       ...mine(c),
       status: status(c),
     },

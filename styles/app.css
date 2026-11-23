@@ -73,8 +73,8 @@
   --color-coral: #ff5a5f; /* the main action of a screen */
   --color-green: #3ddc97; /* yes, ready, right */
   --color-green-dark: #1f3a31; /* behind the right card */
-  --color-red: #ff6b6f; /* wrong, leaving and deleting, no swaps left */
-  --color-red-dark: #40222b; /* behind a wrong pick */
+  --color-red: #ff6b6f; /* wrong, leaving and deleting, no swaps left, a player who is offline */
+  --color-red-dark: #40222b; /* behind a wrong pick, behind a player who is offline */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
   --color-warning-ink: #ffcfa8;
   --color-blue: #5b8cff; /* the timer while everyone looks at the answer (reveal, leaderboard), to violet */
@@ -117,6 +117,7 @@
      `text-lg`, names `text-xl`, sheet titles and icons `text-3xl`. Without a line height of
      their own, sizes keep the line height around them (`normal`, set on the body). */
   --text-*: initial;
+  --text-2xs: 0.6875rem; /* 11px: the note under a name ("Offline, tap to remove") */
   --text-xs: 0.8125rem; /* 13px: fine print, quiet lines */
   --text-sm: 0.875rem; /* 14px: small labels, chips, choices */
   --text-base: 0.9375rem; /* 15px: body text */
@@ -158,6 +159,7 @@
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
   --animate-count: count 1s ease-out infinite; /* the 3-2-1 */
+  --animate-beacon: beacon 1.6s ease-in-out infinite; /* an offline player (red): a slow glow, like a warning light at sea */
 
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -182,6 +184,8 @@
   @keyframes rise { 0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
   @keyframes slide-up { from { transform: translateY(100%); } }
   @keyframes count { from { transform: scale(1.4); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+  /* A red glow swells around the element and fades again; it moves nothing, so nothing jumps. */
+  @keyframes beacon { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-red) 45%, transparent); } }
 }
 
 @layer base {

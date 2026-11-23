@@ -13,7 +13,9 @@
  * - After every event, `settle` runs all due timers and derived transitions until the room
  *   is stable, so no state can wait for a timer that already passed. Consequently
  *   `nextWake` never returns a time in the past for a room `apply` returned.
- * - Host-only events (settings, next, kick) are ignored from anyone else.
+ * - Host-only events (settings, next, kick) are ignored from anyone else, with one
+ *   exception: anyone may remove a player who is offline (`kick`, without the host's block).
+ *   Nobody is removed for being offline by the room itself.
  * - "Play again" (`again`) is anyone's and idempotent: the first one on the end screen
  *   opens a new game under the same code (the lobby) and keeps the final standings
  *   (`final`) for everyone else, who stay on their results (`onResults`) until they tap it
@@ -102,7 +104,7 @@ function dealHolds(room) {
   });
 }
 
-function toLobby(room, now) {
+function toLobby(room) {
   room.phase = 'lobby';
   room.deadline = null;
   room.game = null;
@@ -111,8 +113,6 @@ function toLobby(room, now) {
     p.photos = [];
     p.score = 0;
     p.streak = 0;
-    // Players still offline get a fresh grace period in the new lobby.
-    if (!p.connected) p.goneAt = now;
   }
 }
 
@@ -422,11 +422,11 @@ const HANDLERS = {
   },
 
   /** "Play again": opens the next game for everyone, or joins it when it is open already. */
-  again(room, { playerId }, now) {
+  again(room, { playerId }) {
     const p = playerById(room, playerId);
     if (!p) return;
     if (room.phase === 'end') {
-      toLobby(room, now);
+      toLobby(room);
       for (const q of room.players) q.onResults = q.id !== p.id;
     } else if (inLobby(room)) p.onResults = false;
   },
@@ -457,11 +457,17 @@ const HANDLERS = {
     deletePhoto(room, now, rng);
   },
 
-  /** The host removes a player (and all their photos) and keeps them out of this room. */
+  /**
+   * Removes a player and all their photos. The host may remove anyone, and for good (the
+   * block the stores ask for): their key stays out of this room. A player who is offline
+   * anyone may take off the table, so a phone that went away never holds the others up;
+   * that is tidying up, not a block, so they may join again with the code.
+   */
   kick(room, { playerId, target }, now, rng) {
     const p = playerById(room, target);
-    if (!isHost(room, playerId) || !p || target === playerId) return;
-    room.banned.push(p.key);
+    if (!p || target === playerId || !playerById(room, playerId)) return;
+    if (isHost(room, playerId)) room.banned.push(p.key);
+    else if (p.connected) return;
     removePlayer(room, target, now, rng);
   },
 
@@ -548,14 +554,9 @@ function settle(room, now, rng) {
     return;
   }
   upgradeGame(room, now);
-  if (inLobby(room)) {
-    for (const p of room.players.slice()) {
-      if (!p.connected && p.goneAt !== null && now >= p.goneAt + TIMING.lobbyDropMs) removePlayer(room, p.id, now, rng);
-    }
-  }
   // The last player is gone: an empty lobby keeps the code for whoever comes back with it.
   if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final)) {
-    toLobby(room, now);
+    toLobby(room);
     room.hostId = null;
     room.final = null;
   }
@@ -565,9 +566,9 @@ function settle(room, now, rng) {
   // The host role: always held by a player, handed on in join order when the host leaves.
   // During a game (and on the end screen) the host is needed for "Next" (and the settings
   // of the next game), so an offline host also hands over after a short grace while
-  // someone else is here. In
-  // the lobby the host keeps the role until dropped, so a short trip to the phone's
-  // settings (photo access) never costs it.
+  // someone else is here. In the lobby the host keeps the role until removed, so a short
+  // trip to the phone's settings (photo access) never costs it. Nobody is removed for being
+  // offline: the others see who is (red) and anyone may take them off the table (`kick`).
   const host = playerById(room, room.hostId);
   const firstConnected = connectedPlayers(room)[0] || null;
   if (!host) room.hostId = (firstConnected || room.players[0] || {}).id || null;
@@ -610,9 +611,8 @@ export function nextWake(room) {
   if (room.game && room.game.flag) times.push(room.game.flag.until);
   const someoneHere = connectedPlayers(room).length > 0;
   for (const p of room.players) {
-    if (p.connected || p.goneAt === null) continue;
-    if (inLobby(room)) times.push(p.goneAt + TIMING.lobbyDropMs);
-    else if (p.id === room.hostId && someoneHere) times.push(p.goneAt + TIMING.hostGraceMs);
+    if (p.connected || p.goneAt === null || inLobby(room)) continue;
+    if (p.id === room.hostId && someoneHere) times.push(p.goneAt + TIMING.hostGraceMs);
   }
   return Math.min(...times);
 }

@@ -450,10 +450,13 @@ describe('leaving and connections', () => {
     expect(game.room.hostId).toBe(idOf(game.room, 'Ben'));
   });
 
-  test('offline players leave the lobby after a while, but stay in a running game', () => {
-    const lobby = driver(roomWith(['Ann', 'Ben'])).by('Ben', 'disconnect').wait(TIMING.lobbyDropMs);
-    expect(lobby.room.players.map((p) => p.name)).toEqual(['Ann']);
-    const game = started().by('Cleo', 'disconnect').wait(TIMING.lobbyDropMs * 3);
+  test('nobody is removed for being offline: the room sets no timer for it and keeps them', () => {
+    const lobby = driver(roomWith(['Ann', 'Ben'])).by('Ben', 'disconnect');
+    // Only the room's idle end is left to wake it.
+    expect(nextWake(lobby.room)).toBe(lobby.room.touchedAt + TIMING.roomIdleMs);
+    lobby.wait(TIMING.roomIdleMs / 2);
+    expect(lobby.room.players.map((p) => [p.name, p.connected])).toEqual([['Ann', true], ['Ben', false]]);
+    const game = started().by('Cleo', 'disconnect').wait(TIMING.roomIdleMs / 2);
     expect(game.room.players).toHaveLength(3);
   });
 
@@ -551,17 +554,28 @@ describe('reports and removed players', () => {
     expect(d.room).toMatchObject({ phase: 'board', game: { flag: null } });
   });
 
-  test('only the host removes a player; their photos go and their key cannot rejoin', () => {
-    const d = driver(roomWith(['Ann', 'Ben', 'Cleo'])).by('Ben', 'ready', { photos: ['b1'] });
+  test('the host removes anyone for good; anyone removes a player who is offline, who may come back', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo', 'Dan'])).by('Ben', 'ready', { photos: ['b1'] });
+    // A player who is here only the host may remove, and never themselves.
     d.by('Cleo', 'kick', { target: idOf(d.room, 'Ben') });
-    expect(d.room.players).toHaveLength(3);
+    expect(d.room.players).toHaveLength(4);
     d.by('Ann', 'kick', { target: idOf(d.room, 'Ann') });
-    expect(d.room.players).toHaveLength(3);
+    expect(d.room.players).toHaveLength(4);
     d.by('Ann', 'kick', { target: idOf(d.room, 'Ben') });
-    expect(d.room.players.map((p) => p.name)).toEqual(['Ann', 'Cleo']);
+    expect(d.room.players.map((p) => p.name)).toEqual(['Ann', 'Cleo', 'Dan']);
     expect(referencedPhotoIds(d.room)).toEqual([]);
     d.do('join', { key: 'key-Ben-0000000000', name: 'Ben', avatar: '🐼' });
-    expect(d.room.players).toHaveLength(2);
+    expect(d.room.players).toHaveLength(3);
+    // Dan goes offline with photos in: Cleo (not the host) removes him and his photos, and
+    // his phone joins again when it is back (a new player, not ready).
+    d.by('Dan', 'ready', { photos: ['d1'] }).by('Dan', 'disconnect').by('Cleo', 'kick', { target: idOf(d.room, 'Dan') });
+    expect(d.room.players.map((p) => p.name)).toEqual(['Ann', 'Cleo']);
+    expect(referencedPhotoIds(d.room)).toEqual([]);
+    d.do('join', { key: 'key-Dan-0000000000', name: 'Dan', avatar: '🐸' });
+    expect(d.room.players.find((p) => p.name === 'Dan')).toMatchObject({ connected: true, ready: false });
+    // A player who is no longer in the room removes nobody.
+    d.by('Dan', 'disconnect').do('kick', { playerId: 'gone', target: idOf(d.room, 'Dan') });
+    expect(d.room.players).toHaveLength(3);
   });
 });
 

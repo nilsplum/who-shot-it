@@ -1,5 +1,6 @@
 /**
- * Shared UI building blocks: HTML escaping, avatars, the top bar and its buttons, the logo
+ * Shared UI building blocks: HTML escaping, avatars (and how an offline player looks, and
+ * who may remove them), the top bar and its buttons, the logo
  * with the big title, the two ways to show a wait (the spinner and the progress bar), the
  * timer bar, the list of rules or steps, the confetti of a win, the quiet scrollbars, the
  * one toast, and the reaction row with its floating emojis.
@@ -37,21 +38,39 @@ const AVATAR_SIZES = {
 };
 
 /**
- * The avatar's ring and fill: the player's colour, or while the game waits for the player (in
- * "who has answered", not yet answered) a dashed grey ring on the plain card colour. Waiting is
- * never shown by fading: a faded avatar reads as "gone", a dashed one as "not yet".
+ * How a player who is offline looks wherever they are shown (the lobby's pill, the avatar in
+ * "who has answered"): red border and background, glowing slowly like a warning light
+ * (`animate-beacon`), so the others see at once who is missing and may remove them
+ * (`canRemove`). It brings its own animation, so nothing else animates the same element.
+ */
+export const OFFLINE_LOOK = 'border-solid border-red bg-red-dark animate-beacon motion-reduce:animate-none';
+
+/**
+ * The avatar's ring and fill: the player's colour; while the game waits for the player (in
+ * "who has answered", not yet answered) a dashed grey ring on the plain card colour; offline,
+ * the red warning light. Waiting is never shown by fading: a faded avatar reads as "gone", a
+ * dashed one as "not yet".
  */
 const AVATAR_RINGS = {
   on: 'border-solid border-player bg-player-fill',
   waiting: 'border-dashed border-line-strong bg-card',
+  offline: OFFLINE_LOOK,
 };
 
 /**
  * A round avatar for a player (`{ avatar }`) in their colour; `waiting` gives it the dashed
- * ring, `extra` adds classes (margin, animation).
+ * ring, `offline` the red one (it wins over `waiting`), `extra` adds classes (margin,
+ * animation; never with `offline`, which animates already).
  */
-export const avatar = (player, size = 'md', { waiting = false, extra = '' } = {}) =>
-  `<span class="inline-grid shrink-0 place-items-center rounded-full border-2 leading-none ${AVATAR_RINGS[waiting ? 'waiting' : 'on']} ${AVATAR_SIZES[size]} ${extra}" style="--player:${colourOf(player.avatar)}">${esc(player.avatar)}</span>`;
+export const avatar = (player, size = 'md', { waiting = false, offline = false, extra = '' } = {}) =>
+  `<span class="inline-grid shrink-0 place-items-center rounded-full border-2 leading-none ${AVATAR_RINGS[offline ? 'offline' : waiting ? 'waiting' : 'on']} ${AVATAR_SIZES[size]} ${extra}" style="--player:${colourOf(player.avatar)}">${esc(player.avatar)}</span>`;
+
+/**
+ * Whether this phone may remove player `p` (a tap opens the "Remove?" sheet,
+ * `views/sheets.js`): the host anyone else, everyone a player who is offline. The room
+ * decides the same way (`kick` in src/game/rules.js).
+ */
+export const canRemove = (view, p) => p.id !== view.me.id && (view.hostId === view.me.id || !p.connected);
 
 /**
  * The bar at the top of a screen: a button on the left (leave, back), a title in the middle

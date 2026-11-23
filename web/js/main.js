@@ -71,7 +71,7 @@ import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
 import { device, keyFor, saveDevice, session } from './store.js';
 import { photoState, photoUrl, readyFor, shareFor, syncUpcoming } from './upcoming.js';
-import { floatEmoji, quietScrollbars, toast } from './ui.js';
+import { canRemove, floatEmoji, quietScrollbars, toast } from './ui.js';
 import { endScreen } from './views/end.js';
 import { gameScreen } from './views/game.js';
 import { homeScreen } from './views/home.js';
@@ -444,7 +444,9 @@ function onMessage(msg) {
       session.sheet = null;
     }
   }
-  if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
+  // "Remove?" closes once its player is gone, or may no longer be removed from this phone
+  // (they came back online and this phone does not host).
+  if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target && canRemove(v, p))) session.sheet = null;
   if (inRound(v)) photos.spent = true;
   moments(previous, v);
   // The room forgot this phone's readiness (a new deal, a changed plan): it reports again.

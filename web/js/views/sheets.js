@@ -22,7 +22,7 @@
 import { APP, SETTINGS, TIMING } from '../../shared/config.js';
 import { serverUrl } from '../api.js';
 import { qrSvg } from '../qr.js';
-import { esc, steps } from '../ui.js';
+import { canRemove, esc, steps } from '../ui.js';
 import { legalLink } from './home.js';
 
 /** The settings on screen: the room's in a game, else this phone's for the next game. */
@@ -93,11 +93,17 @@ function reportBody({ flagLeft }) {
   ${buttons(`<button class="btn bg-red text-white" data-act="reportnow">Delete photo<small class="mt-0.5 block text-xs font-semibold text-white/75">Automatic deletion in ${seconds} s</small></button>`, '<button class="btn" data-act="close">Cancel</button>')}`;
 }
 
+/**
+ * "Remove?": the host's removal is for good, anyone else's (of a player who is offline) lets
+ * them join again with the code (`kick` in src/game/rules.js). Once this phone may no longer
+ * remove them (they came back online, `ui.canRemove`), the sheet closes by itself.
+ */
 function removeBody({ view, session }) {
   const p = view.players.find((x) => x.id === session.target);
-  if (!p) return '';
+  if (!p || !canRemove(view, p)) return '';
+  const after = view.hostId === view.me.id ? 'They can’t join it again.' : 'They can join again with the code.';
   return `${title(`Remove ${esc(p.name)}?`)}
-    ${text(`${esc(p.name)} and their photos leave this game and can’t join it again.`)}
+    ${text(`${esc(p.name)} and their photos leave this game. ${after}`)}
     ${buttons('<button class="btn bg-red text-white" data-act="removenow">Remove</button>', '<button class="btn" data-act="close">Cancel</button>')}`;
 }
 

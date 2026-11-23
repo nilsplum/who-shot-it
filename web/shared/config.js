@@ -291,8 +291,6 @@ export const TIMING = {
   effectShare: 0.85,
   /** During a game, a host offline this long hands the role to the next connected player. */
   hostGraceMs: 8000,
-  /** A player offline this long in the lobby is removed, so the others can start. */
-  lobbyDropMs: 60000,
   /**
    * A room with no activity for this long is deleted with everything in it. Until then its
    * code keeps working, even when everyone left, so the same group can play again the next

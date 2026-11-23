@@ -10,8 +10,9 @@
  * the `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when
  * the photo appears and on the reveal (`main.js` `moments`). The bar is a part of its own:
  * on the reveal it changes from the answer time's look to the look time's
- * (`ui.timerBar`). The host can tap a player in the "who has answered" row to remove them
- * (`views/sheets.js`). Scores live on the leaderboard between the rounds, not here. While
+ * (`ui.timerBar`). Tapping a player in the "who has answered" row opens "Remove?"
+ * (`views/sheets.js`) for the host, and for everyone while that player is offline. Scores
+ * live on the leaderboard between the rounds, not here. While
  * someone else flagged the photo (`round.flag`, not mine), the stage says so instead of
  * showing it and the cards wait; the flagger keeps the photo under the report sheet.
  *
@@ -33,7 +34,7 @@
  * a right pick also makes the owner's card pop and throw a little confetti.
  */
 
-import { CONFETTI, LEAVE_BUTTON, SPINNER, avatar, barTitle, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
+import { CONFETTI, LEAVE_BUTTON, SPINNER, avatar, barTitle, canRemove, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -141,14 +142,16 @@ function cards(view, { picked, late, photo }) {
 
 /**
  * Who has answered: a small avatar per player, with the dashed ring while the round waits
- * for them (`ui.avatar`). The host can tap one to remove that player.
+ * for them, the red warning light while they are offline (the round does not wait for them,
+ * `ui.avatar`). A player this phone may remove (`ui.canRemove`) is a button for "Remove?".
  */
-function dots(view, host) {
+function dots(view) {
   if (view.phase !== 'show') return '';
   const answered = new Set(view.round.answered);
   const dot = (p) => {
-    const a = avatar(p, 'sm', { waiting: !answered.has(p.id) });
-    return host && p.id !== view.me.id ? `<button data-act="remove" data-v="${esc(p.id)}" aria-label="${esc(p.name)}: remove from game">${a}</button>` : a;
+    const a = avatar(p, 'sm', { waiting: !answered.has(p.id), offline: !p.connected });
+    const label = p.connected ? `${esc(p.name)}: remove from game` : `${esc(p.name)} is offline: remove from game`;
+    return canRemove(view, p) ? `<button data-act="remove" data-v="${esc(p.id)}" aria-label="${label}">${a}</button>` : a;
   };
   return `<div class="flex flex-wrap justify-center gap-1">${view.players.map(dot).join('')}</div>`;
 }
@@ -165,7 +168,6 @@ function after(view, reactions) {
  */
 export function gameScreen(c, state) {
   const { view } = c;
-  const host = view.hostId === view.me.id;
   return {
     key: `game|${view.code}`,
     layout: `<div class="screen h-dvh">
@@ -180,7 +182,7 @@ export function gameScreen(c, state) {
       timer: timerBar(view.phase === 'reveal' ? 'look' : 'answer'),
       stage: stage(view, state),
       opts: cards(view, state),
-      dots: dots(view, host),
+      dots: dots(view),
       after: after(view, state.reactions),
     },
   };
