@@ -21,7 +21,7 @@
 
 export default {
   /** Under the name on the page and in search. */
-  shortDescription: 'Random photos from your friends’ phones. Guess who took them!',
+  shortDescription: 'Photo guessing game for friends: guess whose phone each random photo came from!',
   developer: 'HiveDone UG (haftungsbeschränkt)',
   /** App type Game, category Trivia; the tags as the Play Console offers them. */
   category: 'Trivia',
@@ -33,10 +33,12 @@ export default {
    * others (none), and data collected, by Google's category with its data types: each
    * collected, not processed ephemerally, required, for App functionality only. Encrypted
    * in transit; deletion on request by email (and gone after a day at the latest anyway).
+   * The answers, points and reactions the room keeps for the game are Google's "Other
+   * actions" ("gameplay, likes"), Apple's "Gameplay Content".
    */
   dataSafety: {
     shared: {},
-    collected: { 'Personal info': ['Name'], 'Photos and videos': ['Photos'], 'Device or other IDs': ['Device or other IDs'] },
+    collected: { 'Personal info': ['Name'], 'Photos and videos': ['Photos'], 'App activity': ['Other actions'], 'Device or other IDs': ['Device or other IDs'] },
     encryptedInTransit: true,
     deletionOnRequest: true,
   },

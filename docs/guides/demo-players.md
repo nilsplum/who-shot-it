@@ -54,7 +54,7 @@ including reporting a photo and removing a player. What worked:
    the app asks **Is everyone here?**, tap **Yes, start**.
 7. In the first round tap the flag on the photo, then **Delete photo**.
 8. Play until the podium has revealed all three places and **Play again** appears (about
-   six seconds), then stop the recording.
+   ten seconds), then stop the recording.
 9. Send it to the Mac (Photos, Share, AirDrop). Cut out waiting time and anything that is
    not the app, and save the result as `store/ios_review-video.mp4` (git-ignored: it shows
    your phone and your photos).

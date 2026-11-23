@@ -30,22 +30,34 @@
  * the description because the first question anyone has about this game is "who sees my
  * photos?". The imprint link at the end keeps the imprint one tap from the store page
  * (German law), on Android too, where the page links only the website.
+ *
+ * Search: the words are the ones players type (the App Store's search suggestions and who
+ * ranks for them, November 2026). Wide searches like "party games with friends", "group
+ * games", "guessing games", "game night" or "games to play with friends in person" belong
+ * to apps with thousands of ratings; the narrow ones a new app can lead are "photo party
+ * game", "photo guessing game", "camera roll game" and "whose photo". So the name holds
+ * "Photo Party Game", the iPhone subtitle "Camera roll guessing game", and the texts use
+ * the wide words where they read naturally. The iPhone store searches only the name, the
+ * subtitle and the keywords (`store/ios_listing.js`); Google Play searches the name, the
+ * short description and this description, so these words matter there, never stuffed.
+ * Another app's name ("Photo Roulette", "Heads Up", "Guess Who") never appears: both stores
+ * forbid it, and it would be a trademark problem.
  */
 import { APP, LIMITS, SERVER } from '../web/shared/config.js';
 
 const description = `Your camera roll is full of stories. Time to play them.
 
-Who Shot It? turns the photos on your phones into the funniest guessing game at the table. Everyone gets a few random photos from their own phone. Then one photo after another pops up on every screen, and you race to tap whose phone it came from.
+Who Shot It? turns the photos on your phones into a guessing game for the whole table. Everyone gets a few random photos from their own camera roll. Then one photo after another pops up on every screen, and you race to tap whose phone it came from.
 
 Was that blurry pizza at 2 a.m. Lena’s? Is the 400th cat picture Ben’s? Guess fast, guess right, and the points are yours. Then the reveal. Friendships have survived worse. Probably.
 
 HOW IT WORKS
-1. One person creates a game. Friends join with a four letter code.
+1. One person creates a game. Friends join with a four letter code or a link.
 2. Everyone gets a few random photos from their phone. Don’t like them? Tap No for new ones, or tap one photo to swap just that one. Happy? Tap Yes.
 3. The photos pop up one by one. Tap who took it. Fast and right scores the most.
 
-MADE FOR PARTIES
-• ${LIMITS.minPlayers} to ${LIMITS.maxPlayers} players, best together in one room
+MADE FOR PARTIES AND GAME NIGHTS
+• ${LIMITS.minPlayers} to ${LIMITS.maxPlayers} players, best played together in person
 • Classic, or Tricky: photos start blurry, zoomed in or pixelated
 • Pick rounds, time and points, each option explained in one sentence
 • Reactions, a leaderboard between the photos, a secret final round and a podium at the end
@@ -80,9 +92,9 @@ export default {
    * short headline and one plain sentence.
    */
   screenshots: [
-    { screen: 'guess', title: 'Whose photo is it?', text: 'Random photos from everyone’s phone. Tap who took it.' },
+    { screen: 'guess', title: 'Whose photo is it?', text: 'Random photos from your friends’ camera rolls. Tap who took it.' },
     { screen: 'photos', title: 'Bring your photos', text: 'The app picks a few at random. Tap No for new ones, Yes when you like them.' },
-    { screen: 'board', title: 'Fast and right wins', text: 'See who guessed what. Then laugh about it.' },
+    { screen: 'board', title: 'Fast and right wins', text: `${LIMITS.minPlayers} to ${LIMITS.maxPlayers} players. See who guessed what, then laugh about it.` },
     { screen: 'newgame', title: 'Play it your way', text: 'Classic, or photos that start blurry, zoomed in or pixelated.' },
     { screen: 'yours', title: 'Your photos stay yours', text: 'Nothing is shared until you tap Yes. Each photo is deleted after its round.' },
   ],

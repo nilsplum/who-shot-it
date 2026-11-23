@@ -22,7 +22,7 @@
  */
 import { SERVER, TIMING } from '../web/shared/config.js';
 
-const promotionalText = 'Tonight’s best party game is already on your phones. Random photos from everyone’s camera roll, one question: whose is it?';
+const promotionalText = 'Your next party game is already on your phones: random photos from everyone’s camera roll, and one question. Whose is it?';
 
 /** One or two plain sentences about what players notice (Apple takes it only for updates). */
 const whatsNew = 'Up to 16 players and over 130 avatars. Yes is instant: your photos are sent in the background, and the 3, 2, 1 starts once every phone has the first photo. The first game asks “Is everyone here?”, and a player whose phone goes offline stays in the game, shown in red, until anyone removes them. A swapped photo turns over like a card, the leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
@@ -42,7 +42,7 @@ Offensive nicknames are replaced. Everyone accepts the terms (16+) before playin
 Questions and reports: whoshotit.info@gmail.com`;
 
 /** Apple's questions for new apps, answered in its order, then the test steps. */
-const reviewNotes = `1. Screen recording: attached. It was made on an iPhone with this build and starts with opening the app. It shows a whole game: creating a game, allowing photo access, removing a player, reporting a photo and the final scores. (The terms screen of the first launch, which everyone accepts before playing, was accepted just before the recording.) Leo, Max and Zoe are our own test players, run on a computer with drawn sample pictures, so one person could record a full game. The video is shortened in a few places (waiting time, iOS pop ups, rounds 6 to 11).
+const reviewNotes = `1. Screen recording: attached. It was made on an iPhone with this build and starts with opening the app. It shows a whole game: creating a game, allowing photo access, removing a player, reporting a photo and the final scores. The other players are our own test players, run on a computer with drawn sample pictures, so one person could record a whole game. Waiting time and some rounds are cut out.
 
 2. Purpose and audience: Who Shot It? is a party game for friends aged 16 and older who meet in person. Each player gets a few random photos from their own phone and decides whether to play with them. Then the photos appear one by one on every phone, and everyone guesses whose photo it is. It gives a group something fun to do together with the photos they already have. Free, no account, no ads, no purchases.
 
@@ -57,15 +57,19 @@ const reviewNotes = `1. Screen recording: attached. It was made on an iPhone wit
 ${howToTest}`;
 
 export default {
-  subtitle: 'Guess whose photo it is',
+  subtitle: 'Camera roll guessing game',
   /** Shown above the description; can change any time without a review. */
   promotionalText,
   /**
    * Search words, never shown. Commas without spaces (a space counts toward the limit).
    * Words of the name and subtitle count already, so none is repeated, and never other
-   * apps' names or trademarks (App Review guideline 2.3.7).
+   * apps' names or trademarks (App Review guideline 2.3.7). The store combines every word
+   * of the name, subtitle and keywords, so single words cover whole searches: "party games
+   * with friends", "group games for adults", "game night", "games to play in person",
+   * "local multiplayer", "icebreaker games", "guess whose photo" (why these: the search
+   * note in store/android_ios_listing.js).
    */
-  keywords: 'memories,selfie,friends,group,camera roll,gallery,pictures,quiz,trivia,multiplayer,funny,icebreaker',
+  keywords: 'friends,group,guess,whose,adults,night,person,play,multiplayer,icebreaker,phone,fun,pics,quiz,local',
   whatsNew,
   developer: 'Nils Plum',
   /** The imprint, which also names every way to reach us. */
@@ -77,12 +81,13 @@ export default {
    * The privacy label ("App Privacy"), by section of the page and Apple's data category,
    * with the data types ticked in App Store Connect: "Yes, we collect data", each type for
    * App Functionality only, not linked to the player, no tracking. The nickname and the
-   * random per-game key are Apple's "User ID".
+   * random per-game key are Apple's "User ID"; the answers, points and reactions the room
+   * keeps for the game are its "Gameplay Content".
    */
   privacy: {
     tracking: {},
     linked: {},
-    notLinked: { 'User Content': ['Photos or Videos'], Identifiers: ['User ID'] },
+    notLinked: { 'User Content': ['Photos or Videos', 'Gameplay Content'], Identifiers: ['User ID'] },
   },
   /** Seen only by Apple's reviewers, for App Review and TestFlight's beta review. */
   reviewContact: { firstName: 'Nils', lastName: 'Plum', phone: '+49 177 2438912', email: 'whoshotit.info@gmail.com' },
