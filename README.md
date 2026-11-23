@@ -81,14 +81,15 @@ game": a 4-letter code (no look-alike letters). Friends join with the code, a sh
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
 lobby → 3-2-1 once everyone (at least two) is ready (the game is dealt then: which photos,
-in which random order) → per round *load* (every phone holds the photo and the next two) →
-*show* → *reveal* → *board* (the leaderboard; holding "Show again" shows the photo to
-everyone and stops the clock; when its time is up it waits until every phone holds the next
-round's photos) → *end*. The last photo's reveal goes straight to *end*, and the board
-before it says only "FINAL ROUND", so the standings stay secret until the podium. "Play
-again" is anyone's: the first tap opens the next game under the same code, the others join
-it when they are done looking at the results. Apps get a full snapshot after every change, with the photo's owner hidden until
-the reveal.
+in which random order) → per round *load* (every phone holds the photo) → *show* →
+*reveal* → *board* (the leaderboard; holding "Show again" shows the photo to everyone and
+stops the clock; when its time is up it waits until every phone holds the next round's
+photo) → *end*. The last photo's reveal goes straight to *end*, and the board before it says
+only "FINAL ROUND", so the standings stay secret until the podium. "Play again" is
+anyone's: the first tap opens the next game under the same code, the others join it when
+they are done looking at the results. An app gets a full snapshot whenever what it shows
+changed (with the photo's owner hidden until the reveal) and counts every timer down to its
+end on the server's clock.
 
 **Photos.** With the player's permission, the app picks n random photos on the phone and
 shows small previews. A bucket of checked previews (and the big versions of the first

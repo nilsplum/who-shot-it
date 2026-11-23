@@ -9,6 +9,11 @@
  * `rules.nextWake`. The photos of the game live in this object's SQLite storage, which
  * the Worker pins to the EU (`SERVER.jurisdiction`).
  *
+ * Only real changes cost anything: an event that changes nothing but the room's activity
+ * time (a message repeated or ignored) is neither stored nor sent, and a phone gets its
+ * view only when what it shows changed (`sendView`). So a player's message reaches the
+ * others only if they see a difference, and no phone's message can make every phone busy.
+ *
  * Invariants:
  * - A Durable Object handles one event at a time, but an `await` lets the next one in.
  *   So handlers read request bodies first and then read the room, apply and commit
@@ -16,7 +21,8 @@
  * - Sockets use the Hibernation API: between messages the object may be evicted from
  *   memory, so everything needed later is in storage or in the socket's attachment
  *   (`{ playerId, openedAt, lastReact, lastPeek }`). App pings are answered by the runtime
- *   without waking the object.
+ *   without waking the object. Only `sent` (what each socket was last sent) lives in memory
+ *   alone: losing it costs one extra view per phone, nothing else.
  * - Deleting is declarative: blobs are kept only while `referencedPhotoIds` names them,
  *   so every rule that drops a photo from the state (round over, game over, unready,
  *   leave, removed player, reported photo, settings change) deletes it here.
@@ -28,7 +34,7 @@ import { CLOSE, matchRoomRoute } from '../web/shared/api.js';
 import { LIMITS, REACTIONS, TIMING } from '../web/shared/config.js';
 import { apply, nextWake } from './game/rules.js';
 import { cleanName, isServablePhoto, makeId, newRoom, playerById, playerByKey, referencedPhotoIds } from './game/state.js';
-import { viewFor } from './game/view.js';
+import { CLOCK_FIELDS, viewFor } from './game/view.js';
 import { bearerKey, cryptoRandom, fail, isJpeg, isPlayerKey, json, tooLarge } from './http.js';
 
 /** App messages that become events, each with exactly the fields the rules read. */
@@ -54,6 +60,12 @@ const attachment = (ws) => {
   }
 };
 
+/** The room without its activity time: an event that changed nothing else changed nothing. */
+const essence = (room) => JSON.stringify({ ...room, touchedAt: 0 });
+
+/** A view as its phone sees it: without the fields that change by themselves with time (`CLOCK_FIELDS`). */
+const seen = (view) => JSON.stringify(view, (key, value) => (CLOCK_FIELDS.includes(key) ? undefined : value));
+
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -62,6 +74,12 @@ export class Room extends DurableObject {
     const exists = this.sql.exec("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'room'").toArray().length > 0;
     const row = exists ? this.sql.exec('SELECT state FROM room WHERE id = 1').toArray()[0] : null;
     this.room = row ? JSON.parse(row.state) : null;
+    /**
+     * What each socket was last sent, as its phone sees it (`seen`). In memory only: after
+     * the object was evicted (hibernation) it starts empty, and the next change simply goes
+     * to every phone once.
+     */
+    this.sent = new WeakMap();
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
 
@@ -85,7 +103,11 @@ export class Room extends DurableObject {
       this.destroy();
       return;
     }
-    if (JSON.stringify(room) !== JSON.stringify(previous)) {
+    if (previous && essence(room) === essence(previous)) {
+      // Nothing happened (a repeated or ignored message): nothing to store or send, and it
+      // is no activity either, so the room keeps its idle time.
+      this.room = previous;
+    } else {
       this.sql.exec('INSERT OR REPLACE INTO room (id, state) VALUES (1, ?)', JSON.stringify(room));
       this.sql.exec('DELETE FROM photos WHERE id NOT IN (SELECT value FROM json_each(?))', JSON.stringify(referencedPhotoIds(room)));
       this.broadcast();
@@ -132,9 +154,19 @@ export class Room extends DurableObject {
     }
   }
 
-  sendView(ws, playerId) {
+  /**
+   * Sends the player their view, unless it shows nothing new since the last one this socket
+   * got (another player's readiness, a "Show again" renewal: changes that player does not
+   * see). The phone counts every timer down by itself (`web/js/clock.js`), so a view that
+   * differs only in its time fields brings nothing. `always` answers a hello.
+   */
+  sendView(ws, playerId, { always = false } = {}) {
+    const view = viewFor(this.room, playerId, Date.now());
+    const shown = seen(view);
+    if (!always && this.sent.get(ws) === shown) return;
     try {
-      ws.send(JSON.stringify({ type: 'state', view: viewFor(this.room, playerId, Date.now()) }));
+      ws.send(JSON.stringify({ type: 'state', view }));
+      this.sent.set(ws, shown);
     } catch {}
   }
 
@@ -273,7 +305,7 @@ export class Room extends DurableObject {
       other.close(CLOSE.replaced, 'replaced');
     }
     ws.serializeAttachment({ ...attachment(ws), playerId: player.id });
-    this.sendView(ws, player.id);
+    this.sendView(ws, player.id, { always: true });
   }
 
   /** Reactions are not game state: they are passed on to everyone else at once. */

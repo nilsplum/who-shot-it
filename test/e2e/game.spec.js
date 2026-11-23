@@ -208,7 +208,7 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
   await host.getByRole('button', { name: 'Done' }).click();
   await host.getByRole('button', { name: 'Start game' }).click();
   const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
-  // Ben's phone gets the game's first three photos at once, the rest only when the test lets them through.
+  // Ben's phone gets the game's first photo at once, the rest only when the test lets them through.
   const guest = await openApp(browser, 'Ben');
   let release;
   const gate = new Promise((resolve) => {
@@ -217,15 +217,15 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
   let served = 0;
   await guest.route('**/api/rooms/*/photos/*', async (route) => {
     served += 1;
-    if (served > 3) await gate;
+    if (served > 1) await gate;
     await route.continue();
   });
   await join(guest, code);
   for (const page of [host, guest]) await choosePhotos(page, 4);
-  // Round 1 needs photos 1 to 3, which both phones hold after the 3-2-1.
+  // Round 1 needs only its own photo, which both phones hold after the 3-2-1.
   await expect(guest.getByText('1 / 5', { exact: true })).toBeVisible();
   for (const page of [host, guest]) await page.locator('[data-act="answer"]').first().click();
-  // The leaderboard's time runs out, but Ben does not hold round 2's photos yet: it stays.
+  // The leaderboard's time runs out, but Ben does not hold round 2's photo yet: it stays.
   await expect(host.getByRole('progressbar', { name: 'Loading photos' })).toBeVisible({ timeout: 20_000 });
   await expect(host.getByRole('heading', { name: 'Round 1 of 5' })).toBeVisible();
   release();

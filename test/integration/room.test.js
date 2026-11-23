@@ -1,8 +1,9 @@
 /**
  * The Worker and the room's Durable Object together, over real HTTP and WebSocket requests
- * in the Workers runtime: who may call the API, creating and joining rooms, uploads, the
- * game flow driven by the alarm, photo access rules, flags, reports and removed players,
- * and deleting everything at the end.
+ * in the Workers runtime: who may call the API, creating and joining rooms, uploads, what
+ * the room stores and sends (only real changes, only to phones that see them), the game
+ * flow driven by the alarm, photo access rules, flags, reports and removed players, and
+ * deleting everything at the end.
  */
 import { env, exports } from 'cloudflare:workers';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
@@ -164,6 +165,46 @@ describe('uploads', () => {
     ann.send({ type: 'unready' });
     await ann.until((v) => !v.me.ready);
     expect(await countRows(code, 'photos')).toBe(0);
+  });
+});
+
+describe('what the room stores and sends', () => {
+  test('a message that changes nothing costs nothing, and a phone gets a view only when what it shows changed', async () => {
+    const code = await createRoom({ photos: 4 });
+    const ann = await connect(code, 'Ann');
+    const ben = await connect(code, 'Ben');
+    await ann.until((v) => v.players.length === 2);
+    await ben.until((v) => v.players.length === 2);
+    const stored = () => runInDurableObject(stub(code), (i) => i.sql.exec('SELECT state FROM room WHERE id = 1').one().state);
+    const views = (p) => p.messages.filter((m) => m.type === 'state').length;
+    // Messages that change nothing (no game to be ready for, no leaderboard to move on from):
+    // nothing is stored and nobody gets a view. A hello is always answered, and on the same
+    // socket it comes after them, so its answer shows that both were handled.
+    const before = { state: await stored(), ann: views(ann), ben: views(ben) };
+    ann.send({ type: 'loaded', round: 1 });
+    ann.send({ type: 'next' });
+    ann.send({ type: 'hello', key: ann.key, name: 'Ann', avatar: '🦊' });
+    await new Promise((resolve) => {
+      const check = () => (views(ann) > before.ann ? (resolve(), true) : false);
+      if (!check()) ann.waiters.push(check);
+    });
+    expect(await stored()).toBe(before.state);
+    expect(views(ann)).toBe(before.ann + 1);
+    expect(views(ben)).toBe(before.ben);
+    // In a dealt game, Ann's readiness changes only what Ann sees: only she gets a view.
+    await upload(code, ann.key, JPEGS);
+    await upload(code, ben.key, []);
+    await ann.until((v) => v.phase === 'countdown');
+    await ben.until((v) => v.phase === 'countdown');
+    const dealt = { ann: views(ann), ben: views(ben) };
+    ann.send({ type: 'loaded', round: 1 });
+    await ann.until((v) => v.me.loaded === 1);
+    // A change both see (the host's setting, which also starts the 3-2-1 over): one view each.
+    ann.send({ type: 'setting', key: 'rounds', value: 5 });
+    await ben.until((v) => v.settings.rounds === 5);
+    await ann.until((v) => v.settings.rounds === 5);
+    expect(views(ben)).toBe(dealt.ben + 1);
+    expect(views(ann)).toBe(dealt.ann + 2);
   });
 });
 

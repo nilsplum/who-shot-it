@@ -34,8 +34,8 @@
  *   far it is (`session.progress`): the big versions getting ready, then the upload.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
- *   is animated every frame from the round's clock (`clock.js`, synced with every view)
- *   and the timer's length the view carries (`total`).
+ *   is animated every frame from the round's timer on the server's clock (`clock.js`,
+ *   learned from every view) and the timer's length the view carries (`total`).
  * - The flag: ⚑ flags the photo in the room (the others stop seeing it, the round waits)
  *   and opens the report sheet on this phone; Delete, Cancel, the backdrop and the back
  *   button end it (`endFlag`). The sheet is this phone's own intent: the room's views only
@@ -88,12 +88,20 @@ const paintSheet = createPainter($('sheet'));
 let socket = null;
 let lastReactAt = 0;
 let checkingAccess = false;
-/** The round this phone last said it is ready for (reset to the room's word with every view). */
+/**
+ * The round this phone last told the room it is ready for (`reportReady`). Set back whenever
+ * the room may not have it: a new connection (a message sent while it broke is lost), or
+ * the room forgot (a new deal, or a changed plan after someone left: `roomMark` went down).
+ */
 let reported = 0;
-/** The room's timer for the phase on screen, counted down on this phone between views. */
-const roundClock = createClock();
-/** How long this phone's flag still waits before the room deletes the photo by itself. */
-const flagClock = createClock();
+/** The room's word on that in the last view (`view.me.loaded`); it only grows unless the room forgot. */
+let roomMark = 0;
+/** The server's clock as this phone knows it (`clock.js`), learned from every view. */
+const clock = createClock();
+/** The room's timer for the phase on screen, on the server's clock (`clock.timer`). */
+let roundTimer = null;
+/** When the room deletes the photo this phone flagged by itself, on the server's clock; null without such a flag. */
+let flagTimer = null;
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -102,7 +110,7 @@ const canReadPhotos = () => session.access === 'full' || session.access === 'lim
 // ---------- Time ----------
 
 /** Milliseconds left on the room's current timer (frozen while the room holds the round), or null. */
-const leftNow = () => roundClock.left();
+const leftNow = () => clock.left(roundTimer);
 
 const isLate = (v) => v.phase === 'show' && Boolean(v.settings.time) && leftNow() === 0;
 
@@ -113,8 +121,8 @@ function myPick(v) {
 
 /**
  * While the room waits for the phones' photos (`view.waiting`), how far the whole table is,
- * 0 to 1: the other phones by what the room knows, this one by what it holds already
- * (finer than its last report); else null.
+ * 0 to 1: the other phones by what the room knows, this one by whether it holds the photo
+ * already (its report may still be on the way); else null.
  */
 function loadShare(v) {
   if (!v.waiting || !v.waiting.of || !v.round) return null;
@@ -127,7 +135,7 @@ function loadShare(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view, flagLeft: flagClock.left() };
+  return { device, session, view: session.view, flagLeft: clock.left(flagTimer) };
 }
 
 function screen() {
@@ -350,8 +358,11 @@ function send(message) {
 }
 
 function onStatus(status) {
-  if (status === 'open') session.conn = 'open';
-  else if (session.conn !== 'down') {
+  if (status === 'open') {
+    session.conn = 'open';
+    // A report sent while the old connection broke may be lost: say it again on the first view.
+    reported = 0;
+  } else if (session.conn !== 'down') {
     session.conn = 'down';
     session.downSince = performance.now();
   }
@@ -368,14 +379,18 @@ function onEnd(code) {
 }
 
 /**
- * Tells the room the round this phone is ready for (`upcoming.readyFor`) whenever it is
- * further than what the room knows; one message per step, so about one per round.
+ * Tells the room the round this phone is ready for (it holds that round's photo,
+ * `upcoming.readyFor`), counted no further than the round after the one on screen: the
+ * furthest the room ever waits for. So a phone sends one message per round (during the
+ * 3-2-1 for round 1, then in each round for the next), however fast its photos arrive, and
+ * never one the room already has or that is still on its way (`reported`).
  */
 function reportReady() {
   const v = session.view;
   if (!v || !v.me || !v.upcoming || !v.upcoming.length) return;
-  const ready = readyFor(v.round ? v.round.n : 1, v.upcoming);
-  if (ready <= reported) return;
+  const round = v.round ? v.round.n : 0;
+  const ready = Math.min(readyFor(Math.max(1, round), v.upcoming), round + 1);
+  if (ready <= Math.max(reported, v.me.loaded || 0)) return;
   reported = ready;
   send({ type: 'loaded', round: ready });
 }
@@ -395,10 +410,11 @@ function onMessage(msg) {
   const previous = session.view;
   const v = msg.view;
   session.view = v;
-  // The timer is named by its phase and round: within one, a snapshot never moves it (`clock.js`).
-  roundClock.sync(`${v.phase}|${v.round ? v.round.n : ''}`, v.left, v.paused);
+  // The timers end at moments on the server's clock, which every view teaches a little better (`clock.js`).
+  clock.heard(v.now);
+  roundTimer = clock.timer(v.left, v.now, v.paused);
   const flag = v.round && v.round.flag;
-  flagClock.sync(`flag|${v.round ? v.round.n : ''}`, flag && flag.mine ? flag.left : null);
+  flagTimer = flag && flag.mine ? clock.timer(flag.left, v.now) : null;
   if (!v.me) return;
   if (previous && previous.hostId !== v.hostId && v.hostId === v.me.id) toast('You’re the host now 👑');
   // Back in a lobby (not still looking at the last results): the next game plays its entrances again.
@@ -425,8 +441,10 @@ function onMessage(msg) {
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target)) session.sheet = null;
   if (inRound(v)) photos.spent = true;
   moments(previous, v);
-  // The room's word on this phone's readiness (it forgets after a changed plan), then the photos.
-  reported = v.me.loaded || 0;
+  // The room forgot this phone's readiness (a new deal, a changed plan): it reports again.
+  const mark = v.me.loaded || 0;
+  if (mark < roomMark || !(v.upcoming && v.upcoming.length)) reported = mark;
+  roomMark = mark;
   syncUpcoming(v.upcoming || [], onPhotos);
   reportReady();
   syncPhotoFilter();

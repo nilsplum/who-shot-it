@@ -3,8 +3,9 @@
  * over the room's WebSocket.
  *
  * Mechanisms: part of the pure game logic; the room's Durable Object sends
- * `viewFor(room, playerId, now)` to every socket after every change, as a full snapshot
- * (rooms are small, so there are no diffs to get out of sync after a reconnect).
+ * `viewFor(room, playerId, now)` to a phone after every change that changes what that phone
+ * sees, as a full snapshot (rooms are small, so there are no diffs to get out of sync after
+ * a reconnect).
  *
  * Invariants (the game depends on them):
  * - Built from an explicit list of fields, never by copying a player or the room, so a
@@ -13,10 +14,15 @@
  *   players' picks: before that an app only learns who has answered, and its own pick.
  * - Who flagged a photo stays hidden: an app only learns that it is flagged, and whether
  *   by itself (`round.flag.mine`, so it shows the report sheet while the others wait).
- * - The phase's timer is relative: `left` (ms) and `total` (its full length, from
- *   `timerMs`), so a phone's wrong clock never matters and no app needs to know how long a
- *   phase lasts. `paused` says the round's clock stands still (someone holds the round),
- *   so apps stop counting down; `left` is then frozen at the moment it stopped.
+ * - The phase's timer: `left` (ms) and `total` (its full length, from `timerMs`), with
+ *   `now`, the server's time when the view was made. A phone never trusts its own clock's
+ *   date: it learns how its clock differs from the server's (`web/js/clock.js`) and counts
+ *   down to `now + left`, the timer's end on the server's clock, which is the same in every
+ *   view of the same timer however late a view arrives. No app needs to know how long a
+ *   phase lasts. `paused` says the round's clock stands still (someone holds the round), so
+ *   apps stop counting down; `left` is then frozen at the moment it stopped.
+ * - `now` and every `left` change by themselves as time passes (`CLOCK_FIELDS`); the room
+ *   leaves them out when it decides whether a phone's view changed (`src/room.js`).
  * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
  * - `upcoming` lists the links of the photos a phone may load now, in play order (from the
  *   3-2-1 on: the whole game; then from the round on screen; `null` for a deleted one),
@@ -28,6 +34,13 @@
 
 import { API } from '../../web/shared/api.js';
 import { currentEntry, inGame, nextEntry, photoWait, playerById, timerMs, upcomingEntries } from './state.js';
+
+/**
+ * The fields of a view that change by themselves with time (the server's time, and the
+ * time left on the phase's timer and on a flag), not with the game. Every other field
+ * changes only when something happens in the room.
+ */
+export const CLOCK_FIELDS = ['now', 'left'];
 
 /** The round's clock stands still (someone holds the round, `rules.js` `settleClock`). */
 const isPaused = (room) => Boolean(room.game && room.game.pausedAt != null && inGame(room));
@@ -100,6 +113,7 @@ export function viewFor(room, playerId, now) {
     players: room.players.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
     })),
+    now,
     left,
     total,
     paused: isPaused(room),

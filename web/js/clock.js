@@ -1,52 +1,55 @@
 /**
- * A countdown the room runs, followed on this phone between the room's snapshots: the
- * timer bar, the 3-2-1, the photo effects and "time is up" all read it.
+ * The server's clock on this phone: every timer the room runs (the 3-2-1, the answer time,
+ * the reveal, the leaderboard, a flag's automatic deletion) ends at a moment on the server's
+ * clock, and the phone counts down to that moment. The timer bar, the 3-2-1, the photo
+ * effects, "time is up" and the flag's countdown all read it.
  *
- * Mechanisms: `main.js` keeps one clock for the round's timer and syncs it with every
- * snapshot (`left`, `paused` from `src/game/view.js`); `left()` counts down from there with
- * the phone's own monotonic time. The room owns the time: a phone's wrong clock never
- * matters, because a snapshot only says how much is left.
+ * Mechanisms: every view carries the server's time when it was made (`view.now`,
+ * `src/game/view.js`) next to the time a timer still has (`left`). `main.js` hands each
+ * arriving view's `now` to `heard`, and so the phone learns how far its own clock is from
+ * the server's. A view always arrives a little late (the network, a busy phone), never
+ * early, so the view that shows the largest difference is the most exact one, and the clock
+ * keeps it: the usual way a game client follows its server's clock. A timer (`timer`) then
+ * ends at `now + left` on the server's clock: the same moment in every view of the same
+ * timer, however late a view arrives, while a restarted or extended timer ends at another.
  *
  * Invariants:
- * - A snapshot moves the countdown only when it describes another timer (its `key` changed:
- *   another phase or round) or disagrees by more than TIMING.clockSlackMs. Every snapshot
- *   arrives with a slightly different network delay; following each one made the timer bar
- *   jump whenever someone answered. A real change (a round let go after being held, an app
- *   that slept) is always far more than the slack.
- * - While the room's clock stands still (`stopped`), the countdown shows the frozen time;
- *   when it runs again the next snapshot anchors it anew.
- * - Pure apart from the time source it is given, so the unit tests drive it with a fake one.
+ * - A late view never moves a countdown: it neither changes a timer's end (exact on the
+ *   server) nor the clock's difference (only an earlier, better view does). So the 3-2-1
+ *   counts 3, 2, 1 and the timer bar only runs down.
+ * - While the room's clock stands still (`paused`), a timer shows its frozen time.
+ * - Pure apart from the time source it is given (`performance.now` in the app, which never
+ *   jumps), so the unit tests drive it with a fake one. A view without `now` (a server
+ *   before it) anchors its timer on arrival instead.
  */
 
-import { TIMING } from '../shared/config.js';
-
-/** A countdown; `now` is the phone's monotonic time in ms (`performance.now` in the app). */
-export function createClock(now = () => performance.now()) {
-  let key = null;
-  /** When the timer ends, in `now`'s time, or null while stopped or without a timer. */
-  let end = null;
-  /** The frozen time while the room's clock stands still, else null. */
-  let frozen = null;
+/** The server's clock; `local` is this phone's monotonic time in ms. */
+export function createClock(local = () => performance.now()) {
+  /** The server's time minus this phone's, from the fastest view heard; null before the first. */
+  let offset = null;
+  /** The server's time now, as best known (this phone's own time before any view). */
+  const serverNow = () => local() + (offset ?? 0);
   return {
-    /** Takes a snapshot's timer: `left` ms (null: no timer), named by `nextKey`. */
-    sync(nextKey, left, stopped = false) {
-      if (left === null || stopped) {
-        key = nextKey;
-        end = null;
-        frozen = stopped ? left : null;
-        return;
-      }
-      const estimate = now() + left;
-      if (nextKey !== key || end === null || Math.abs(estimate - end) > TIMING.clockSlackMs) {
-        key = nextKey;
-        end = estimate;
-        frozen = null;
-      }
+    /** A view made at the server's time `now` arrived just now. */
+    heard(now) {
+      if (typeof now !== 'number') return;
+      const difference = now - local();
+      if (offset === null || difference > offset) offset = difference;
     },
-    /** Milliseconds left, or null when there is no timer. */
-    left() {
-      if (frozen !== null) return frozen;
-      return end === null ? null : Math.max(0, end - now());
+    /**
+     * A view's timer: `left` ms remained when the view was made at the server's time `now`.
+     * `{ ends }` on the server's clock, `{ frozen }` while the room holds it, or null for none.
+     */
+    timer(left, now, paused = false) {
+      if (left === null || left === undefined) return null;
+      if (paused) return { frozen: left };
+      return { ends: (typeof now === 'number' ? now : serverNow()) + left };
+    },
+    /** Milliseconds left on `timer` now, or null without one. */
+    left(timer) {
+      if (!timer) return null;
+      if (timer.frozen !== undefined) return timer.frozen;
+      return Math.max(0, timer.ends - serverNow());
     },
   };
 }

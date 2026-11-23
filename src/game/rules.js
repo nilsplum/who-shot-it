@@ -385,8 +385,8 @@ const HANDLERS = {
   },
 
   /**
-   * A phone is ready for `round` (it holds that round's photo and the next
-   * LIMITS.readyAhead). Marks only grow; from the 3-2-1 on, for any round of the plan.
+   * A phone is ready for `round`: it holds that round's photo (and every one before it that
+   * is still to come). Marks only grow; from the 3-2-1 on, for any round of the plan.
    */
   loaded(room, { playerId, round }) {
     const g = room.game;
@@ -591,7 +591,8 @@ export function apply(room, event, now, rng) {
   // A room saved by an earlier server version may lack a setting added since; normalizing
   // gives it every current setting (its default), so no rule ever reads an undefined one.
   next.settings = normalizeSettings(next.settings);
-  // Activity keeps a room alive; timers and lost connections are not activity.
+  // Activity keeps a room alive; timers and lost connections are not activity, and neither
+  // is an event that changes nothing else (the room keeps nothing of it, `src/room.js`).
   if (event.type !== 'tick' && event.type !== 'disconnect') next.touchedAt = now;
   handler(next, event, now, rng);
   settle(next, now, rng);

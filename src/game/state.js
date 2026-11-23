@@ -199,10 +199,10 @@ export function isServablePhoto(room, photoId) {
 }
 
 /**
- * Whether a player's phone holds what round `r` needs. An app that loads ahead
- * (`player.ahead`) says the round it is ready for (`game.loaded`, LIMITS.readyAhead); an app
- * before that reports only the photo on screen, during its round's `load`, so the room
- * waits for it only there. Past the last round there is nothing to hold.
+ * Whether a player's phone holds what round `r` needs: its photo. An app that loads ahead
+ * (`player.ahead`) says the round it is ready for (`game.loaded`); an app before that
+ * reports only the photo on screen, during its round's `load`, so the room waits for it
+ * only there. Past the last round there is nothing to hold.
  */
 export function holdsRound(room, player, r) {
   const g = room.game;

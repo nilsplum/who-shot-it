@@ -4,7 +4,7 @@
 import { expect, test } from 'vitest';
 import { TIMING } from '../../web/shared/config.js';
 import { apply } from '../../src/game/rules.js';
-import { viewFor } from '../../src/game/view.js';
+import { CLOCK_FIELDS, viewFor } from '../../src/game/view.js';
 import { T0, idOf, roomWith, seededRandom } from '../helpers.js';
 
 const rng = seededRandom(3);
@@ -58,12 +58,17 @@ test('the leaderboard: everyone sees who holds "Show again" as a shared flag, an
   expect(JSON.stringify(view)).not.toContain('peeks');
 });
 
-test('timers are relative and carry their full length; photo links point at the photo on screen and the next one', () => {
+test('timers carry the server time, what is left and their full length; photo links point at the photo on screen and the next one', () => {
   const room = inShow();
   const shownAt = T0 + TIMING.countdownMs;
   const view = viewFor(room, idOf(room, 'Ann'), shownAt + 4000);
-  // The answer time the players see ends before the room's deadline (its grace for late answers).
-  expect(view).toMatchObject({ left: room.settings.time * 1000 - 4000, total: room.settings.time * 1000, paused: false });
+  // The answer time the players see ends before the room's deadline (its grace for late answers);
+  // `now + left` is that end on the server's clock, the same in every view of this timer.
+  expect(view).toMatchObject({ now: shownAt + 4000, left: room.settings.time * 1000 - 4000, total: room.settings.time * 1000, paused: false });
+  expect(viewFor(room, idOf(room, 'Ann'), shownAt + 7000)).toMatchObject({ now: shownAt + 7000, left: room.settings.time * 1000 - 7000 });
+  // Only the time fields change by themselves: the room compares views without them.
+  const timeless = (v) => JSON.stringify(v, (key, value) => (CLOCK_FIELDS.includes(key) ? undefined : value));
+  expect(timeless(viewFor(room, idOf(room, 'Ann'), shownAt + 7000))).toBe(timeless(view));
   let revealed = room;
   for (const p of room.players) revealed = apply(revealed, { type: 'answer', playerId: p.id, pick: p.id }, shownAt + 5000, rng);
   expect(viewFor(revealed, idOf(room, 'Ann'), shownAt + 6000)).toMatchObject({ left: TIMING.revealMs - 1000, total: TIMING.revealMs });

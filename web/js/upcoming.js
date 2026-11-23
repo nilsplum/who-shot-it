@@ -5,12 +5,12 @@
  * Mechanisms: from the 3-2-1 on, every view lists the photos this phone may load now
  * (`view.upcoming`: the whole game during the 3-2-1, then from the round on screen;
  * `src/game/view.js`). `syncUpcoming` takes that list; one loader (`loader.js`) fetches the
- * photos one at a time in play order, so the photo on screen and the next LIMITS.loadAhead
- * come first by being first, and the rest follow without a break. Each one becomes an
- * object URL that the stage, the photo effects and "Show again" paint from (`photoUrl`).
- * `readyFor` says which round this phone holds what it needs for (its photo and the next
- * LIMITS.readyAhead); `main.js` reports that to the room (`loaded`), which starts round 1
- * and ends a leaderboard only when every phone is ready.
+ * photos one at a time in play order, so the photo on screen comes first, the next one
+ * right after it, and the rest follow without a break, the whole game during the 3-2-1 and
+ * the first rounds. Each one becomes an object URL that the stage, the photo effects and
+ * "Show again" paint from (`photoUrl`). `readyFor` says up to which round this phone holds
+ * the photos; `main.js` reports that to the room (`loaded`, once per round), which starts
+ * round 1 and ends a leaderboard only when every phone holds the photo it is about to show.
  *
  * Invariants:
  * - Memory only: photos are fetched with `cache: 'no-store'` (the server says `no-store`
@@ -23,7 +23,7 @@
  * - Nothing here tells whose a photo is: the list comes in play order, which is random.
  */
 
-import { LIMITS, TIMING } from '../shared/config.js';
+import { TIMING } from '../shared/config.js';
 import { serverUrl } from './api.js';
 import { createLoader } from './loader.js';
 
@@ -100,19 +100,19 @@ export function photoState(link) {
 const done = (link) => link === null || photoState(link) !== 'loading';
 
 /**
- * The highest round this phone is ready for: it holds that round's photo and the next
- * LIMITS.readyAhead (or every one that is left), counted along `links` from `base`, the
- * round of its first link. Less than `base` when it is not even ready for the first.
- * `holds` says whether a link is done (here: in memory or failed for good).
+ * The highest round this phone is ready for: it holds that round's photo and every one
+ * before it, counted along `links` from `base`, the round of its first link. `base - 1`
+ * when it does not even hold the first. `holds` says whether a link is done (here: in
+ * memory, or failed for good).
  */
 export function readyFor(base, links, holds = done) {
   let n = 0;
   while (n < links.length && holds(links[n])) n += 1;
-  return n === links.length ? base + links.length - 1 : base + n - 1 - LIMITS.readyAhead;
+  return base + n - 1;
 }
 
-/** How much of what round `round` needs this phone holds, 0 to 1 (for the loading bar). */
+/** Whether this phone holds what round `round` needs, 0 or 1 (its share of the loading bar). */
 export function shareFor(base, links, round, holds = done) {
-  const needed = links.slice(round - base, round - base + 1 + LIMITS.readyAhead);
-  return needed.length ? needed.filter(holds).length / needed.length : 1;
+  const link = links[round - base];
+  return link === undefined || holds(link) ? 1 : 0;
 }
