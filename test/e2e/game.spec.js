@@ -124,11 +124,12 @@ test('friends play a full game and start another one', async ({ browser }) => {
   const bar = host.locator('#tbar');
   for (let round = 2; round <= 5; round++) {
     if (round === 5) {
-      // From the last photo on, the host's phone notes each podium place as it loses its "?".
+      // From the last photo on, the host's phone notes each podium place as its orb bursts
+      // (it loses `data-covered`), with the vibration felt at that moment.
       await host.evaluate(() => {
         window.revealed = [];
         new MutationObserver((changes) => {
-          for (const c of changes) if (!c.target.hasAttribute('data-covered')) window.revealed.push(c.target.dataset.place);
+          for (const c of changes) if (!c.target.hasAttribute('data-covered')) window.revealed.push([c.target.dataset.place, window.felt.at(-1)]);
         }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-covered'] });
       });
     }
@@ -177,11 +178,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
 
   const podium = (page) => page.getByRole('list', { name: 'Podium' }).getByRole('listitem');
   for (const page of everyone) await expect(podium(page)).toHaveCount(3);
-  // The podium's tension: third place is revealed, then second, then the winner (each with a
-  // heavy thud), and only then does "Play again" appear.
+  // The podium charges up place by place: third bursts out first (a firm pulse), then second
+  // and the winner (each a heavy thud), and only then does "Play again" appear.
   await expect(host.getByRole('button', { name: 'Play again' })).toBeVisible();
-  expect(await host.evaluate(() => window.revealed)).toEqual(['3', '2', '1']);
-  expect(await host.evaluate(() => window.felt.at(-1))).toBe('HEAVY');
+  expect(await host.evaluate(() => window.revealed)).toEqual([['3', 'MEDIUM'], ['2', 'HEAVY'], ['1', 'HEAVY']]);
   // Play again is everyone's: a guest opens the next game, the others keep their results
   // until they join it, and the lobby quietly says who it is waiting on.
   await guests[0].getByRole('button', { name: 'Play again' }).click();
@@ -351,6 +351,13 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
       await expect(podium(page)).toHaveCount(3);
       await fits(page, { paging: true });
     }
+    // Thirteen more players than the podium holds: their ranking scrolls in its own list,
+    // under a podium that stays on screen.
+    const ranking = host.locator('[data-part="ranking"]');
+    await expect(ranking.getByRole('listitem')).toHaveCount(LIMITS.maxPlayers - 3);
+    expect(await ranking.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await ranking.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await expect(host.getByRole('list', { name: 'Podium' })).toBeInViewport();
   } finally {
     bots.close();
   }

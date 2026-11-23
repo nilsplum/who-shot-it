@@ -151,8 +151,8 @@
   --animate-shake: shake 0.4s ease-out; /* the screen as FINAL ROUND lands */
   --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal */
   --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when I guessed right */
-  --animate-winner: appear 0.6s var(--ease-bounce); /* the winner popping in on the podium */
-  --animate-tense: tense var(--tense-ms, 1s) linear both; /* a podium place before its reveal: the "?" trembles harder and harder (main.js sets how long) */
+  --animate-pop-in: pop-in 0.56s cubic-bezier(0.2, 0.8, 0.2, 1); /* a podium place's player bursting out of its orb, a little too big first (`--pop`, views/end.js) */
+  --animate-rays: rays-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, turn 14s linear infinite; /* the rays behind the winner: they open up, then turn for as long as the podium shows */
   --animate-arrive: fade 0.5s ease-out; /* what follows the podium: the facts, the ranking, Play again */
   --animate-burst: burst 0.9s ease-out forwards; /* a confetti piece */
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
@@ -167,8 +167,10 @@
   @keyframes flip { from { transform: perspective(600px) rotateY(-180deg); } to { transform: perspective(600px) rotateY(0deg); } }
   @keyframes bump { 40% { transform: scale(1.35); } }
   @keyframes appear { from { transform: scale(0.4); opacity: 0; } }
-  /* Shakes from side to side, a little wider and bigger each time, until the reveal. */
-  @keyframes tense { 10% { transform: translateX(-1px) rotate(-2deg); } 20% { transform: translateX(1px) rotate(2deg); } 30% { transform: translateX(-2px) rotate(-3deg); } 40% { transform: translateX(2px) rotate(4deg) scale(1.02); } 50% { transform: translateX(-3px) rotate(-5deg) scale(1.04); } 60% { transform: translateX(3px) rotate(6deg) scale(1.06); } 70% { transform: translateX(-4px) rotate(-7deg) scale(1.08); } 80% { transform: translateX(4px) rotate(8deg) scale(1.1); } 90% { transform: translateX(-5px) rotate(-9deg) scale(1.12); } 100% { transform: translateX(5px) rotate(10deg) scale(1.14); } }
+  /* From a fifth of its size to `--pop` times it (half way), then its own size. */
+  @keyframes pop-in { from { scale: 0.2; opacity: 0; } 50% { scale: var(--pop, 1.3); opacity: 1; } }
+  @keyframes rays-in { from { opacity: 0; scale: 0.4; } }
+  @keyframes turn { to { rotate: 360deg; } }
   /* Falls in big and turned, overshoots a little when it hits (45%), settles. */
   @keyframes smash { 0% { transform: scale(2.6) rotate(-14deg); opacity: 0; } 45% { transform: scale(0.92) rotate(3deg); opacity: 1; } 70% { transform: scale(1.05) rotate(-1deg); } 100% { transform: none; } }
   @keyframes shake { 20% { transform: translate(-6px, 3px); } 40% { transform: translate(5px, -4px); } 60% { transform: translate(-4px, 2px); } 80% { transform: translate(2px, -1px); } }
@@ -228,6 +230,81 @@
 }
 @utility pb-safe {
   padding-bottom: max(--spacing(6), env(safe-area-inset-bottom));
+}
+
+/*
+ * The podium at the end of a game (views/end.js), revealed by `web/js/podium.js`: each place
+ * charges up in an orb before its player bursts out of it. A place's colour reaches all of
+ * it as `--tone` (bronze, silver, the yellow); `podium.js` sets how full the orb is
+ * (`--charge`, 0 to 1, in a few jumps), how bright the block has become (`--fill`), and for
+ * the winner how much the orb grows with its charge (`--grow`) and when it draws in before
+ * bursting (`--squeeze`). Every one of them is read with its resting value as the fallback
+ * (`var(--charge, 0)`) and none is registered (`@property`): Safari 26.2 did not apply a
+ * registered `--charge`'s starting value, so its orbs lost their ring and glowed white
+ * before they had charged at all. Each jump of the charge is a snap, so the ring and the
+ * glow repaint only at the jumps.
+ */
+
+/* The orb: it grows with its charge (the winner's only) and draws in for a moment when full. */
+@utility orb {
+  scale: calc((1 + var(--charge, 0) * var(--grow, 0)) * var(--squeeze, 1));
+  transition: scale 0.15s ease-in;
+}
+/* Its ring, filling clockwise in the place's colour. */
+@utility orb-ring {
+  border-radius: 50%;
+  background: conic-gradient(var(--tone) calc(var(--charge, 0) * 360deg), color-mix(in srgb, var(--tone) 14%, transparent) 0);
+  mask: radial-gradient(circle, transparent 57%, black 59%);
+}
+/* Its core: dark and dim while empty, white-hot and glowing when full. */
+@utility orb-core {
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color-white) 0, var(--tone) 40%, color-mix(in srgb, var(--tone) 20%, var(--color-stage)) 75%);
+  opacity: calc(0.25 + var(--charge, 0) * 0.75);
+  box-shadow: 0 0 calc(6px + var(--charge, 0) * 46px) calc(var(--charge, 0) * 12px) color-mix(in srgb, var(--tone) 80%, transparent);
+}
+/*
+ * The winner's orb cracks as it fills: two cracks (`data-crack`), then all four
+ * (`data-split`), each drawn from the rim inwards (its dash slides in). Until the first
+ * crack the lines are not shown at all, so no browser's way of drawing a dash can let one
+ * show early.
+ */
+@utility orb-cracks {
+  visibility: hidden;
+  overflow: visible;
+  fill: none;
+  stroke: var(--color-white);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  filter: drop-shadow(0 0 4px var(--tone));
+  transition: stroke-dashoffset 0.25s;
+  [data-crack] > & { visibility: visible; }
+  [data-crack] > & path:nth-child(-n + 2), [data-split] > & path { stroke-dashoffset: 0; }
+}
+/* A block of the podium: it glows in its colour; while its place waits it is dimmed, brighter as its orb fills. */
+@utility podium-block {
+  box-shadow: 0 0 28px 2px color-mix(in srgb, var(--tone) 70%, transparent);
+  transition: filter 0.5s, box-shadow 0.5s;
+  [data-covered] > & { box-shadow: none; filter: brightness(calc(0.3 + var(--fill, 0) * 0.7)) saturate(0.6); }
+}
+/* The rays behind the winner, fading out at their ends. */
+@utility bg-rays {
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tone) 38%, transparent) 0deg 8deg, transparent 8deg 24deg);
+  mask: radial-gradient(circle, black 18%, transparent 70%);
+}
+
+/*
+ * A list that scrolls inside a screen (the end screen's ranking) shows a thin scrollbar
+ * only while it scrolls (`data-scrolling`, set by `quietScrollbars` in web/js/ui.js), never
+ * at rest. The phones' own bars already behave so; this gives a computer's browser the
+ * same (the drafts, the tests). Browsers without `scrollbar-color` keep their own bar.
+ */
+@utility scrollbar-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  &[data-scrolling] { scrollbar-color: var(--color-line-strong) transparent; }
 }
 
 /*

@@ -1,8 +1,8 @@
 /**
  * Shared UI building blocks: HTML escaping, avatars, the top bar and its buttons, the logo
  * with the big title, the two ways to show a wait (the spinner and the progress bar), the
- * timer bar, the list of rules or steps, the confetti of a win, the one toast, and the
- * reaction row with its floating emojis.
+ * timer bar, the list of rules or steps, the confetti of a win, the quiet scrollbars, the
+ * one toast, and the reaction row with its floating emojis.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -124,14 +124,30 @@ export const steps = (items) =>
 
 /**
  * Ten confetti pieces flying out of the middle of the element they are in (it must be
- * `relative`), each its own direction and player colour: a right guess on the reveal, the
- * podium's winner. They fly as soon as they are drawn, so a view puts them in only for that
- * moment (or keeps them `hidden` until then).
+ * `relative`), each its own direction and player colour: a right guess on the reveal. They
+ * fly as soon as they are drawn, so a view puts them in only for that moment.
  */
 export const CONFETTI = Array.from({ length: 10 }, (_, i) => {
   const angle = (i / 10) * 2 * Math.PI;
   return `<i class="pointer-events-none absolute top-1/2 left-1/2 size-2.25 animate-burst rounded-xs bg-player motion-reduce:hidden" style="--x:${Math.round(Math.cos(angle) * 90)}px;--y:${Math.round(Math.sin(angle) * 60)}px;--player:var(--color-p${i})"></i>`;
 }).join('');
+
+/**
+ * Scrollbars that show only while their list scrolls (`scrollbar-quiet` in styles/app.css):
+ * one listener for the whole page marks whatever scrolls (`data-scrolling`) until it has
+ * stood still for a moment. Phones show their own thin bars only while scrolling anyway;
+ * this gives a computer's browser the same. Call once (main.js; the drafts' screens).
+ */
+export function quietScrollbars() {
+  const resting = new WeakMap();
+  document.addEventListener('scroll', (e) => {
+    const el = e.target;
+    if (!(el instanceof Element)) return;
+    el.setAttribute('data-scrolling', '');
+    clearTimeout(resting.get(el));
+    resting.set(el, setTimeout(() => el.removeAttribute('data-scrolling'), 800));
+  }, { capture: true, passive: true });
+}
 
 let toastTimer = 0;
 /** The one toast (`#toast` in index.html): `data-on` slides it in. */
