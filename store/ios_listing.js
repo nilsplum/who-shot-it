@@ -28,7 +28,7 @@ const promotionalText = 'Your next party game is already on your phones: random 
  * What players notice in this version, in plain sentences: the App Store's "What's New"
  * (Apple takes it only for updates) and TestFlight's "What to Test" for this version's build.
  */
-const whatsNew = 'Up to 16 players and over 130 avatars. Yes is instant: your photos are sent in the background, and the 3, 2, 1 starts once every phone has the first photo. The first game asks “Is everyone here?”, and a player whose phone goes offline stays in the game, shown in red, until anyone removes them. A swapped photo turns over like a card, the leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
+const whatsNew = 'In the lobby, the players now take two rows that you can swipe sideways, with an arrow to go through them, so your photos stay big even with 16 players. The arrow of the reactions now turns round too.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */
 const howToTest = `HOW TO TEST
