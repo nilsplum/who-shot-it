@@ -7,8 +7,8 @@ showed waits everywhere photos are involved; the follow-up on the branch `fix/no
 (section 13, version 1.0.4) removes their causes and is on `main` too. Testing 1.0.4 brought
 a second follow-up on the branch `feat/start-flow` (section 14, version 1.0.5: offline
 players, the start, "No" again and again), also on `main`. Its server is deployed and 1.0.5
-is in TestFlight (23 November); the store release waits for the operator's test (Operator
-handoff, below).
+is in App Review (23 November); 1.0.6 (the lobby's players in two rows that swipe
+sideways) is in TestFlight and follows once 1.0.5 is live (Operator handoff, below).
 
 ## Operator handoff
 
@@ -52,21 +52,30 @@ knowing. Kept up to date with every commit.
   does (and `submit` ends with it): 1.0.5 is in "Friends" and was sent to Apple's beta
   check on 23 November; the link gives 1.0.5 once Apple approves it.
 
-**On `main` since 1.0.5, in no app yet**
-- The lobby's players take exactly two rows that scroll sideways together, with an arrow at
-  their right while they do not all fit; it pages through them and turns round at each end,
-  as the reaction row's arrow now does too (one `ui.sidewaysRow` for both). Every pill has
-  one size, so the photo grid keeps the same room from 2 players to 16: on a 360 x 640
-  phone with 16 players 211 px of height instead of 112. It ships with the next build:
-  raise the version to 1.0.6 first, also for an Android release from `main`, which would
-  otherwise be a different 1.0.5 than the iPhone's.
+**1.0.6, in TestFlight since 23 November (1.0.5 stays in App Review)**
+- What it adds to 1.0.5: the lobby's players take exactly two rows that scroll sideways
+  together, with an arrow at their right while they do not all fit; it pages through them
+  and turns round at each end, as the reaction row's arrow now does too (one
+  `ui.sidewaysRow` for both). Every pill has one size, so the photo grid keeps the same
+  room from 2 players to 16: on a 360 x 640 phone with 16 players 211 px of height instead
+  of 112. It also carries the privacy manifest with "Gameplay Content".
+- Build 1.0.6 (10006) is uploaded (`./scripts/release-apps.sh ios` from the worktree, every
+  test green) and in the public group "Friends", sent to Apple's beta check
+  (`app-store.mjs testflight`): the public link gives 1.0.6 once Apple approves it. Its
+  "What to Test" is the version's What's New in `store/ios_listing.js`, which names only
+  the lobby's rows and the reactions' arrow (the changes since 1.0.5). It is not sent to
+  App Review: Apple takes one App Store version at a time (to do 3).
+- `main` is 1.0.6 now, so an Android release from it is 1.0.6 as well.
 - The test players fill a game up to its 16 players (`scripts/helpers/demo-players.mjs`;
   only this Mac runs them, nothing to release).
 
 **To do by hand, in this order**
-1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone
-   (`./scripts/dev.sh android`, the game from this Mac), right after starting the app, with
-   the test players (`docs/guides/demo-players.md`); the browser tests cannot show or feel:
+1. Try 1.0.6 on a real iPhone (TestFlight, against the live server; it holds all of 1.0.5)
+   and a real Android phone (`./scripts/dev.sh android`, the game from this Mac), right after
+   starting the app, with the test players (`docs/guides/demo-players.md`); the browser tests
+   cannot show or feel:
+   - The lobby's two rows (1.0.6): with 15 test players, swipe them and tap the arrow to the
+     right end and back (it turns at each end); the photos keep their size as players join.
    - The lobby and the start (section 14): a phone that goes offline turns red and glows,
      with "Offline, tap to remove", and anyone can remove it; "Yes" shows "✓ Ready" at once;
      in a group's first game "Is everyone here?" comes up on every phone once everyone said
@@ -94,10 +103,13 @@ knowing. Kept up to date with every commit.
    here?"), the flag, the leaderboard and the end of a game look different now. If it is not
    needed any more (the app is already live), change the first review note in
    `store/ios_listing.js` instead.
-3. Wait for App Review (done: 1.0.5 is sent). If Apple writes back or rejects, answer in
-   App Store Connect or fix what it asks for, then `node scripts/helpers/app-store.mjs
-   submit` sends the same version back. Once it is live, the invite page's App Store button
-   works without another step.
+3. Wait for App Review (done: 1.0.5 is sent). If Apple only writes back, answer in App Store
+   Connect. `submit` takes the version from `package.json`, which is 1.0.6 now: after a
+   rejection it sends 1.0.6 (build 10006) in 1.0.5's place, so first make the first review
+   note true for it (record with 10006, or say what differs). Once 1.0.5 is live, the invite
+   page's App Store button works without another step, and `node scripts/helpers/app-store.mjs
+   submit` sends 1.0.6 as the update (its What's New is ready), again with a fitting first
+   review note.
 4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
