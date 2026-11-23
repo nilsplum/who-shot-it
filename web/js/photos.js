@@ -13,15 +13,15 @@
  *   gathers for the room's "Which photos" and "Photos per player", or this phone's own
  *   settings outside a game, and rests from the start until the end screen, when the game's
  *   photos need the phone and nobody chooses (`setNeeds`).
- * - One list of work, in the order of what a player waits for (`pick`), done by one worker
- *   per kind of work on `loader.js`, so a slow job never holds up a quick one of another kind:
+ * - One list of work, in the order of what a player waits for (`pick`), done by workers of
+ *   each kind on `loader.js` (`SLOTS`), so a slow job never holds up a quick one of another kind:
  *   1. `held`: the big version of the photo a finger holds (downloaded if needed);
  *   2. `deal`: previews whenever the bucket holds fewer than a set being dealt ("No", the
  *      first set) or, outside a game, than LIMITS.readySets sets behind the one on screen,
  *      so "No" is instant however often it is tapped (`previewsShort`);
  *   3. `sharp`: the big versions of the set on screen, for "Yes": each first from the phone
  *      alone (quick, and a photo kept only in iCloud says so at once), then the iCloud ones
- *      downloaded; not for a set being replaced;
+ *      downloaded, a few at once; not for a set being replaced;
  *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: the next set's big
  *      versions (from the phone only), then previews up to LIMITS.bucketPreviews.
  * - `roll` deals a set from the front of the bucket, so its big versions are usually there
@@ -174,7 +174,15 @@ function pick(open) {
   return null;
 }
 
-const worker = createLoader(pick, { held: 1, deal: 1, sharp: 1, fill: 1 });
+/**
+ * How many jobs of each kind run at once. The set on screen gets three: a photo kept only in
+ * iCloud takes seconds to download, and one after another those waits added up before "Yes"
+ * could send (the app before the bucket fetched the whole set at once); three at a time
+ * overlaps them without flooding the phone. Everything else is one at a time.
+ */
+const SLOTS = { held: 1, deal: 1, sharp: 3, fill: 1 };
+
+const worker = createLoader(pick, SLOTS);
 
 /** Something changed: the workers look again, waiting promises are checked, the view repaints. */
 function poke() {

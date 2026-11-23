@@ -32,7 +32,7 @@ export const APP = {
    * The app's version, restated from `package.json` (the page cannot read it; a test keeps
    * both equal). Every new version asks for the terms once more (`termsToken`).
    */
-  version: '1.0.4',
+  version: '1.0.5',
 };
 
 export const SERVER = {

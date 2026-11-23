@@ -1163,3 +1163,34 @@ photos those were once the background had tried them, and after fast "No" taps t
 was untried. Now every photo of the set on screen is first asked for from the phone alone
 (one kept only in iCloud says so at once), then the iCloud ones download. The limit did what
 it is there for; 1.0.4 was built after the fix, with every test green.
+
+## 14. Follow-up of 23 November 2026: offline players, the start, "No" again and again (branch `feat/start-flow`)
+
+Testing 1.0.4 on a real iPhone, the operator asked for six changes; they are five commits:
+
+1. `feat(players)`: a player who goes offline stays, shows red, and anyone can remove them.
+2. `fix(photos)`: "No" stays instant however often it is tapped.
+3. `feat(start)`: "Yes" never waits, and the 3-2-1 starts only when every phone has the first
+   photo (the operator's points 3 and 5).
+4. `feat(start)`: a group's first game asks "Is everyone here?", and after a No anyone can
+   "Start now".
+5. `fix(photos)`: the set's big versions three at a time; the release as version 1.0.5.
+
+| Question | Decision | Why |
+|---|---|---|
+| A player who goes offline | Nobody is removed for being offline (`TIMING.lobbyDropMs` and its timer are gone); their pill turns red with a slow glow (`animate-beacon`) and "Offline, tap to remove" under the name, their avatar in "who has answered" the same red | The one-minute removal threw out players who only switched apps or lost signal for a moment. |
+| Who may remove whom | The host anyone, for good (their key cannot rejoin: the block the stores ask for); anyone a player who is offline, who may join again with the code (`kick`, `ui.canRemove`) | The operator: everyone can remove an offline player. Keeping the host's removal a block keeps the legal page and the review notes true ("The host can remove a player, who cannot join that game again"). |
+| "No" slow after about fifteen sets | The reserve of ready sets (`LIMITS.readySets`) is refilled by the `deal` worker next to the set's big versions, no longer by the background worker behind them | The bucket's stock (250 previews, about 15 sets of 16) ran out and nothing refilled it while big versions loaded, which with photos kept only in iCloud was nearly always. Measured with the old order: every second "No" waited about 320 ms; now 4 to 18 ms. The speed test taps "No" 20 times, a glance apart, limit 250 ms. |
+| How the room learns "Yes" | The app says it at once over the socket (`sending`, with a random upload id); the upload carries the same id and counts only while it is the "Yes" the room knows; every hello names the upload in flight | The start of an upload is no reliable signal: one report says Cloudflare buffered an upload before the Worker ran, and the docs do not say. The id also settles a "Change" that crosses an upload exactly, and a refused upload's photos are deleted at once. |
+| The start | Three steps the group goes through together: photos still on their way come in ("Sending photos", the sender's own progress exact), the game is dealt and every phone gets the first photo (at most 6 s), then the 3-2-1, exactly 3 s, and round 1 at once | How real-time group games do it: a ready check, then one countdown everyone sees on the same clock. The "1, 1, 1" was the number's endless animation while the phone waited for the next view; the late round was the room waiting after the 3-2-1 for phones still loading. Each number now plays once. |
+| The bar after "Yes" | Gone; "✓ Ready" at once. A bar shows only while the group waits for photos still on their way | The operator's point 3. |
+| The start's wait for the first photo | Not counted to the apps (a spinner under "Get ready", no bar) | It takes a moment, and counting it would send every phone a view for every phone's report. |
+| "Is everyone here?" | Asked on every phone in a group's first game once everyone said Yes; anyone answers. No: "Start now" at the bottom of every phone, greyed until everyone said Yes. Later games start by themselves; a room everyone left asks the next group again | The operator's point 2. A tap that crosses someone's "Change" does nothing. |
+| Older apps and the question | Asked only while an app here says it can show it (`asks` in the hello); otherwise the room starts by itself | 1.0.2 is in the store and 1.0.4 in TestFlight; they could not answer it. |
+| The pulse of "Start now" | A glow around the button; the button itself never moves | A moving button is harder to hit; the browser test could not tap it either. |
+| Point 6: faster photos after "Yes", small versions first? | Not done. The upload now runs in the background from the moment of "Yes", while the others still choose and while the question is on screen; the set's big versions come three at a time | 1.0.1 used the same sizes (1080 px, JPEG 0.75) and sent the whole set, all prepared at once. Since 1.0.4 one worker prepared one big version after the other, so photos kept only in iCloud waited in a row. Small versions first would mean two uploads and two stored versions per photo, two downloads per phone and a photo turning sharp mid-round, for a wait the background upload already hides: "Yes, start" reached the 3-2-1 in about 0.2 s in the speed test. |
+| Native code | Unchanged | Every change here is in the app's page and the server; a native change would need both phones to try (AGENTS.md, section 5). |
+
+Measured after the five commits (speed test): "No" 4 to 18 ms, "Yes" to "✓ Ready" about
+10 ms, the last "Yes" to the question about 15 ms, "Yes, start" to the 3-2-1 about 0.2 s,
+the 3-2-1 painted "3 2 1", the room never waiting after it.
