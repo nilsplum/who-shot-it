@@ -50,7 +50,9 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
      (install it on your iPhone with Apple's TestFlight app). With `--submit` the script
      then fills in the App Store page from the listings in `store/` and sends the version to
      App Review; it goes live by itself after approval. `node scripts/helpers/app-store.mjs
-     status` shows where things stand (builds, TestFlight beta check, review).
+     status` shows where things stand (builds, TestFlight beta check, review); `withdraw`
+     takes a version Apple has not approved yet back, so `--submit` can send a newer build
+     in its place.
    - **Android:** to Google Play, released on the production track: Google reviews it
      (hours to a few days), then it goes live. `--android-track internal` releases to the
      internal test track instead.

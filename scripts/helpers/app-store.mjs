@@ -3,6 +3,7 @@
  *   node scripts/helpers/app-store.mjs status   builds, TestFlight beta check, public link, versions
  *   node scripts/helpers/app-store.mjs submit   fills the App Store page and sends it to App Review
  *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
+ *   node scripts/helpers/app-store.mjs withdraw     takes the version in App Review back, to send a newer build
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
  * `submit` takes the iPhone listing from `listing.mjs` (LISTINGS.ios and IMAGES.ios, from
@@ -15,9 +16,10 @@
  * age rating, price (free) and countries. Running it again updates the same version until
  * Apple reviews it; after a rejection it sends the same submission back, with the rejection
  * marked as answered. Once a version is live, the next run starts the new one (with "What's
- * New"); while one is with Apple, it refuses. Two settings have no API and are made by hand
- * once (store/ios_listing.js): App Privacy and the EU trader status; until then Apple
- * refuses the submission and this script prints Apple's reason.
+ * New"); while one is with Apple, it refuses (`withdraw` takes a version Apple has not
+ * approved yet back, so a newer build can take its place). Two settings have no API and
+ * are made by hand once (store/ios_listing.js): App Privacy and the EU trader status; until
+ * then Apple refuses the submission and this script prints Apple's reason.
  *
  * Signs in with the team API key in `secrets/` (`app-store-connect.p8` and
  * `app-store-connect.json` with keyId and issuerId; git-ignored). The key and the token
@@ -144,7 +146,7 @@ async function setVersion(app) {
   if (!version) {
     // Apple keeps one version on its way at a time: the next one starts once the last is live.
     const busy = versions.find((v) => !['READY_FOR_SALE', 'REMOVED_FROM_SALE', 'DEVELOPER_REMOVED_FROM_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(v.attributes.appStoreState));
-    if (busy) throw new Error(`Version ${busy.attributes.versionString} is still with Apple (${busy.attributes.appStoreState}); a new one can follow once it is live.`);
+    if (busy) throw new Error(`Version ${busy.attributes.versionString} is still with Apple (${busy.attributes.appStoreState}); a new one can follow once it is live, or take it back first with \`node scripts/helpers/app-store.mjs withdraw\`.`);
     // App Store Connect copies the texts and screenshots of the live version into the new one.
     version = (await api('POST', '/v1/appStoreVersions', { data: { type: 'appStoreVersions', attributes: { platform: 'IOS', versionString: VERSION }, relationships: { app: ref('apps', app.id) } } })).data;
   }
@@ -283,6 +285,24 @@ async function sendToReview(app, version) {
   console.log(`✓ Version ${VERSION} sent to App Review. It goes live by itself after approval (usually within a day).`);
 }
 
+// ---------- withdraw ----------
+
+/**
+ * App Store Connect's "Remove from Review": the version waiting for or in App Review comes
+ * back (as "Developer Rejected"), so nothing goes live by itself, and the next `submit`
+ * attaches the current build to the same version, updates its page and sends it again.
+ * For a newer build that should take the place of one Apple has not approved yet; the
+ * review starts over then. Apple needs a moment to finish taking it back: a `submit` right
+ * after it may still find the version "with Apple" and simply needs running again.
+ */
+async function withdraw() {
+  const app = await findApp();
+  const open = (await get(`/v1/reviewSubmissions?filter[app]=${app.id}&filter[state]=WAITING_FOR_REVIEW,IN_REVIEW`)).data[0];
+  if (!open) throw new Error('No version is waiting for or in App Review.');
+  await patch('reviewSubmissions', open.id, { canceled: true });
+  console.log('✓ Taken back from App Review; `submit` sends the current version in its place.');
+}
+
 async function submit() {
   // A listing a store would refuse stops here, before anything at Apple changes.
   const found = problems((file) => fs.existsSync(path.join(ROOT, file)));
@@ -303,7 +323,8 @@ try {
   if (command === 'status') await status();
   else if (command === 'submit') await submit();
   else if (command === 'testflight') await setTestFlightInfo(await findApp());
-  else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit|testflight');
+  else if (command === 'withdraw') await withdraw();
+  else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit|testflight|withdraw');
 } catch (error) {
   console.error(`✗ ${error.message}`);
   process.exit(1);
