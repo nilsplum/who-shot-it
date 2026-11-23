@@ -14,6 +14,11 @@
  * The numbers come from the page itself (`measure`, an init script: arrival of every view,
  * the 3-2-1's numbers, each round's photo on screen, the page's long tasks) and from the
  * sockets as Playwright sees them.
+ *
+ * Then it holds them to `LIMITS`, each a promise to the players (nobody waits for photos,
+ * the 3-2-1 counts cleanly, the room never waits for a phone that kept up, no phone floods
+ * the others). The limits sit well above what a healthy run measures, so they catch a real
+ * slowdown, not a busy computer.
  */
 import { expect, test } from '@playwright/test';
 import { addBots } from './bots.js';
@@ -24,6 +29,24 @@ const CPU_SLOWDOWN = 4;
 /** A phone network: delay each way and throughput (bytes per second). */
 const NETWORK = { offline: false, latency: 60, downloadThroughput: 2_500_000, uploadThroughput: 700_000 };
 const ROUNDS = 5;
+
+/** What the players may wait at most (ms), and how much the phones may send and do. */
+const LIMITS = {
+  firstSet: 2000,
+  no: 1000,
+  /** The preview shows at once; the sharp version follows (a photo kept only in iCloud downloads first). */
+  heldPreview: 500,
+  heldSharp: 5000,
+  yes: 3000,
+  /** How long the room may stand in `load` (or a leaderboard wait) for phones that all kept up. */
+  roomWait: 1000,
+  board: { min: 4900, max: 5600 },
+  photoPainted: 300,
+  /** Readiness reports per phone: one per round. */
+  loaded: ROUNDS + 1,
+  viewsInCountdown: 4,
+  blockedInGame: 500,
+};
 
 /** Runs in the page before the app: notes what the player would wait for (`window.measure`). */
 function measure() {
@@ -97,7 +120,7 @@ async function msUntil(page, check, arg, limit = 30_000) {
 const TILE = '[data-act="swap"] [style*="background-image"]';
 const firstTile = (page) => page.locator(TILE).first().getAttribute('style');
 
-test('a game at phone speed: what the players wait for', async ({ browser, baseURL }) => {
+test('a game at phone speed: what the players wait for stays within its limits', async ({ browser, baseURL }) => {
   const report = {};
   const ann = await openPhone(browser, 'Ann', realPhone(), { cpu: CPU_SLOWDOWN });
   const host = ann.page;
@@ -132,11 +155,13 @@ test('a game at phone speed: what the players wait for', async ({ browser, baseU
       await page.getByRole('button', { name: 'Yes' }).click();
       await expect(page.getByText('✓ Ready')).toBeVisible();
     }
-    // Holding a photo: until its sharp version is above the preview.
+    // Holding a photo: its preview at once (the hold starts after 350 ms, `main.js` HOLDS),
+    // then its sharp version above it.
     const box = await host.locator('[data-act="swap"]').nth(1).boundingBox();
     await host.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await host.mouse.down();
-    report.sharp = await msUntil(host, () => document.querySelectorAll('#look img').length >= 2);
+    report.preview = Math.max(0, (await msUntil(host, () => document.querySelectorAll('#look img').length >= 1)) - 350);
+    report.sharp = report.preview + (await msUntil(host, () => document.querySelectorAll('#look img').length >= 2));
     await host.mouse.up();
     // Yes: Ann is the last one, so her photos being sent starts the 3-2-1.
     await host.getByRole('button', { name: 'Yes' }).click();
@@ -168,8 +193,8 @@ test('a game at phone speed: what the players wait for', async ({ browser, baseU
   const blocked = (from) => m.long.filter(([at]) => at >= from).reduce((sum, [, ms]) => sum + Math.max(0, ms - 50), 0);
   Object.assign(report, {
     countdown: m.cover.filter(([at]) => countdown && at >= countdown.at - 300).map(([, n]) => n).join(' '),
-    roomWaits: game.filter((p) => p.label.startsWith('load') || p.label.includes('waiting')).map((p) => `${p.label} ${p.ms ?? '?'} ms`),
-    boards: game.filter((p) => p.label.startsWith('board')).map((p) => p.ms),
+    roomWaits: game.filter((p) => p.label.startsWith('load') || p.label.includes('waiting')).map((p) => ({ label: p.label, ms: p.ms ?? 0 })),
+    boards: game.filter((p) => p.label.startsWith('board') && !p.label.includes('waiting')).map((p) => p.ms),
     photoPainted: m.painted.filter(([, n]) => showAt.has(n)).map(([at, n]) => at - showAt.get(n)),
     loadedSent: [ann, ...others].map((p) => p.sent.filter((type) => type === 'loaded').length),
     viewsInCountdown: m.views.filter(([, phase]) => phase === 'countdown').length,
@@ -182,10 +207,10 @@ test('a game at phone speed: what the players wait for', async ({ browser, baseU
     'A game at phone speed (Ann: CPU / 4, 60 ms network, 400 photos, a quarter only in iCloud):',
     `  first set after entering the lobby  ${report.firstSet} ms`,
     `  each "No", tapped right away        ${report.no.join(', ')} ms`,
-    `  holding a photo until it is sharp   ${report.sharp} ms`,
+    `  holding a photo: preview, sharp     ${report.preview} ms, ${report.sharp} ms`,
     `  "Yes" until the 3-2-1               ${report.yes} ms`,
     `  the 3-2-1 as painted                ${report.countdown}`,
-    `  the room waiting for phones         ${report.roomWaits.join(', ') || 'never'}`,
+    `  the room waiting for phones         ${report.roomWaits.map((w) => `${w.label} ${w.ms} ms`).join(', ') || 'never'}`,
     `  leaderboards                        ${report.boards.join(', ')} ms`,
     `  photo on screen after its round     ${report.photoPainted.join(', ')} ms`,
     `  "loaded" sent (Ann, Ben, Cleo)      ${report.loadedSent.join(', ')}`,
@@ -193,4 +218,21 @@ test('a game at phone speed: what the players wait for', async ({ browser, baseU
     `  page blocked during the game        ${report.blockedInGame} ms (longest task ${report.longestTask} ms)`,
     `  phone work                          ${report.phoneWork.previews} previews, ${report.phoneWork.bigVersions} big versions`,
   ].join('\n'));
+
+  // The promises (`LIMITS`), checked after the report so a failure shows all the numbers.
+  expect(report.firstSet, 'the first set').toBeLessThanOrEqual(LIMITS.firstSet);
+  for (const ms of report.no) expect(ms, '"No"').toBeLessThanOrEqual(LIMITS.no);
+  expect(report.preview, 'a held photo\'s preview').toBeLessThanOrEqual(LIMITS.heldPreview);
+  expect(report.sharp, 'a held photo turning sharp').toBeLessThanOrEqual(LIMITS.heldSharp);
+  expect(report.yes, '"Yes" until the 3-2-1').toBeLessThanOrEqual(LIMITS.yes);
+  expect(report.countdown, 'the 3-2-1, each number once').toBe('3 2 1');
+  for (const w of report.roomWaits) expect(w.ms, `the room waiting (${w.label})`).toBeLessThanOrEqual(LIMITS.roomWait);
+  for (const ms of report.boards) {
+    expect(ms, 'a leaderboard').toBeGreaterThanOrEqual(LIMITS.board.min);
+    expect(ms, 'a leaderboard').toBeLessThanOrEqual(LIMITS.board.max);
+  }
+  for (const ms of report.photoPainted) expect(ms, 'a photo on screen after its round started').toBeLessThanOrEqual(LIMITS.photoPainted);
+  for (const n of report.loadedSent) expect(n, '"loaded" reports of one phone').toBeLessThanOrEqual(LIMITS.loaded);
+  expect(report.viewsInCountdown, 'views during the 3-2-1').toBeLessThanOrEqual(LIMITS.viewsInCountdown);
+  expect(report.blockedInGame, 'the page blocked during the game').toBeLessThanOrEqual(LIMITS.blockedInGame);
 });

@@ -25,7 +25,7 @@ import { SERVER, TIMING } from '../web/shared/config.js';
 const promotionalText = 'Tonight’s best party game is already on your phones. Random photos from everyone’s camera roll, one question: whose is it?';
 
 /** One or two plain sentences about what players notice (Apple takes it only for updates). */
-const whatsNew = 'Up to 16 players and over 130 avatars. Photos are ready faster, and a swapped photo turns over like a card. The leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
+const whatsNew = 'Up to 16 players and over 130 avatars. Photos are prepared in the background, so nobody waits, and a swapped photo turns over like a card. The leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */
 const howToTest = `HOW TO TEST

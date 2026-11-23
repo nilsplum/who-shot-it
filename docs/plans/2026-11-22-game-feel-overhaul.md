@@ -3,7 +3,9 @@
 Status: planned on 22 November 2026, implemented on the branch `feat/game-feel-overhaul`
 (all thirteen commits, each with `docs/prompts/implement.md`, its decisions in the decision
 log at the end) and merged into `main` on 22 November 2026. The server is deployed and the
-iPhone app is in TestFlight (23 November); the store release waits for the operator's test
+iPhone app is in TestFlight (23 November). Testing 1.0.3 on a real iPhone showed waits
+everywhere photos are involved; the follow-up on the branch `fix/no-waiting` (section 13,
+version 1.0.4) removes their causes. The store release waits for the operator's test
 (Operator handoff, below).
 
 ## Operator handoff
@@ -12,21 +14,27 @@ What only the operator can do, and the decisions made while implementing that ar
 knowing. Kept up to date with every commit.
 
 **Done on 23 November 2026**
-- The server is deployed (`./scripts/deploy.sh`, Cloudflare version `e697ec83`); installed
-  apps keep working with it (section 6). If it ever has to go back: `npx wrangler rollback`
-  (a critical command, ask first).
-- The iPhone app 1.0.3 (build 10003) is uploaded to App Store Connect: in TestFlight, not
-  sent to App Review.
+- The server of 1.0.3 is deployed (`./scripts/deploy.sh`, Cloudflare version `e697ec83`);
+  installed apps keep working with it (section 6). If it ever has to go back: `npx wrangler
+  rollback` (a critical command, ask first).
+- The iPhone app 1.0.3 (build 10003) is in TestFlight, not sent to App Review. Testing it
+  showed the waits that section 13 removes; it is not to be released.
 
 **To do by hand, in this order**
-1. Try version 1.0.3 on a real iPhone (the TestFlight build, which plays against the live
-   server) and a real Android phone (`./scripts/dev.sh android`, the game from this Mac);
-   the browser tests cannot show or feel these:
-   - The photo choice: the native `photo` call got `download` in commit 8 (AGENTS.md §5;
-     the iPhone app compiles with it in the simulator). With "Optimize iPhone Storage" on,
-     photos kept only in iCloud get their big version once they are on screen (watch that
-     "Yes" still uploads them), and the bucket's first minute of work after the app starts
-     should not make the phone warm or slow.
+1. Deploy the server of `fix/no-waiting` once it is on `main` (`./scripts/deploy.sh`, a
+   critical command: I ask before running it). It keeps every installed app working (1.0.2,
+   the 1.0.3 TestFlight build), which then simply get fewer updates, only real changes.
+2. Upload 1.0.4 to TestFlight (`./scripts/release-apps.sh ios`, no `--submit`).
+3. Try 1.0.4 on a real iPhone (TestFlight, against the live server) and a real Android phone
+   (`./scripts/dev.sh android`, the game from this Mac), right after starting the app, with
+   the test players (`docs/guides/demo-players.md`); the browser tests cannot show or feel:
+   - Waiting (section 13): tap "No" many times in a row, hold a photo, tap "Yes": all at
+     once; the 3-2-1 counts 3, 2, 1; the photos and leaderboards never stand still. The
+     speed test checks this at phone speed, but only a real phone has the real plugin.
+   - The iPhone's quick previews (section 13): previews look as sharp as before, and photos
+     full of text still stay out with "Little text".
+   - With "Optimize iPhone Storage" on: photos kept only in iCloud still come up, and "Yes"
+     still sends them; the phone does not get warm or slow in the first minute.
    - The vibrations (commit 6): the 3-2-1 is a 120 ms buzz, a new photo a light tap, a
      right guess one pulse, a wrong one two, FINAL ROUND a thud, the podium's ticks (the
      winner's drumroll speeds up to about ten light taps a second).
@@ -35,16 +43,15 @@ knowing. Kept up to date with every commit.
      the podium's reveal.
    - The screen edges (commit 9): screens start right under the status bar and end right
      above the home indicator (checked in the iPhone simulator); also look on the iPad.
-2. Record the App Review video again with the 1.0.3 TestFlight build before sending it to
+4. Record the App Review video again with the 1.0.4 TestFlight build before sending it to
    review (`docs/guides/demo-players.md`, "Record the video for App Review"): the review
    notes say the attached video was made with the build under review, and the flag, the
    leaderboard and the end of a game look different now. If it is not needed any more
    (the app is already live), change the first review note in `store/ios_listing.js` instead.
-3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
-   Store page and sends the TestFlight build 10003 to App Review (no new upload; it goes
-   live by itself once approved). A change to the app after this test needs version 1.0.4
-   and a new upload.
-4. Release the Android app. This Mac has neither the Android upload key
+5. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
+   Store page and sends the TestFlight build 10004 to App Review (no new upload; it goes
+   live by itself once approved).
+6. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
    `./scripts/release-apps.sh android`. Without the upload key the script would create a
@@ -92,6 +99,12 @@ knowing. Kept up to date with every commit.
   links), the report sentences say what the flag does now, What's New describes 1.0.3,
   and the leaderboard screenshot is taken right after its animation, so its timer bar
   still shows (it was almost empty with the first try).
+- Section 13 (the follow-up): the room sends only real changes and each phone reports
+  once per round; timers run on the server's clock; the phone's photo work has one order of
+  what a player waits for; "Yes" sends only as many photos as the game can show of the
+  player (if players leave the lobby afterwards, a game can end a round or two early); the
+  room waits for each phone's next photo only, not three; big versions are prepared only
+  for the next set. A speed test now holds every wait to a limit.
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
@@ -1098,3 +1111,46 @@ fonts, and removes any that look alike on one of them.
 | Commit 13: version | 1.0.3 in `package.json`, its lock file and `APP.version` | Every player accepts the terms once more after the update (`termsToken`). No deploy and no upload: both are the operator's (Operator handoff). |
 | Commit 13: the App Review video | Not recorded again here | It needs a real iPhone with the 1.0.3 TestFlight build; the review notes claim it shows the build under review (Operator handoff, to do 3). |
 | Note of 23 November, at the deploy: a browser test failed once | The tests read a style through `styleOf` (`test/e2e/game.spec.js`), which finds the element and reads it in one step inside the page | The 16-player test found a dot of "who has answered" and read its ring in a second call; a bot's answer repainted the row in between, and the replaced dot read as an empty style. The app was right; the 3-2-1's background check had the same two-step read. `./scripts/deploy.sh` refused, as it should, and deployed after the fix. |
+
+## 13. Follow-up of 23 November 2026: nobody waits (branch `fix/no-waiting`)
+
+Testing 1.0.3 on a real iPhone showed waits wherever photos were involved: "No" sometimes
+took seconds (often the last of several fast taps), "Getting photos ready" sometimes too, a
+held photo did not always turn sharp, the 3-2-1 jumped ("33, 2, 111", sometimes not shown),
+the test players and the page transitions were slow. The operator asked for one simple,
+standard design in which nobody waits, built from the root causes, not a rebuild. Measured
+first (a speed test with a phone at phone speed, and a game on the live server), the causes
+were four, and the follow-up is four commits:
+
+1. `test(speed)`: the stand-in phone can behave like a real one (`realPhone`: 400 photos at
+   real sizes, the plugin's time per photo, a quarter kept only in iCloud), and
+   `test/e2e/speed.spec.js` plays a game with it at a slowed processor and a phone network.
+   On the code of 1.0.3 it measured each "No" at 5 to 14 s and "Yes" at 3.7 to 6.8 s.
+2. `fix(sync)`: the message storm and the clock. Live, one phone of four sent 87 readiness
+   reports and got 161 views in the 3 s of the 3-2-1.
+3. `fix(photos)`: the order of the phone's own photo work.
+4. `test(speed)` limits, docs, version 1.0.4.
+
+| Question | Decision | Why |
+|---|---|---|
+| The message storm | A phone reports its readiness once per round, at most for the round after the one on screen, and never repeats a report the room has not answered (only after a new connection, or when the room forgot it) | It reset "what I reported" to the room's last word with every view, so every view arriving while a report was on its way made it send again, and each report made the room send everyone a view. |
+| Messages that change nothing | The room neither stores nor sends anything for them, and they are no activity (`src/room.js`) | Its activity time made every message look like a change: a stored row and a view to every phone, for nothing. Also saves the free plan's storage writes. |
+| Who gets a view | Each phone only when what it shows changed, compared without the time fields (`CLOCK_FIELDS`); the last view per socket is kept in memory only | Another player's readiness or a "Show again" renewal changes nothing on the others' screens. After an eviction the next change simply goes to everyone once. |
+| How long the room waits | For each phone's next photo only (`LIMITS.readyAhead` goes); the phones still load the whole game from the 3-2-1 on, in play order | The operator's "wait until the queue is full" made every leaderboard wait for photos two rounds ahead, so a phone on a weak connection held up everyone for photos nobody needed yet. One photo keeps the game fair: everyone sees each photo at the same moment. |
+| The countdown | Every view carries the server's time (`now`); the phone learns how its clock differs from the server's from the fastest view, and every timer counts down to its end on the server's clock (`web/js/clock.js`) | The usual way a game client follows its server. A late view can no longer push the 3-2-1 back up, the 500 ms tolerance (`TIMING.clockSlackMs`) goes, and a restarted 3-2-1 is right at once. |
+| The phone's own photo work | One list in the order of what a player waits for (the held photo, previews for a set being dealt, the set on screen's big versions, then the background), one worker per kind so a slow job never holds up a quick one (`web/js/photos.js`, `loader.js`) | One worker did everything urgent and made the big versions of the set on screen (iCloud downloads included) before the previews a "No" needed, even for a set being thrown away. |
+| Big versions ahead | Only for the next set (was 100); previews for two more sets come first (`LIMITS.readySets`) | The operator: "I didn't even want the big versions", only that holding and "Yes" never wait. One set covers both; 100 meant hundreds of full-size decodes right after every app start. |
+| The bucket during a game | Rests from the 3-2-1 until the end screen | The game's photos need the phone then, and nobody chooses photos. |
+| A held photo | Its big version is decoded before it is shown and fades in over the preview; the overlay is painted by the one painter, so only that layer changes | The whole overlay was replaced when the sharp version came (the fade played again, the preview flickered), and the big version could wait behind other downloads. |
+| What "Yes" sends | No more photos than the game can show of the player (the Balanced range's most, at least an equal share rounded up; all when every photo is played), the prepared ones first; one formula for room and phone (`balancedRange` in config.js) | The operator's idea: about a third of the bytes for a typical game, so "Yes" is quick on a weak connection, and fewer photos leave the phone. If players leave the lobby afterwards, a game can end a round or two early. The legal text ("only the photos on screen are sent") stays true. |
+| Image sizes | Unchanged: 480 px previews, 1080 px for holding, sending and the game | The operator asked whether sizes should be limited at the source: they are, and they match the screens. The cost was in how many images were made and moved, not their size. |
+| iPhone previews | Photos answers with the nearest size it keeps ready (`.fast`) and the plugin scales it to 480 px, as the Android twin does with thumbnails | Apple's quick path for photo grids; the exact resize could decode a large original for each preview. Compiled for the simulator; a real iPhone shows the gain (Operator handoff, to do 3). |
+| Considered, not done | Handing images to the page as files instead of base64 through the native bridge (Capacitor's recommended way for large images) | With far fewer big versions it is not needed for what was measured; it would change both native twins and keep copies of the player's photos in the app's cache. Worth it only if a real phone still shows load. |
+| The test players' half minute | Unchanged | Deliberate (time to show the lobby and remove one for the App Review video); in the measurements nothing else slowed them. |
+| A transition that looked broken | Most likely the next round's screen without a photo while the room waited for one slow phone | With the room waiting for one photo and the storm gone, it no longer shows in the speed test; a screen recording helps if it still appears. |
+
+The speed test now fails when a wait exceeds its limit (each "No" 1 s, "Yes" 3 s, a held
+photo's preview 0.5 s, the room waiting for phones that kept up 1 s, the 3-2-1 not 3 2 1,
+more than one report per round, more than 4 views during the 3-2-1, the page blocked 0.5 s
+during the game). Measured after the fixes: each "No" 6 to 342 ms, "Yes" 0.7 s, views during
+the 3-2-1 2 (was 20), one report per round, nothing blocked.
