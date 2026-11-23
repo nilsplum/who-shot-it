@@ -1,0 +1,90 @@
+/*
+ * The results animations' stylesheet, built by Tailwind like the app's: it imports the
+ * app's (styles/app.css, which also brings the podium of "Supercharge, in the app"), and
+ * adds the first five animations' own styles: plain CSS on the theme's variables
+ * (`var(--color-…)`), grouped by animation: `ra-` shared, `jp-` Jackpot, `sc-` Supercharge,
+ * `tr-` Tricky, `pf-` Photo finish (Spotlight draws on a canvas). A place's colour reaches
+ * their elements as `--tone` (stage.js `TONES`). They act only on the end screen as it was
+ * (end_before.js): nothing here touches the app's podium.
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+/* Shared: a player not revealed yet, the blocks waiting dimmed, a revealed block glowing. */
+[data-hidden] { visibility: hidden; }
+[data-place] > div:last-child { transition: filter 0.5s, box-shadow 0.5s; }
+[data-dim] [data-place]:not([data-lit]) > div:last-child { filter: brightness(calc(0.3 + var(--fill, 0) * 0.7)) saturate(0.6); }
+[data-dim] [data-place][data-lit] > div:last-child { box-shadow: 0 0 28px 2px color-mix(in srgb, var(--tone) 70%, transparent); }
+
+/* Rays of light turning behind the winner, fading out at their ends. */
+.ra-rays {
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tone) 38%, transparent) 0deg 8deg, transparent 8deg 24deg);
+  -webkit-mask: radial-gradient(circle, black 18%, transparent 70%);
+  mask: radial-gradient(circle, black 18%, transparent 70%);
+  animation: ra-turn 14s linear infinite;
+}
+@keyframes ra-turn { to { rotate: 360deg; } }
+
+/* The darkening edge: everything but the middle of the screen sinks into the dark. */
+.ra-vignette { background: radial-gradient(ellipse at 50% 45%, transparent 25%, color-mix(in srgb, var(--color-stage) 92%, transparent) 75%); }
+
+/* Jackpot: the reel's window (one player in the middle, the neighbours fading at its edges) and its bulbs. */
+.jp-window {
+  position: absolute; inset: 0; overflow: hidden; border-radius: 1rem;
+  background: var(--color-card); border: 2px solid var(--color-line);
+  -webkit-mask: linear-gradient(transparent, black 26%, black 74%, transparent);
+  mask: linear-gradient(transparent, black 26%, black 74%, transparent);
+}
+.jp-strip { will-change: transform; }
+.jp-item { height: 60px; display: grid; place-items: center; }
+.jp-reel[data-steady] .jp-window { border-color: var(--tone); box-shadow: 0 0 22px color-mix(in srgb, var(--tone) 60%, transparent); }
+.jp-bulb {
+  position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--color-yellow); box-shadow: 0 0 6px var(--color-yellow);
+  animation: jp-chase var(--bulb-ms, 700ms) steps(1) infinite;
+  animation-delay: calc(var(--i) * var(--bulb-ms, 700ms) / -7);
+}
+@keyframes jp-chase { 50% { opacity: 0.15; box-shadow: none; } }
+.jp-reel[data-steady] .jp-bulb { animation: none; opacity: 1; background: var(--tone); box-shadow: 0 0 8px var(--tone); }
+.jp-reel[data-off] .jp-bulb { animation: none; opacity: 0.12; box-shadow: none; }
+
+/* Supercharge: the orb (a ring that fills with --charge, a glowing core, cracks), trembling by --jx/--jy and growing by --grow. */
+.sc-orb { width: 64px; height: 64px; margin: -32px 0 0 -32px; translate: var(--jx, 0) var(--jy, 0); scale: var(--grow, 1); }
+.sc-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--tone) calc(var(--charge, 0) * 360deg), color-mix(in srgb, var(--tone) 14%, transparent) 0);
+  -webkit-mask: radial-gradient(circle, transparent 57%, black 59%);
+  mask: radial-gradient(circle, transparent 57%, black 59%);
+}
+.sc-core {
+  position: absolute; inset: 12px; border-radius: 50%;
+  background: radial-gradient(circle, var(--color-white) 0, var(--tone) 40%, color-mix(in srgb, var(--tone) 20%, var(--color-stage)) 75%);
+  opacity: calc(0.25 + var(--charge, 0) * 0.75);
+  box-shadow: 0 0 calc(6px + var(--charge, 0) * 46px) calc(var(--charge, 0) * 12px) color-mix(in srgb, var(--tone) 80%, transparent);
+}
+.sc-cracks { position: absolute; inset: 0; overflow: visible; fill: none; stroke: var(--color-white); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 40; stroke-dashoffset: 40; transition: stroke-dashoffset 0.25s; filter: drop-shadow(0 0 4px var(--tone)); }
+.sc-orb[data-crack] .sc-cracks path:nth-child(-n + 2), .sc-orb[data-split] .sc-cracks path { stroke-dashoffset: 0; }
+
+/* Tricky: the frame (the pixel canvas in a dark tile, the scrambled name under it), centred on the place's avatar. */
+.tr-frame { width: 0; height: 0; }
+.tr-tile {
+  position: absolute; left: -32px; top: -32px; width: 64px; height: 64px; padding: 4px;
+  border-radius: 1rem; background: var(--color-stage); border: 2px solid var(--color-line-strong);
+}
+.tr-tile canvas { width: 100%; height: 100%; display: block; }
+.tr-frame[data-lit] .tr-tile { border-color: var(--tone); box-shadow: 0 0 30px color-mix(in srgb, var(--tone) 70%, transparent); }
+.tr-name { position: absolute; left: 0; width: 7rem; margin-left: -3.5rem; translate: 0 -50%; text-align: center; font-size: var(--text-sm); color: var(--color-muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.tr-frame[data-lit] .tr-name { color: var(--color-ink); }
+
+/* Photo finish: each lane's bar in the player's colour with its score after it, the finish line, and the lanes' states. */
+.pf-lane { transition: opacity 0.4s; }
+.pf-bar { position: absolute; left: 0; top: 50%; height: 56%; translate: 0 -50%; border-radius: 999px; background: var(--player); }
+.pf-score { position: absolute; top: 50%; translate: 0 -50%; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.pf-finish { position: absolute; top: 2.25rem; bottom: 0.5rem; width: 0; border-right: 2px dashed var(--color-line-strong); }
+.pf-lane[data-out] { opacity: 0.4; }
+.pf-lane[data-close] .pf-bar { animation: pf-pulse 0.5s ease-in-out infinite alternate; }
+@keyframes pf-pulse { to { box-shadow: 0 0 18px var(--player); } }
+.pf-lane[data-won] .pf-bar { animation: none; box-shadow: 0 0 24px var(--color-yellow); }
+.pf-lane[data-won] .pf-score { color: var(--color-yellow); }

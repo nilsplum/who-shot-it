@@ -1,0 +1,22 @@
+/*
+ * The demo draft's stylesheet, written exactly like the app's (styles/app.css), so what is
+ * chosen moves over as it is: it imports the app's stylesheet (every colour, size, font and
+ * class of the app) and adds the draft's own entrances to the theme, where Tailwind turns
+ * them into classes (`animate-demo-pop`, used in screen.js).
+ *
+ * Mechanisms: scripts/helpers/drafts.mjs builds it with Tailwind (scanning this folder for
+ * classes) and serves the result as the screen's one stylesheet.
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+@theme {
+  --animate-demo-pop: demo-pop 0.45s var(--ease-bounce) both; /* a player pops in, a little too big first */
+  --animate-demo-slide: demo-slide 0.5s var(--ease-spring) both; /* a player slides in from the left and settles */
+  --animate-demo-bump: demo-bump 0.5s var(--ease-bounce) both; /* the button arrives with one bump */
+
+  @keyframes demo-pop { from { transform: scale(0.3); opacity: 0; } }
+  @keyframes demo-slide { from { transform: translateX(-120%); opacity: 0; } }
+  @keyframes demo-bump { from { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.04); } }
+}

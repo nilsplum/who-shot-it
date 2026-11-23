@@ -27,7 +27,7 @@ room, stored in the EU.
 |---|---|
 | `./scripts/setup.sh` | Installs the pinned dependencies and the test browser. Run once and after dependency changes. |
 | `./scripts/test.sh` | All tests: unit + integration (inside the Workers runtime), then phone-sized browsers playing a full game with a stand-in photo library. `--no-e2e` skips the browsers. |
-| `./scripts/dev.sh [android\|ios\|store]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. `store`: both store pages as players will see them, at `http://localhost:8788`. |
+| `./scripts/dev.sh [android\|ios\|store\|drafts]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. `store`: both store pages as players will see them, at `http://localhost:8788`. `drafts`: pick a draft to try out in the browser, at `http://localhost:8789`. |
 | `./scripts/deploy.sh` | Checks, runs every test, deploys the server to Cloudflare. |
 | `./scripts/release-apps.sh [android] [ios]` | Runs every test, builds the signed apps and uploads them to App Store Connect and Google Play; `--submit` also fills in the App Store page and sends it to App Review (`--no-upload`: only build into `dist/`). |
 
@@ -71,6 +71,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `clock.js` (the timer bar's countdown), `photos.js` (the photos to choose from, with a bucket of previews kept ready), `upcoming.js` (the game's photos, loaded ahead in play order), `loader.js` (one job at a time, for both), `textcheck.js` (counts lines of text on a preview), `podium.js` and `sparks.js` (the end screen's reveal, its sparks and fireworks), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. `scripts/helpers/listing.mjs` is the one reader: the iOS upload, the image scripts and the preview (`./scripts/dev.sh store`) all use it, so the preview shows what both stores get. |
+| `drafts/` | Screens and animations tried out before they go into the app, on phone-sized screens with the app's real views and theme; never shipped. How they work and how to make one: [drafts/README.md](drafts/README.md). |
 | `android/`, `ios/` | The native projects; what is ours there: [docs/apps.md](docs/apps.md). |
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin and light bots that fill a table of 16). |
 

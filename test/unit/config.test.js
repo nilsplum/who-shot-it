@@ -2,8 +2,8 @@
  * The shared config (web/shared/config.js) and every file that restates one of its
  * values because it cannot import it: the web page, the legal page, the Capacitor
  * config, the native projects and wrangler.jsonc. A copy that drifts fails here. Also the
- * colours: their one home is the theme in styles/app.css, and the app's code and pages
- * only name them.
+ * colours: their one home is the theme in styles/app.css, and the app's code and pages, and
+ * the drafts that try out new ones (drafts/), only name them.
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -24,6 +24,7 @@ import iosProject from '../../ios/App/App.xcodeproj/project.pbxproj?raw';
 /** Every text file of the repo that people write (the built stylesheet web/css/app.css is not one). */
 const texts = import.meta.glob([
   '../../web/**/*.{js,mjs,html,css,svg}', '!../../web/css/**', '../../styles/**/*.css', '../../src/**/*.js', '../../test/**/*.js', '../../docs/**/*.md', '../../store/**/*.js', '../../*.md', '../../scripts/**/*.{sh,mjs}',
+  '../../drafts/**/*.{js,html,css,md}',
   '../../android/app/src/main/java/**/*.java', '../../android/app/src/main/AndroidManifest.xml', '../../android/app/build.gradle',
   '../../ios/App/App/*.swift', '../../ios/App/App/Info.plist', '../../ios/App/App/PrivacyInfo.xcprivacy',
 ], { query: '?raw', import: 'default', eager: true });
@@ -151,9 +152,9 @@ describe('colours: styles/app.css is their one home', () => {
     expect(indexHtml).toContain(`<meta name="theme-color" content="${colour('navy')}">`);
   });
 
-  test('the code and pages of the app define no colour, they only name the theme colours', () => {
-    const files = Object.entries(texts).filter(([file]) => /\/web\/.*\.(js|html)$/.test(file) && !file.includes('/vendor/'));
-    expect(files.length).toBeGreaterThan(20);
+  test('the code and pages of the app and the drafts define no colour, they only name the theme colours', () => {
+    const files = Object.entries(texts).filter(([file]) => (/\/web\/.*\.(js|html)$/.test(file) && !file.includes('/vendor/')) || /\/drafts\/.*\.(js|html|css)$/.test(file));
+    expect(files.length).toBeGreaterThan(30);
     for (const [file, text] of files) {
       const own = text.replace(/<meta name="theme-color" content="#[0-9a-fA-F]+">/, '');
       expect(own.match(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/g), file).toBeNull();

@@ -1,0 +1,14 @@
+/*
+ * The stylesheet of the kit's page (the title, the controls, the phone frames): the app's
+ * own (styles/app.css: its theme with every colour, the type scale and the fonts, the
+ * component classes and every class the app uses) plus the classes the kit uses. A draft's
+ * screen has its own, the draft's style.css, written the same way.
+ *
+ * Mechanisms: `scripts/helpers/drafts.mjs` builds it with Tailwind into memory and serves
+ * it at /drafts.css; the kit's page (kit/page.html) and the list of drafts load it.
+ *
+ * Invariant: it adds no colour, size or animation of its own: the page looks like the app.
+ */
+
+@import '../../styles/app.css';
+@source '.';

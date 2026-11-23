@@ -1,0 +1,20 @@
+<!doctype html>
+<!--
+  A draft's phone screen: scripts/helpers/drafts.mjs serves it at /<draft>/screen, and the
+  draft's page shows it in a phone-sized frame. Like the app's own page (web/index.html) it
+  has an empty #app, clipped like the app's; the draft's screen.js paints into it. Its one
+  stylesheet is the draft's style.css, built by Tailwind like the app's (it imports the
+  app's, so every class and colour of the app is there too). Both relative to the draft.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Screen</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="screen.js"></script>
+</head>
+<body>
+<div id="app" class="overflow-clip"></div>
+</body>
+</html>

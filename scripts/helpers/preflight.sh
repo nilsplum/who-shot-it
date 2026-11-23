@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Preflight checks shared by every script in scripts/. Each check is one function that
 # prints a short reason and the exact fix when it fails; each script runs its bundle
-# (preflight_setup, preflight_test, preflight_dev, preflight_deploy, preflight_android,
-# preflight_ios) before doing anything; release-apps.sh adds check_play_upload_key and
+# (preflight_setup, preflight_test, preflight_dev, preflight_drafts, preflight_deploy,
+# preflight_android, preflight_ios) before doing anything; release-apps.sh adds check_play_upload_key and
 # check_app_store_key. Sourced, never run directly. Expects to be called
 # from the repo root.
 
@@ -90,9 +90,15 @@ check_play_upload_key() {
   [ -f secrets/google-play.json ] || fail "The Google Play upload key is missing (secrets/google-play.json)." "Create it once as described in docs/apps.md (Google Play), or build only: ./scripts/release-apps.sh android --no-upload"
 }
 
+# A draft is a folder of drafts/ with a draft.js (drafts/README.md); `dev.sh drafts` needs one to show.
+check_drafts() {
+  ls drafts/*/draft.js >/dev/null 2>&1 || fail "There is no draft yet (a folder in drafts/ with a draft.js)." "Copy drafts/demo to drafts/<name> (drafts/README.md, \"A new draft\")."
+}
+
 preflight_setup() { check_node; }
 preflight_test() { check_node; check_dependencies; check_test_browser; }
 preflight_dev() { check_node; check_dependencies; }
+preflight_drafts() { check_node; check_dependencies; check_drafts; }
 preflight_deploy() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_cloudflare_login; }
 preflight_android() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_java; check_android_sdk; }
 preflight_ios() { check_node; check_dependencies; check_test_browser; check_operator_todos; check_xcode; check_ios_team; }
