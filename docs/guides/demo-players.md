@@ -3,9 +3,10 @@
 A game needs at least two players. The test players are computer opponents that join a real
 game from this computer, so one person with one phone can try the app, show it to someone,
 check a new TestFlight build or record a video for App Review. They are Leo 🐼, Zoe 🦄,
-Max 🐸 and Ida 🐙. Each one is the real app page in a browser on this computer with drawn
-sample pictures (`scripts/helpers/demo-photos.mjs`), so they never upload anybody's real
-photos. The script is `scripts/helpers/demo-players.mjs`.
+Max 🐸, Ida 🐙 and more, as many as the game holds (16 players, you included). Each one is
+the real app page in a browser on this computer with drawn sample pictures
+(`scripts/helpers/demo-photos.mjs`), so they never upload anybody's real photos. The
+script is `scripts/helpers/demo-players.mjs`.
 
 **Needs:** this computer with the repo, `./scripts/setup.sh` run once (it installs the test
 browser), and internet. The computer must stay awake while they play.
@@ -19,9 +20,9 @@ browser), and internet. The computer must stay awake while they play.
        node scripts/helpers/demo-players.mjs ABCD 3
 
    Or ask Claude: "Get me the test users: ABCD".
-3. After a few seconds they appear in the lobby. They wait **half a minute** before they get
-   ready, so there is time to show the lobby, for example to remove one (tap the name, then
-   **Remove**).
+3. After a few seconds they appear in the lobby, one after the other. Once the last one is
+   in, they wait **half a minute** before they get ready, so there is time to show the
+   lobby, for example to remove one (tap the name, then **Remove**).
 4. Choose your photos (**Continue**, then **Yes**). Once everyone is ready, the app asks
    **Is everyone here?**: tap **Yes, start**.
 5. In each round they tap a random player a few seconds after the photo appears.
@@ -31,8 +32,10 @@ browser), and internet. The computer must stay awake while they play.
 They also leave when you remove them or when the game is gone. Ctrl+C on the computer ends
 them all at once.
 
-**Options:** the number of players (1 to 4, default 2) and the server (default: the live
-one). With the local server of `./scripts/dev.sh android` or `ios`, add its address:
+**Options:** the number of players (1 to 15, default 2) and the server (default: the live
+one). Everyone already in the game counts: with 15 they fill the game up to its 16
+players, and the script says when the game is full. With the local server of
+`./scripts/dev.sh android` or `ios`, add its address:
 `node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787`.
 
 ## Record the video for App Review
@@ -67,6 +70,7 @@ including reporting a photo and removing a player. What worked:
 | You see | Why, and what to do |
 |---|---|
 | "No game with this code" in the script's output | A typo, or the game is closed. Start a new game and use its code. |
+| "This game is full" in the script's output | The game already holds 16 players, everyone counted. Those who joined before it play as usual. |
 | They never appear in the lobby | The computer is offline, or the test browser is missing: run `./scripts/setup.sh`. |
 | They join but never get ready | Wait the half minute. If it takes longer, Ctrl+C and start them again. |
 | The game does not start | Someone is not ready yet: the lobby says who ("Waiting on …"). |

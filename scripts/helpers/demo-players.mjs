@@ -3,34 +3,64 @@
  * play, demonstrate or record the whole game (for example the screen recording App Review
  * asks for; step by step in docs/guides/demo-players.md). Usage, with the code the phone shows:
  *   node scripts/helpers/demo-players.mjs ABCD            two players on the live server
+ *   node scripts/helpers/demo-players.mjs ABCD 15         as many as the game still holds
  *   node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787   three, local server
+ *
+ * They join one after the other until as many as asked for are in, or until the room turns
+ * one away. The room alone knows who else is in the game, so it alone decides: it holds
+ * `LIMITS.maxPlayers` players, everyone counted (`rules.join`), and turns the next one away
+ * with "This game is full." The first refusal (full, or no such game) ends the joining,
+ * since every later player would hear the same. At most `LIMITS.maxPlayers - 1` can be asked
+ * for: the game needs the person's phone too.
  *
  * Each player is the real app page in a headless browser with the end-to-end tests' fake
  * photo plugin (`test/e2e/fake-phone.js`) and drawn stand-in photos (`demo-photos.mjs`),
  * so they upload nobody's real photos. They accept the terms, join, wait half a minute
- * before they say Yes to their photos (so the host has time to show the lobby, for example
- * removing a player; then the person answers "Is everyone here?"), guess a random
- * player a moment after each photo appears, wait through each leaderboard, and stay on the
- * end screen for two minutes (joining the next game when anyone taps "Play again") before
- * they leave. They also stop when the
- * game is gone or the host removed them. Ctrl+C ends them all.
+ * after the last of them joined before they say Yes to their photos (so the host has time
+ * to show the lobby, for example removing a player; then the person answers "Is everyone
+ * here?"), guess a random player a moment after each photo appears, wait through each
+ * leaderboard, and stay on the end screen for two minutes (joining the next game when
+ * anyone taps "Play again") before they leave. They also stop when the game is gone or the
+ * host removed them. Ctrl+C ends them all.
  */
 import { chromium } from '@playwright/test';
-import { SERVER } from '../../web/shared/config.js';
+import { LIMITS, SERVER } from '../../web/shared/config.js';
 import { installFakePhone } from '../../test/e2e/fake-phone.js';
 import { drawLibrary } from './demo-photos.mjs';
 
+const MOST = LIMITS.maxPlayers - 1;
 const [code, count = '2', server = SERVER.origin] = process.argv.slice(2);
-if (!/^[A-Z0-9]{4}$/.test(code || '')) {
-  console.error('Use: node scripts/helpers/demo-players.mjs <CODE> [players] [server]');
+if (!/^[A-Z0-9]{4}$/.test(code || '') || !(Number(count) >= 1)) {
+  console.error(`Use: node scripts/helpers/demo-players.mjs <CODE> [players, 1 to ${MOST}] [server]`);
   process.exit(1);
 }
-const NAMES = [['Leo', '🐼'], ['Zoe', '🦄'], ['Max', '🐸'], ['Ida', '🐙']];
+const wanted = Math.min(Math.floor(Number(count)), MOST);
+if (wanted < Number(count)) console.log(`At most ${MOST}: a game holds ${LIMITS.maxPlayers} players, you included.`);
+
+/**
+ * Names and avatars in joining order, one per player the game can take next to the person.
+ * The room gives a player whose avatar is taken a free one (`freeAvatar`); should the limit
+ * ever outgrow the list, the names come round again with a number, so it never caps the count.
+ */
+const NAMES = [
+  ['Leo', '🐼'], ['Zoe', '🦄'], ['Max', '🐸'], ['Ida', '🐙'], ['Ben', '🦊'], ['Mia', '🐨'], ['Tom', '🦁'], ['Ava', '🦋'],
+  ['Sam', '🐢'], ['Lia', '🦩'], ['Kai', '🐳'], ['Eva', '🌻'], ['Jon', '🎸'], ['Uma', '🍉'], ['Noa', '🚀'],
+];
+const nameOf = (i) => {
+  const [name, avatar] = NAMES[i % NAMES.length];
+  const round = Math.floor(i / NAMES.length);
+  return [round ? `${name} ${round + 1}` : name, avatar];
+};
 const READY_AFTER_MS = 30_000;
 const END_STAY_MS = 120_000;
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function player(browser, library, [name, avatar]) {
+/**
+ * Opens the app as a new phone and joins the game. Resolves with the page once it is in the
+ * room (every room screen has the Leave button), or null once the app is back on its start
+ * screen with the room's answer in the toast (full, no such game).
+ */
+async function join(browser, library, [name, avatar]) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addInitScript(installFakePhone, { photos: library });
   await context.addInitScript(([n, a]) => localStorage.setItem('whoshotit', JSON.stringify({ name: n, avatar: a })), [name, avatar]);
@@ -42,13 +72,25 @@ async function player(browser, library, [name, avatar]) {
   await page.getByRole('button', { name: 'I agree, let’s play' }).click();
   await page.fill('#code', code);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
-  console.log(`${avatar} ${name} joined ${code}`);
-  const joined = Date.now();
+  await page.waitForFunction(() => document.querySelector('[data-act="leave"]') || (document.querySelector('#code') && document.querySelector('#toast')?.textContent));
+  if (await page.locator('[data-act="leave"]').count()) {
+    console.log(`${avatar} ${name} joined ${code}`);
+    return page;
+  }
+  console.log(`${avatar} ${name} could not join: ${await page.locator('#toast').textContent()}`);
+  await context.close();
+  return null;
+}
+
+/**
+ * Plays along until the page is back on the start screen (room gone, removed), or until
+ * the end screen has shown for a while: then it leaves the room properly, so a later
+ * "Play again" does not wait for it. When someone opens the next game, it joins. `since`:
+ * when the last player joined, from which the half minute before "Yes" counts.
+ */
+async function play(page, [name, avatar], since) {
   let lastRound = null;
   let ended = null;
-  // Plays along until the page is back on the start screen (room gone, removed), or until
-  // the end screen has shown for a while: then it leaves the room properly, so a later
-  // "Play again" does not wait for it. When someone opens the next game, it joins.
   let reason = '';
   for (;;) {
     await pause(400 + Math.random() * 400);
@@ -68,7 +110,7 @@ async function player(browser, library, [name, avatar]) {
       reason = 'after the game';
       break;
     }
-    if (Date.now() - joined > READY_AFTER_MS) {
+    if (Date.now() - since > READY_AFTER_MS) {
       const proceed = page.getByRole('button', { name: 'Continue' });
       if (await proceed.count()) await proceed.click();
       // Exactly "Yes": "Is everyone here?" is the person's to answer, not the demo players'.
@@ -87,10 +129,18 @@ async function player(browser, library, [name, avatar]) {
     }
   }
   console.log(`${avatar} ${name} left (${reason})`);
-  await context.close();
+  await page.context().close();
 }
 
 const browser = await chromium.launch();
 const library = await drawLibrary(browser);
-await Promise.all(NAMES.slice(0, Number(count)).map((who) => player(browser, library, who)));
+const players = [];
+for (let i = 0; i < wanted; i++) {
+  const page = await join(browser, library, nameOf(i));
+  if (!page) break;
+  players.push([page, nameOf(i)]);
+}
+if (players.length) console.log(`${players.length} in ${code}; they say Yes to their photos in half a minute.`);
+const since = Date.now();
+await Promise.all(players.map(([page, who]) => play(page, who, since)));
 await browser.close();

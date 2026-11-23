@@ -206,7 +206,8 @@ export const LIMITS = {
    * guessing screen's cards, the lobby's pills and the leaderboard are laid out for up to
    * this many on a 360 px phone, and a full room's photos stay small for the free plan's
    * storage. The store description is built from it and `minPlayers`; the README says
-   * "2 to 16 players".
+   * "2 to 16 players", and the test players' guide (docs/guides/demo-players.md) 16 and
+   * "1 to 15" (the test players fill a game up to it, `scripts/helpers/demo-players.mjs`).
    */
   maxPlayers: 16,
   nameMax: 16,
