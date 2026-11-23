@@ -60,9 +60,10 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
    `--no-upload` only builds (`dist/who-shot-it-<version>.aab`, `dist/ios/App.ipa`).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with
-Xcode 26 or newer (from April 2027 Apple accepts only builds made with Xcode 27 or newer),
-and either the App Store Connect API key in `secrets/` (below; it signs and uploads, also
-unattended) or Xcode signed in to the Apple developer account (Xcode, Settings, Accounts);
+Xcode 26 or newer (from April 2027 Apple accepts only builds made with Xcode 27 or newer,
+which needs macOS 26.6 or newer), and either the App Store Connect API key in `secrets/`
+(below; it signs and uploads, also unattended) or Xcode signed in to the Apple developer
+account (Xcode, Settings, Accounts);
 the team is set in the project (`DEVELOPMENT_TEAM`, AG58VXA9TW).
 
 **Keys in `secrets/`** (git-ignored; back the folder up in a password manager):

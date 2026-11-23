@@ -43,6 +43,10 @@ knowing. Kept up to date with every commit.
   with automatic release, was taken back (`node scripts/helpers/app-store.mjs withdraw`), so
   the old app can never go live by itself. It waits as "Developer Rejected" (Apple's word for
   "taken back"); `submit` attaches build 10005 to it, renames it 1.0.5 and sends it.
+- 1.0.5 (build 10005) was sent to App Review on 23 November (`app-store.mjs submit`, now
+  "Waiting for Review"), with the new recording: made with 10005 on the iPad, uncut, from
+  opening the app to "Play again", removing a player and reporting a photo included (review
+  note 1 says exactly that). It goes live by itself once approved.
 
 **To do by hand, in this order**
 1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone
@@ -75,10 +79,10 @@ knowing. Kept up to date with every commit.
    here?"), the flag, the leaderboard and the end of a game look different now. If it is not
    needed any more (the app is already live), change the first review note in
    `store/ios_listing.js` instead.
-3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
-   Store page and sends the TestFlight build of `package.json`'s version (10005) to App
-   Review (no new upload; it goes live by itself once approved, and the invite page's App
-   Store button works from then on).
+3. Wait for App Review (done: 1.0.5 is sent). If Apple writes back or rejects, answer in
+   App Store Connect or fix what it asks for, then `node scripts/helpers/app-store.mjs
+   submit` sends the same version back. Once it is live, the invite page's App Store button
+   works without another step.
 4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
@@ -89,6 +93,13 @@ knowing. Kept up to date with every commit.
    screenshots `store/images/android_screenshot-*.png`; `./scripts/dev.sh store` shows both
    pages to copy from. Once its page is public, set `STORES.android` and deploy, so invites
    show the Google Play button too.
+5. The next iPhone update, before April 2027, is built with Xcode 27: Apple's upload of
+   10005 warned (ITMS-90725) that from then on only builds with the iOS 27 SDK are accepted.
+   Xcode 27 needs macOS 26.6 or newer (this Mac runs 26.2): update macOS, install Xcode 27,
+   check that the app's oldest iOS (15.4, `docs/apps.md`) is still offered, raise the
+   version and run `./scripts/release-apps.sh ios --submit`, after a test on a real iPhone
+   (a new SDK can change how iOS draws the app). That build also carries the privacy
+   manifest's "Gameplay Content".
 
 **Decisions worth knowing** (details in the decision log, section 12)
 - Your own AGENTS.md edit got into my commit 2 by mistake (`git add -A`); I took it out
