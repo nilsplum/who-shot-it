@@ -81,11 +81,17 @@ export const BLOCKED_WORDS = [
   'fick', 'scheiss', 'fotze', 'nutte', 'schlampe', 'wichser', 'arschloch', 'missgeburt', 'schwuchtel', 'kanake', 'spast',
 ];
 
-/** Store pages, shown on the website's invite page. `null` hides a store until it exists. */
+/**
+ * Store pages, shown on the website's invite page (the shared links and the QR code), so a
+ * friend without the app can get it. `null` hides a store until its page is public: a
+ * button to a "not found" page would be a dead end. The iPhone link is the App Store
+ * Connect record's Apple ID (it opens once a version is approved); the Android one is
+ * `https://play.google.com/store/apps/details?id=${APP.id}` once Google Play publishes it.
+ * The website shows a change only after `./scripts/deploy.sh`.
+ */
 export const STORES = {
-  android: `https://play.google.com/store/apps/details?id=${APP.id}`,
-  // Set to the App Store link (https://apps.apple.com/app/id…) once the app record exists.
-  ios: null,
+  android: null,
+  ios: 'https://apps.apple.com/app/id6837810354',
 };
 
 /**

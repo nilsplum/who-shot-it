@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { LIMITS, REACTIONS } from '../../web/shared/config.js';
+import { LIMITS, REACTIONS, STORES } from '../../web/shared/config.js';
 import { addBots } from './bots.js';
 import { library, newPhone } from './fake-phone.js';
 
@@ -492,7 +492,9 @@ test('in a browser the page is the website: the invite page and the legal page',
   await page.goto('/ABCD');
   await expect(page.getByText('You’re invited to game')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open in the app' })).toHaveAttribute('href', 'whoshotit://join/ABCD');
-  await expect(page.getByRole('link', { name: 'Google Play (Android)' })).toBeVisible();
+  // Only the stores with a public page get a button (STORES): a friend never lands on "not found".
+  await expect(page.getByRole('link', { name: 'App Store (iPhone)' })).toHaveAttribute('href', STORES.ios);
+  await expect(page.getByRole('link', { name: 'Google Play (Android)' })).toHaveCount(STORES.android ? 1 : 0);
   await page.goto('/legal');
   await expect(page.getByRole('heading', { name: 'Imprint (Impressum)' })).toBeVisible();
   await expect(page.getByText('Zum Isetal 1')).toBeVisible();

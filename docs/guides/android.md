@@ -65,6 +65,9 @@ Countries: Production, Countries / regions, add all.
    Release notes: "First version." Save, Review release, Start rollout.
 4. Google reviews the app (hours to a few days). Friends with Android can test earlier:
    Testing, Internal testing, add their emails, and share the link Google shows.
+5. Once the app's page is public on Google Play, set `STORES.android` in
+   `web/shared/config.js` to it and run `./scripts/deploy.sh`, so shared invite links show
+   the Google Play button too (it stays hidden while the page would say "not found").
 
 ## 5. Automatic uploads from then on (once)
 
