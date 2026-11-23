@@ -22,9 +22,9 @@ import { LIMITS, REACTIONS } from '../../web/shared/config.js';
 import { addBots } from './bots.js';
 import { library, newPhone } from './fake-phone.js';
 
-/** Opens the app on a new phone: terms accepted, name typed; `options` as for `newPhone` (a viewport). */
-async function openApp(browser, name, photos, options) {
-  const page = await newPhone(browser, photos, options);
+/** Opens the app on a new phone with `photos` as its library: terms accepted, name typed; `options` as for `newPhone` (a viewport). */
+async function openApp(browser, name, photos = library, options = {}) {
+  const page = await newPhone(browser, { photos }, options);
   await page.goto('/');
   await page.getByRole('button', { name: 'I agree, let’s play' }).click();
   await page.fill('#name', name);

@@ -50,7 +50,7 @@ async function waitForServer() {
 
 async function phone(browser, library, name, avatar) {
   const context = await browser.newContext({ viewport: PHONE, deviceScaleFactor: SCALE, isMobile: true, hasTouch: true });
-  await context.addInitScript(installFakePhone, library);
+  await context.addInitScript(installFakePhone, { photos: library });
   await context.addInitScript(([n, a]) => localStorage.setItem('whoshotit', JSON.stringify({ name: n, avatar: a })), [name, avatar]);
   const page = await context.newPage();
   await page.goto(BASE);

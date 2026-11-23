@@ -32,7 +32,7 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function player(browser, library, [name, avatar]) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await context.addInitScript(installFakePhone, library);
+  await context.addInitScript(installFakePhone, { photos: library });
   await context.addInitScript(([n, a]) => localStorage.setItem('whoshotit', JSON.stringify({ name: n, avatar: a })), [name, avatar]);
   // Waits for the app's own screens are short, so a bot that cannot go on says so instead
   // of hanging (outside the test runner Playwright would wait forever).
