@@ -42,7 +42,7 @@ Offensive nicknames are replaced. Everyone accepts the terms (16+) before playin
 Questions and reports: whoshotit.info@gmail.com`;
 
 /** Apple's questions for new apps, answered in its order, then the test steps. */
-const reviewNotes = `1. Screen recording: attached. It was made on an iPhone with this build and starts with opening the app. It shows a whole game: creating a game, allowing photo access, removing a player, reporting a photo and the final scores. The other players are our own test players, run on a computer with drawn sample pictures, so one person could record a whole game. Waiting time and some rounds are cut out.
+const reviewNotes = `1. Screen recording: attached, uncut. It was made with this build on an iPad, where the iPhone app runs in its iPhone layout, and starts with opening the app. It shows a whole game: creating a game, choosing photos, removing a player, “Is everyone here?”, reporting a photo, the final round and the final scores. Photo access and the terms had been accepted before the recording (both are asked only at the first start). The other players are our own test players, run on a computer with drawn sample pictures, so one person could record a whole game.
 
 2. Purpose and audience: Who Shot It? is a party game for friends aged 16 and older who meet in person. Each player gets a few random photos from their own phone and decides whether to play with them. Then the photos appear one by one on every phone, and everyone guesses whose photo it is. It gives a group something fun to do together with the photos they already have. Free, no account, no ads, no purchases.
 
