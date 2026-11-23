@@ -2,10 +2,10 @@
 
 Status: planned on 22 November 2026, implemented on the branch `feat/game-feel-overhaul`
 (all thirteen commits, each with `docs/prompts/implement.md`, its decisions in the decision
-log at the end) and merged into `main` on 22 November 2026. The server is deployed and the
-iPhone app is in TestFlight (23 November). Testing 1.0.3 on a real iPhone showed waits
-everywhere photos are involved; the follow-up on the branch `fix/no-waiting` (section 13,
-version 1.0.4) removes their causes. The store release waits for the operator's test
+log at the end) and merged into `main` on 22 November 2026. Testing 1.0.3 on a real iPhone
+showed waits everywhere photos are involved; the follow-up on the branch `fix/no-waiting`
+(section 13, version 1.0.4) removes their causes and is on `main` too. Its server is deployed
+and 1.0.4 is in TestFlight (23 November); the store release waits for the operator's test
 (Operator handoff, below).
 
 ## Operator handoff
@@ -14,18 +14,19 @@ What only the operator can do, and the decisions made while implementing that ar
 knowing. Kept up to date with every commit.
 
 **Done on 23 November 2026**
-- The server of 1.0.3 is deployed (`./scripts/deploy.sh`, Cloudflare version `e697ec83`);
-  installed apps keep working with it (section 6). If it ever has to go back: `npx wrangler
-  rollback` (a critical command, ask first).
-- The iPhone app 1.0.3 (build 10003) is in TestFlight, not sent to App Review. Testing it
-  showed the waits that section 13 removes; it is not to be released.
+- The server of `fix/no-waiting` is deployed (`./scripts/deploy.sh` from its worktree,
+  Cloudflare version `bb4e9792`; it replaced `e697ec83`, the server of 1.0.3). It keeps every
+  installed app working (1.0.2, the 1.0.3 TestFlight build), which simply get fewer updates,
+  only real changes. If it ever has to go back: `npx wrangler rollback` (a critical command,
+  ask first). The other session's podium and drafts commits, merged into `main` after it,
+  change only the app, so the live server matches `main`.
+- `main` holds both sessions' work (the podium and the drafts first, then section 13's
+  commits on top) and is pushed to GitHub.
+- The iPhone app 1.0.4 (build 10004) is in TestFlight, not sent to App Review. Build 1.0.3
+  (10003) showed the waits that section 13 removes; it is not to be released.
 
 **To do by hand, in this order**
-1. Deploy the server of `fix/no-waiting` once it is on `main` (`./scripts/deploy.sh`, a
-   critical command: I ask before running it). It keeps every installed app working (1.0.2,
-   the 1.0.3 TestFlight build), which then simply get fewer updates, only real changes.
-2. Upload 1.0.4 to TestFlight (`./scripts/release-apps.sh ios`, no `--submit`).
-3. Try 1.0.4 on a real iPhone (TestFlight, against the live server) and a real Android phone
+1. Try 1.0.4 on a real iPhone (TestFlight, against the live server) and a real Android phone
    (`./scripts/dev.sh android`, the game from this Mac), right after starting the app, with
    the test players (`docs/guides/demo-players.md`); the browser tests cannot show or feel:
    - Waiting (section 13): tap "No" many times in a row, hold a photo, tap "Yes": all at
@@ -43,15 +44,15 @@ knowing. Kept up to date with every commit.
      the podium's reveal.
    - The screen edges (commit 9): screens start right under the status bar and end right
      above the home indicator (checked in the iPhone simulator); also look on the iPad.
-4. Record the App Review video again with the 1.0.4 TestFlight build before sending it to
+2. Record the App Review video again with the 1.0.4 TestFlight build before sending it to
    review (`docs/guides/demo-players.md`, "Record the video for App Review"): the review
    notes say the attached video was made with the build under review, and the flag, the
    leaderboard and the end of a game look different now. If it is not needed any more
    (the app is already live), change the first review note in `store/ios_listing.js` instead.
-5. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
+3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
    Store page and sends the TestFlight build 10004 to App Review (no new upload; it goes
    live by itself once approved).
-6. Release the Android app. This Mac has neither the Android upload key
+4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
    `./scripts/release-apps.sh android`. Without the upload key the script would create a
@@ -1144,7 +1145,7 @@ were four, and the follow-up is four commits:
 | A held photo | Its big version is decoded before it is shown and fades in over the preview; the overlay is painted by the one painter, so only that layer changes | The whole overlay was replaced when the sharp version came (the fade played again, the preview flickered), and the big version could wait behind other downloads. |
 | What "Yes" sends | No more photos than the game can show of the player (the Balanced range's most, at least an equal share rounded up; all when every photo is played), the prepared ones first; one formula for room and phone (`balancedRange` in config.js) | The operator's idea: about a third of the bytes for a typical game, so "Yes" is quick on a weak connection, and fewer photos leave the phone. If players leave the lobby afterwards, a game can end a round or two early. The legal text ("only the photos on screen are sent") stays true. |
 | Image sizes | Unchanged: 480 px previews, 1080 px for holding, sending and the game | The operator asked whether sizes should be limited at the source: they are, and they match the screens. The cost was in how many images were made and moved, not their size. |
-| iPhone previews | Photos answers with the nearest size it keeps ready (`.fast`) and the plugin scales it to 480 px, as the Android twin does with thumbnails | Apple's quick path for photo grids; the exact resize could decode a large original for each preview. Compiled for the simulator; a real iPhone shows the gain (Operator handoff, to do 3). |
+| iPhone previews | Photos answers with the nearest size it keeps ready (`.fast`) and the plugin scales it to 480 px, as the Android twin does with thumbnails | Apple's quick path for photo grids; the exact resize could decode a large original for each preview. Compiled for the simulator; a real iPhone shows the gain (Operator handoff, to do 1). |
 | Considered, not done | Handing images to the page as files instead of base64 through the native bridge (Capacitor's recommended way for large images) | With far fewer big versions it is not needed for what was measured; it would change both native twins and keep copies of the player's photos in the app's cache. Worth it only if a real phone still shows load. |
 | The test players' half minute | Unchanged | Deliberate (time to show the lobby and remove one for the App Review video); in the measurements nothing else slowed them. |
 | A transition that looked broken | Most likely the next round's screen without a photo while the room waited for one slow phone | With the room waiting for one photo and the storm gone, it no longer shows in the speed test; a screen recording helps if it still appears. |
@@ -1154,3 +1155,11 @@ photo's preview 0.5 s, the room waiting for phones that kept up 1 s, the 3-2-1 n
 more than one report per round, more than 4 views during the 3-2-1, the page blocked 0.5 s
 during the game). Measured after the fixes: each "No" 6 to 342 ms, "Yes" 0.7 s, views during
 the 3-2-1 2 (was 20), one report per round, nothing blocked.
+
+Note at the release of 1.0.4: the release's own test run failed once on the "Yes" limit
+(5.4 s). The trace showed "Getting photos ready" waiting for a photo kept only in iCloud to
+download while photos on the phone waited behind it: "on the phone first" only knew which
+photos those were once the background had tried them, and after fast "No" taps the new set
+was untried. Now every photo of the set on screen is first asked for from the phone alone
+(one kept only in iCloud says so at once), then the iCloud ones download. The limit did what
+it is there for; 1.0.4 was built after the fix, with every test green.
