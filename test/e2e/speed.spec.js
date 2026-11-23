@@ -6,8 +6,9 @@
  * photos kept only in iCloud, its processor slowed to a phone's (Chromium's CPU throttling)
  * and a phone network's delay. Two more app phones and five light bots (`bots.js`) fill the
  * table, so the room and the sockets carry what a real group causes. The test plays the
- * lobby (the first set, "No" tapped as fast as new sets come, holding a photo, "Yes") and a
- * short game, and prints what each step took: the lobby's waits, the 3-2-1 as it was painted,
+ * lobby (the first set, "No" SKIPS times a glance apart, more sets than the bucket held at
+ * first, holding a photo, "Yes") and a short game, and prints what each step took: the
+ * lobby's waits, the 3-2-1 as it was painted,
  * how long the room waited for phones, when each photo appeared, how many messages went
  * each way and how long the page was blocked.
  *
@@ -29,11 +30,15 @@ const CPU_SLOWDOWN = 4;
 /** A phone network: delay each way and throughput (bytes per second). */
 const NETWORK = { offline: false, latency: 60, downloadThroughput: 2_500_000, uploadThroughput: 700_000 };
 const ROUNDS = 5;
+/** How often Ann taps "No" in a row, and how long she glances at each set first. */
+const SKIPS = 20;
+const GLANCE_MS = 1000;
 
 /** What the players may wait at most (ms), and how much the phones may send and do. */
 const LIMITS = {
   firstSet: 2000,
-  no: 1000,
+  /** "No" is instant: the next set is already in the bucket (a wait would show it dimmed under a spinner). */
+  no: 250,
   /** The preview shows at once; the sharp version follows (a photo kept only in iCloud downloads first). */
   heldPreview: 500,
   heldSharp: 5000,
@@ -135,6 +140,16 @@ test('a game at phone speed: what the players wait for stays within its limits',
   const code = (await host.locator('[data-act="invite"]').innerText()).replace(/\s/g, '');
   // Ann's phone may read photos already, so the lobby deals her set at once.
   report.firstSet = await msUntil(host, (sel) => Boolean(document.querySelector(sel)), TILE);
+  // "No" again and again, right from the first set: a glance at each set, then "No". Far
+  // more sets than the bucket held at the start, so nearly every one comes from the bucket
+  // refilling while Ann looks, next to the big versions of the set on screen.
+  report.no = [];
+  for (let i = 0; i < SKIPS; i++) {
+    await host.waitForTimeout(GLANCE_MS);
+    const before = await firstTile(host);
+    await host.getByRole('button', { name: 'No' }).click();
+    report.no.push(await msUntil(host, ([sel, style]) => { const el = document.querySelector(sel); return Boolean(el) && el.getAttribute('style') !== style; }, [TILE, before]));
+  }
   for (const name of ['Ben', 'Cleo']) {
     const phone = await openPhone(browser, name, { photos: library });
     await phone.page.fill('#code', code);
@@ -143,13 +158,6 @@ test('a game at phone speed: what the players wait for stays within its limits',
   }
   const bots = await addBots(baseURL, code, 5);
   try {
-    // "No", tapped again as soon as each new set is there.
-    report.no = [];
-    for (let i = 0; i < 3; i++) {
-      const before = await firstTile(host);
-      await host.getByRole('button', { name: 'No' }).click();
-      report.no.push(await msUntil(host, ([sel, style]) => { const el = document.querySelector(sel); return Boolean(el) && el.getAttribute('style') !== style; }, [TILE, before]));
-    }
     for (const { page } of others) {
       await page.getByRole('button', { name: 'Continue' }).click();
       await page.getByRole('button', { name: 'Yes' }).click();
@@ -206,7 +214,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
   console.log([
     'A game at phone speed (Ann: CPU / 4, 60 ms network, 400 photos, a quarter only in iCloud):',
     `  first set after entering the lobby  ${report.firstSet} ms`,
-    `  each "No", tapped right away        ${report.no.join(', ')} ms`,
+    `  "No" ${SKIPS} times, a glance apart     ${report.no.join(', ')} ms`,
     `  holding a photo: preview, sharp     ${report.preview} ms, ${report.sharp} ms`,
     `  "Yes" until the 3-2-1               ${report.yes} ms`,
     `  the 3-2-1 as painted                ${report.countdown}`,

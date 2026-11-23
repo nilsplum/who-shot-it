@@ -16,12 +16,13 @@
  * - One list of work, in the order of what a player waits for (`pick`), done by one worker
  *   per kind of work on `loader.js`, so a slow job never holds up a quick one of another kind:
  *   1. `held`: the big version of the photo a finger holds (downloaded if needed);
- *   2. `deal`: previews for a set being dealt ("No", the first set), when the bucket is short;
+ *   2. `deal`: previews whenever the bucket holds fewer than a set being dealt ("No", the
+ *      first set) or, outside a game, than LIMITS.readySets sets behind the one on screen,
+ *      so "No" is instant however often it is tapped (`previewsShort`);
  *   3. `sharp`: the big versions of the set on screen, for "Yes": each first from the phone
  *      alone (quick, and a photo kept only in iCloud says so at once), then the iCloud ones
  *      downloaded; not for a set being replaced;
- *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: previews until
- *      LIMITS.readySets more sets are ready (so "No" is instant), then the next set's big
+ *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: the next set's big
  *      versions (from the phone only), then previews up to LIMITS.bucketPreviews.
  * - `roll` deals a set from the front of the bucket, so its big versions are usually there
  *   already; `swap` replaces one photo with the bucket's next (the tile turns over, its old
@@ -137,8 +138,16 @@ function fits(entry, filter) {
 /** A photo still needs its big version: none there, none on its way, and it has not failed for good. */
 const needsFull = (e) => Boolean(e) && !e.full && !e.pending && e.failed !== true;
 
-/** A set being dealt needs more previews than the bucket holds. */
-const dealShort = () => readable && dealing > 0 && bucket.length < dealing && !exhausted;
+/**
+ * The bucket holds fewer previews than a player may need without waiting: the set being
+ * dealt and, outside a game, LIMITS.readySets sets behind the one on screen, so "No" is
+ * instant however often it is tapped. Each "No" spends a set of this reserve, and the
+ * reserve is filled again at once, by its own worker (`deal`) next to the big versions of
+ * the set on screen. Behind them it starved: those take seconds when a photo is kept only
+ * in iCloud, so a player tapping "No" again and again had used up the bucket after about
+ * fifteen sets and then waited at every "No".
+ */
+const previewsShort = () => readable && !exhausted && bucket.length < (needs.paused ? dealing : Math.max(dealing, needs.size * LIMITS.readySets));
 
 /**
  * The next job for a free worker (`open`: the kinds with a free slot), in the order of what
@@ -149,7 +158,7 @@ function pick(open) {
   const free = (kind) => open.includes(kind);
   const held = photos.chosen.find((c) => c.id === heldId);
   if (free('held') && needsFull(held)) return { key: `full:${held.id}`, kind: 'held', run: () => fetchFull(held, true) };
-  if (free('deal') && dealShort()) return { key: 'deal', kind: 'deal', run: () => fetchPreviews() };
+  if (free('deal') && previewsShort()) return { key: 'deal', kind: 'deal', run: () => fetchPreviews() };
   // The set on screen, unless it is being replaced. Every photo is first asked for from the
   // phone alone, which is quick (one kept only in iCloud says so at once and becomes
   // `failed: 'ahead'`); only then do those download. So the photos on the phone are ready
@@ -158,8 +167,7 @@ function pick(open) {
   const local = set.find((c) => needsFull(c) && !c.failed);
   const next = local || set.find(needsFull);
   if (free('sharp') && next) return { key: `full:${next.id}`, kind: 'sharp', run: () => fetchFull(next, !local) };
-  if (!free('fill') || !readable || needs.paused || needsFull(held) || dealShort() || next) return null;
-  if (bucket.length < needs.size * LIMITS.readySets && !exhausted) return { key: 'fill', kind: 'fill', run: () => fetchPreviews() };
+  if (!free('fill') || !readable || needs.paused || needsFull(held) || previewsShort() || next) return null;
   const ahead = bucket.slice(0, needs.size).find((e) => needsFull(e) && !e.failed);
   if (ahead) return { key: `full:${ahead.id}`, kind: 'fill', run: () => fetchFull(ahead, false) };
   if (bucket.length < LIMITS.bucketPreviews && !exhausted) return { key: 'fill', kind: 'fill', run: () => fetchPreviews() };

@@ -227,8 +227,9 @@ export const LIMITS = {
    */
   bucketPreviews: 250,
   /**
-   * How many sets of previews the bucket keeps ready beyond the one on screen before it does
-   * anything else, so "No" is instant even when tapped again and again.
+   * How many sets of previews the bucket keeps ready beyond the one on screen, refilled at
+   * once after every "No" (next to the big versions of the set on screen, never behind
+   * them), so "No" is instant even when tapped again and again.
    */
   readySets: 2,
   /**
