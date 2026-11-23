@@ -10,10 +10,10 @@
  *
  * Invariants: the way the app plays an entrance (AGENTS.md, Rendering): the markup is the
  * final state, whole class names picked per frame; the story only sets `data-*` attributes
- * over it (`data-playing` hides what has not arrived, `data-go` lets each piece arrive). With
- * Reduce Motion the final screen shows at once.
+ * over it (`data-playing` hides what has not arrived, `data-go` lets each piece arrive). Until
+ * the page's Play (`play`), and always with Reduce Motion, the final screen shows at once.
  */
-import { buzz, options, reduceMotion, wait } from '/kit/screen.js';
+import { buzz, options, play, wait } from '/kit/screen.js';
 import { LEAVE_BUTTON, avatar, esc, topBar } from '/js/ui.js';
 
 /** Stand-in players (never real people): a name and an avatar of the app's list. */
@@ -33,7 +33,7 @@ document.getElementById('app').innerHTML = `<div class="screen h-dvh">
   <button class="btn mt-auto bg-coral text-white data-go:animate-demo-bump ${WAITS}" data-start>Start game</button>
 </div>`;
 
-if (!reduceMotion) {
+if (play) {
   const screen = document.getElementById('app').firstElementChild;
   // In the same task as the paint, so no frame shows the end first.
   screen.setAttribute('data-playing', '');

@@ -3,7 +3,9 @@
  * http://localhost:8789/<draft>/. Run by `./scripts/dev.sh drafts [name]`: it picks a draft
  * (the name given, or typed and chosen in a short list in the terminal), serves everything,
  * opens the draft in the browser and reloads every open draft whenever a file it shows
- * changes. `--no-open` leaves the browser alone.
+ * changes. `--no-open` leaves the browser alone. Every page lists all drafts by their
+ * folder in its top bar (from /drafts.json), so the others are one click away; / opens
+ * the first.
  *
  * Mechanisms: a draft is a folder of drafts/ with a `draft.js` (drafts/README.md). Every
  * draft's page is the kit's page (drafts/kit/page.html, at /<draft>/), which reads the
@@ -42,7 +44,7 @@ const ORIGIN = `http://localhost:${PORT}`;
 /** The app's own folders, served from web/ at the paths the app itself uses (its fonts are linked as /fonts/…). */
 const APP_DIRS = ['js', 'shared', 'fonts', 'icons'];
 /** What a draft cannot be called: the app's folders above and the server's own paths. */
-const RESERVED = new Set([...APP_DIRS, 'kit', 'events', 'ping', 'drafts.css']);
+const RESERVED = new Set([...APP_DIRS, 'kit', 'events', 'ping', 'drafts.css', 'drafts.json']);
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -237,13 +239,6 @@ function fileFor(parts) {
   return path.join(DRAFTS, head, ...rest);
 }
 
-/** The address of every draft, for whoever opens http://localhost:8789/ itself. */
-function indexPage() {
-  const links = listDrafts().map((n) => `<li><a class="link" href="/${n}/">${n}</a></li>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Drafts</title><link rel="stylesheet" href="/drafts.css"></head>
-<body><div class="screen"><h1 class="mt-6 font-display text-7xl font-extrabold">Drafts</h1><ul class="mt-4">${links}</ul></div></body></html>`;
-}
-
 const server = http.createServer((req, res) => {
   const headers = (type) => ({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP });
   const send = (status, type, body) => res.writeHead(status, headers(type)).end(body);
@@ -254,8 +249,10 @@ const server = http.createServer((req, res) => {
   } catch {
     return send(400, TYPES['.json'], '{"error":"Bad address"}');
   }
-  if (pathname === '/') return send(200, TYPES['.html'], indexPage());
+  // Nothing lives at the root: it opens the first draft, whose top bar lists them all.
+  if (pathname === '/') return res.writeHead(302, { Location: `/${listDrafts()[0]}/` }).end();
   if (pathname === '/ping') return send(200, TYPES['.json'], '{"drafts":true}');
+  if (pathname === '/drafts.json') return send(200, TYPES['.json'], JSON.stringify({ drafts: listDrafts() }));
   if (pathname === '/drafts.css') return stylesheet(KIT_CSS).then((css) => send(200, TYPES['.css'], css));
   if (pathname === '/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });

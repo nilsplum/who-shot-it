@@ -9,10 +9,9 @@
  */
 export default {
   title: 'Demo',
-  note: 'A small example of a draft: the same screen twice, with two ways for the players to arrive. Copy this folder to start a new draft.',
   frames: [
-    { id: 'pop', title: 'Pop', idea: 'Each player pops in with a light tap, then the button bumps.' },
-    { id: 'slide', title: 'Slide', idea: 'The players slide in from the side, one after the other.' },
+    { id: 'pop', title: 'Pop' },
+    { id: 'slide', title: 'Slide' },
   ],
   controls: [{ key: 'players', label: 'Players', options: [['3', '3'], ['6', '6']], value: '3' }],
 };

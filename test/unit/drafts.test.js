@@ -11,7 +11,7 @@ const files = Object.keys(import.meta.glob('../../drafts/**/*')).map((file) => f
 /** Each draft's description (its draft.js), by the draft's name. */
 const drafts = Object.fromEntries(Object.entries(import.meta.glob('../../drafts/*/draft.js', { eager: true, import: 'default' })).map(([file, draft]) => [file.split('/')[3], draft]));
 /** The choices the kit's page makes itself (drafts/kit/page.js): a draft's own controls cannot take these names. */
-const KIT_CHOICES = ['show', 'phone', 'reduce', 'frame'];
+const KIT_CHOICES = ['show', 'phone', 'reduce', 'frame', 'play'];
 
 test('drafts/ holds its README, the kit and drafts, nothing else', () => {
   expect(files).toContain('README.md');
@@ -42,7 +42,7 @@ test('every description has a title, frames with their own ids, and controls wit
   for (const [name, draft] of Object.entries(drafts)) {
     expect(typeof draft.title, name).toBe('string');
     const frames = draft.frames || [];
-    for (const f of frames) expect([typeof f.id, typeof f.title, typeof f.idea], `${name}: ${f.id}`).toEqual(['string', 'string', 'string']);
+    for (const f of frames) expect([typeof f.id, typeof f.title], `${name}: ${f.id}`).toEqual(['string', 'string']);
     expect(new Set(frames.map((f) => f.id)).size, name).toBe(frames.length);
     for (const c of draft.controls || []) {
       expect(KIT_CHOICES, `${name}: ${c.key}`).not.toContain(c.key);
