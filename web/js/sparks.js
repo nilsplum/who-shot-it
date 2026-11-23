@@ -2,13 +2,15 @@
  * One canvas over the whole screen for everything that glows and sparkles at the end of a
  * game: sparks (some trailing embers), rings of light that spread, soft glows, the
  * darkening edge of the screen (`shade`), a white flash, a stream of sparks rushing into a
- * point (`inflow`) and the fireworks (`fireworks`).
+ * point (`inflow`) and the fireworks (`fireworks`); and for the white frame that ends the
+ * 3-2-1's film leader (its flash).
  *
- * Mechanisms: `podium.js` calls these while it reveals the podium. The canvas is made on
- * first use (a sibling of #app, so a jolt of the screen never moves the light) and removed
- * again as soon as nothing shines, and one frame loop runs only meanwhile. Movement is in
- * pixels per second over the real time between frames, so it looks the same at 60 and 120
- * frames a second. Light adds up (`lighter`) the way light does.
+ * Mechanisms: `podium.js` calls these while it reveals the podium, `countdown.js` its flash
+ * as the first round begins (right after main.js cleared the screen before). The canvas is
+ * made on first use (a sibling of #app, so a jolt of the screen never moves the light) and
+ * removed again as soon as nothing shines, and one frame loop runs only meanwhile. Movement
+ * is in pixels per second over the real time between frames, so it looks the same at 60
+ * and 120 frames a second. Light adds up (`lighter`) the way light does.
  *
  * Invariants:
  * - Every colour is a theme colour read from the page's CSS variables (`colour`); the canvas

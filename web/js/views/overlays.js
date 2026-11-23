@@ -1,6 +1,6 @@
 /**
  * Everything drawn over the screens: the start of a game ("Is everyone here?" before a
- * group's first game, "Get ready", then the 3-2-1),
+ * group's first game, "Get ready", then the 3-2-1 as a film leader),
  * the "Reconnecting…" banner, the photo held to look at, and the two full screens without
  * game content (joining, and "this game is open somewhere else": the same player connected
  * again, for example after the app was restored while an older connection was still alive).
@@ -39,13 +39,37 @@ const ASK = {
 };
 
 /**
+ * The 3-2-1 as a film leader, the countdown at the head of a film reel (chosen from
+ * drafts/countdown_animations): a frame over the screen with crosshairs and two circles, the
+ * number in their middle, and a hand that goes round once per number, leaving its shadow
+ * behind it (CSS animations of one second, `animate-hand`, `animate-sweep`); the frame
+ * weaves a little, like film in a projector (`animate-weave`), and the number changes with
+ * a cut, as film does. The shadow is a circle half as wide as its stroke, so its stroke is
+ * a filled pie; its length is 100 (radius 100 / 2π), so it runs out from 100 to 0. With
+ * Reduce Motion the leader stands still: the circles and the number, without the hand.
+ */
+const leader = (n) => `<div class="screen h-dvh"><div class="relative grid flex-1 animate-weave place-items-center overflow-hidden rounded-3xl border-2 border-line motion-reduce:animate-none">
+  <i class="absolute inset-y-0 left-1/2 w-px bg-line-strong"></i><i class="absolute inset-x-0 top-1/2 h-px bg-line-strong"></i>
+  <div class="relative grid size-60 place-items-center">
+    <svg class="col-start-1 row-start-1 size-full" viewBox="0 0 80 80" aria-hidden="true">
+      <circle cx="40" cy="40" r="15.9155" class="fill-none animate-sweep stroke-raised motion-reduce:animate-none" stroke-width="31.83" stroke-dasharray="100" stroke-dashoffset="100" transform="rotate(-90 40 40)"/>
+      <circle cx="40" cy="40" r="36.4" class="fill-none stroke-ink/40" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      <circle cx="40" cy="40" r="31.83" class="fill-none stroke-ink/40" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <i class="absolute bottom-1/2 left-1/2 -ml-px h-[39.8%] w-0.5 origin-bottom animate-hand bg-ink/80 motion-reduce:hidden"></i>
+    <span class="relative col-start-1 row-start-1 font-display text-9xl leading-none font-extrabold text-ink" data-count="${n}">${n}</span>
+  </div>
+</div></div>`;
+
+/**
  * The start of a game, or null: "Is everyone here?" (`ASK`) in a group's first lobby, then
  * the room's three steps (`view.phase` 'countdown', `src/game/rules.js`): "Get ready" while
  * photos are still on their way (a bar: how far the group's uploads are, `sendShare`, this
  * phone's own counted exactly) or while the phones get the first photo (a spinner: it takes
- * a moment); then the 3-2-1 (`count`). Each number is a new element, so its entrance plays
- * once (a number that stays, the 1 until the first photo appears, stays still), and
- * `main.js` feels each one as it is painted.
+ * a moment); then the 3-2-1 (`count`), the film leader (`leader`). Each number is a new
+ * element, so its hand goes round once (a number that stays, the 1 until the first photo
+ * appears, keeps its round full), and `main.js` feels each one as it is painted and keeps it
+ * on the room's second (web/js/countdown.js).
  */
 export function startScreen(view, leftMs, sendShare) {
   if (!view || !view.me) return null;
@@ -55,11 +79,11 @@ export function startScreen(view, leftMs, sendShare) {
   const wait = view.uploads && sendShare !== null ? progress(sendShare, 'Sending photos') : SPINNER;
   return {
     key: 'start',
-    // Both parts share the one cell in the middle; the empty one takes no room.
-    layout: '<div class="fixed inset-0 z-50 grid place-items-center bg-page px-10"><div class="col-start-1 row-start-1 w-full max-w-80 text-center" data-part="wait"></div><div class="col-start-1 row-start-1" data-part="count"></div></div>',
+    // Both parts share the one cell, the whole screen; the empty one shows nothing.
+    layout: '<div class="fixed inset-0 z-50 grid bg-page"><div class="col-start-1 row-start-1 grid place-items-center px-10"><div class="w-full max-w-80 text-center" data-part="wait"></div></div><div class="col-start-1 row-start-1" data-part="count"></div></div>',
     parts: {
       wait: n === null ? `<div class="mb-6 font-display text-5xl font-extrabold text-yellow">Get ready</div>${wait}` : '',
-      count: n === null ? '' : `<span class="block animate-count font-display text-9xl font-extrabold text-yellow motion-reduce:animate-none" data-count="${n}">${n}</span>`,
+      count: n === null ? '' : leader(n),
     },
   };
 }

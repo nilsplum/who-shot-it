@@ -1,11 +1,12 @@
 /**
- * The countdown animations: four ways to play the 3-2-1 before a game's first photo, beside
- * the app's own as it is today, to choose one for the app (it would replace the number's
- * entrance in views/overlays.js `startScreen`).
+ * The countdown animations: four ways to play the 3-2-1 before a game's first photo. Film
+ * leader was chosen: the app plays it (views/overlays.js `startScreen`, kept on the room's
+ * clock by web/js/countdown.js), and "Film leader, in the app" shows it beside the draft it
+ * came from.
  *
  * Mechanisms: the kit's page (drafts/kit/page.js) shows `screen.js` once per frame below;
  * each frame paints the app's own first round under the 3-2-1 (round.js) and, on Play,
- * plays its countdown over it (now.js, lens.js, timer.js, leader.js, pulse.js), all on the
+ * plays its countdown over it (lens.js, timer.js, leader.js, pulse.js, app.js), all on the
  * same clock (stage.js).
  *
  * Invariants, the same for all four:
@@ -20,9 +21,9 @@
 export default {
   title: 'Countdown animations',
   frames: [
-    { id: 'now', title: 'Now, in the app' },
     { id: 'lens', title: 'Lens' },
     { id: 'timer', title: 'Self-timer' },
+    { id: 'leader_app', title: 'Film leader, in the app' },
     { id: 'leader', title: 'Film leader' },
     { id: 'pulse', title: 'Pulse' },
   ],

@@ -158,7 +158,12 @@
   --animate-burst: burst 0.9s ease-out forwards; /* a confetti piece */
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
-  --animate-count: count 1s ease-out; /* a number of the 3-2-1, once (each number is a new element) */
+  /* The 3-2-1, a film leader (views/overlays.js): per number (each is a new element) the hand
+     goes round once and leaves its shadow behind it; its frame weaves a little, like film in
+     a projector. web/js/countdown.js keeps each round on the room's second. */
+  --animate-sweep: sweep 1s linear both;
+  --animate-hand: turn 1s linear both;
+  --animate-weave: weave 0.33s steps(1) infinite;
   --animate-beacon: beacon 1.6s ease-in-out infinite; /* an offline player (red): a slow glow, like a warning light at sea */
   --animate-breathe: breathe 1.4s ease-in-out infinite; /* "Start now": a glow swells around it and fades, so nobody misses it */
 
@@ -184,7 +189,10 @@
   @keyframes burst { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(220deg); opacity: 0; } }
   @keyframes rise { 0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
   @keyframes slide-up { from { transform: translateY(100%); } }
-  @keyframes count { from { transform: scale(1.4); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+  /* The shadow is a circle half as wide as its stroke (a filled pie), its dash 100 long: it runs out once. */
+  @keyframes sweep { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  /* A few positions a fraction of a pixel apart, jumped between (`steps`), with a faint flicker. */
+  @keyframes weave { 25% { translate: 0.6px -0.4px; } 50% { translate: -0.4px 0.5px; opacity: 0.95; } 75% { translate: 0.3px 0.3px; } }
   /* A red glow swells around the element and fades again; it moves nothing, so nothing jumps. */
   @keyframes beacon { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-red) 45%, transparent); } }
   /* Only the glow moves, never the button, so it stays easy to hit (and its press, `active:scale-98`, works). */

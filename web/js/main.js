@@ -18,9 +18,9 @@
  *   lets the phone feel the room's moments (`moments`: a new photo, the reveal) and
  *   repaints. Actions are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
- *   (`moments`), each new number of the 3-2-1 (when it is painted), a swap's flip or
- *   refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the podium's charges,
- *   bursts and first fireworks (`podium.js`, which `startPodium` hands `buzz`).
+ *   (`moments`), each new number of the 3-2-1 (when it is painted, `paintStart`), a swap's
+ *   flip or refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the podium's
+ *   charges, bursts and first fireworks (`podium.js`, which `startPodium` hands `buzz`).
  * - Entrances: a screen that tells a story when it appears (the leaderboard: who overtakes
  *   whom; FINAL ROUND; the podium's charges) is painted in its final state, and
  *   `startBoard` or `startPodium` plays the story over it once (`session.shown`), so a
@@ -39,9 +39,11 @@
  *   "Change" cancels an upload still on its way. Every hello names the upload in flight,
  *   so the room never waits for one this phone no longer sends.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
- *   repaints only what changed, four times a second and after every change. The timer bar
- *   is animated every frame from the round's timer on the server's clock (`clock.js`,
- *   learned from every view) and the timer's length the view carries (`total`). The arrow
+ *   repaints only what changed, four times a second and after every change, and right on
+ *   each second of the 3-2-1 (`paintStart`, which keeps its film leader on the room's clock
+ *   with `countdown.js`). The timer bar is animated every frame from the round's timer on
+ *   the server's clock (`clock.js`, learned from every view) and the timer's length the
+ *   view carries (`total`). The arrow
  *   of a row that scrolls sideways (`ui.sidewaysRow`: the lobby's players, the reactions)
  *   follows its row after every paint and every scroll (`ui.syncRow`).
  * - The flag: ⚑ flags the photo in the room (the others stop seeing it, the round waits)
@@ -69,6 +71,7 @@ import { makeId, shuffle } from '../shared/random.js';
 import { createRoom, uploadPhotos } from './api.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
+import { cut, nextNumberIn, onTheClock } from './countdown.js';
 import { startEffect, stopEffects } from './effects.js';
 import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
@@ -112,6 +115,10 @@ const clock = createClock();
 let roundTimer = null;
 /** When the room deletes the photo this phone flagged by itself, on the server's clock; null without such a flag. */
 let flagTimer = null;
+/** Whether the cover showed the 3-2-1 at the last paint (its end is the film leader's cut, `paintStart`). */
+let counting = false;
+/** The paint due on the 3-2-1's next second (`paintStart`). */
+let nextNumber = 0;
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -308,6 +315,29 @@ function lookLayers() {
   return url ? { key: link, base: url, sharp: null } : null;
 }
 
+/**
+ * Paints the start over the lobby (`views/overlays.js` `startScreen`). Each new number of the
+ * 3-2-1 is felt, a little longer than a tap, and kept on the room's clock (`countdown.js`):
+ * a number painted late starts as far into its second as the clock is, and the next one is
+ * painted right on its second (one timer for the next number, renewed with every paint, so
+ * at most one waits). When the 3-2-1 gives way to the round, the film leader cuts to the
+ * photo with one white frame: after this frame's `clearSparks`, so it stays.
+ */
+function paintStart() {
+  const left = leftNow();
+  const start = startScreen(session.view, left, sendShare(session.view));
+  const now = Boolean(start && start.parts.count);
+  if (paintCover(start).includes('count') && now) {
+    buzz('count');
+    onTheClock($('cover'), left);
+  }
+  if (counting && !now && session.view && inRound(session.view)) cut();
+  counting = now;
+  clearTimeout(nextNumber);
+  const due = now ? nextNumberIn(left) : null;
+  if (due !== null) nextNumber = setTimeout(render, due + 1);
+}
+
 function render() {
   const changed = paintApp(screen());
   // In the same task as the paint, so no frame shows an arrow that does not fit what it scrolls.
@@ -318,9 +348,7 @@ function render() {
   if (changed.includes('board')) startBoard();
   if (changed.includes('podium')) startPodium();
   paintSheet(sheetScreen(context()));
-  // The 3-2-1 paints a new number each second: each one is felt, a little longer than a tap.
-  const start = startScreen(session.view, leftNow(), sendShare(session.view));
-  if (paintCover(start).includes('count') && start.parts.count) buzz('count');
+  paintStart();
   paintLook(lookScreen(lookLayers()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
