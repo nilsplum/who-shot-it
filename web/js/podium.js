@@ -26,7 +26,7 @@
  *   it); main.js clears the sparks when the screen changes.
  * - With Reduce Motion main.js does not call it: the final state simply stays.
  */
-import { colour, fireworks, flash, inflow, ring, shade, spark } from './sparks.js';
+import { colour, fireworks, flash, inflow, ring, shade, spray } from './sparks.js';
 
 /**
  * The timing in ms and the size of each place's charge: how long it charges, in how many
@@ -68,15 +68,6 @@ function jolt(el, px) {
     const k = (1 - i / steps) ** 1.6;
     return { translate: i === steps ? 'none' : `${(i % 2 ? 1 : -1) * px * k}px ${((i % 3) - 1) * px * 0.6 * k}px` };
   }), { duration: 420 });
-}
-
-/** Sparks spraying out of `at` in `tint`: `count` of them, flying about `reach` px. */
-function spray(at, tint, count, reach) {
-  for (let i = 0; i < count; i += 1) {
-    const a = Math.random() * Math.PI * 2;
-    const v = reach * 3 * (0.6 + Math.random() * 0.5);
-    spark({ x: at.x, y: at.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 3, gravity: 160, life: 0.6 + Math.random() * 0.5, size: 2.4, tint, hot: 0.2 });
-  }
 }
 
 /**

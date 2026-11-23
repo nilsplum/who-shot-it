@@ -1,10 +1,10 @@
 /**
  * Shared UI building blocks: HTML escaping, avatars (and how an offline player looks, and
- * who may remove them), the top bar and its buttons, the logo
- * with the big title, the two ways to show a wait (the spinner and the progress bar), the
- * timer bar, the list of rules or steps, the confetti of a win, the quiet scrollbars, the
- * one toast, the row that scrolls sideways with its arrow (the lobby's players, the
- * reactions), and the reaction row with its floating emojis.
+ * who may remove them), the top bar and its buttons, the logo with the big title, the two
+ * ways to show a wait (the spinner and the progress bar), the timer bar, the list of rules
+ * or steps, the quiet scrollbars, the one toast, the row that scrolls sideways with its
+ * arrow (the lobby's players, the reactions), and the reaction row with its floating
+ * emojis.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -141,16 +141,6 @@ export const timerBar = (kind) =>
 /** A few rules or steps, each with an emoji in front (the terms, "How to play"); the texts are HTML. */
 export const steps = (items) =>
   `<ul class="mb-4">${items.map(([icon, text]) => `<li class="flex items-start gap-3 py-2 leading-snug"><span class="text-3xl leading-none">${icon}</span>${text}</li>`).join('')}</ul>`;
-
-/**
- * Ten confetti pieces flying out of the middle of the element they are in (it must be
- * `relative`), each its own direction and player colour: a right guess on the reveal. They
- * fly as soon as they are drawn, so a view puts them in only for that moment.
- */
-export const CONFETTI = Array.from({ length: 10 }, (_, i) => {
-  const angle = (i / 10) * 2 * Math.PI;
-  return `<i class="pointer-events-none absolute top-1/2 left-1/2 size-2.25 animate-burst rounded-xs bg-player motion-reduce:hidden" style="--x:${Math.round(Math.cos(angle) * 90)}px;--y:${Math.round(Math.sin(angle) * 60)}px;--player:var(--color-p${i})"></i>`;
-}).join('');
 
 /**
  * Scrollbars that show only while their list scrolls (`scrollbar-quiet` in styles/app.css):

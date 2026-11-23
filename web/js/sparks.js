@@ -1,16 +1,17 @@
 /**
- * One canvas over the whole screen for everything that glows and sparkles at the end of a
- * game: sparks (some trailing embers), rings of light that spread, soft glows, the
- * darkening edge of the screen (`shade`), a white flash, a stream of sparks rushing into a
- * point (`inflow`) and the fireworks (`fireworks`); and for the white frame that ends the
- * 3-2-1's film leader (its flash).
+ * One canvas over the whole screen for everything that glows and sparkles: sparks (some
+ * trailing embers, a spray out of a point: `spray`), rings of light that spread, soft
+ * glows, the darkening edge of the screen (`shade`), a white flash, a stream of sparks
+ * rushing into a point (`inflow`) and the fireworks (`fireworks`).
  *
- * Mechanisms: `podium.js` calls these while it reveals the podium, `countdown.js` its flash
- * as the first round begins (right after main.js cleared the screen before). The canvas is
- * made on first use (a sibling of #app, so a jolt of the screen never moves the light) and
- * removed again as soon as nothing shines, and one frame loop runs only meanwhile. Movement
- * is in pixels per second over the real time between frames, so it looks the same at 60
- * and 120 frames a second. Light adds up (`lighter`) the way light does.
+ * Mechanisms: `podium.js` calls these while it reveals the podium, `reveal.js` for a
+ * round's reveal (the pop on my card, its coins), and `countdown.js` its flash, the white
+ * frame that ends the 3-2-1 as the first round begins (right after main.js cleared the
+ * screen before). The canvas is made on first use (a sibling of #app, so a jolt of the
+ * screen never moves the light) and removed again as soon as nothing shines, and one frame
+ * loop runs only meanwhile. Movement is in pixels per second over the real time between
+ * frames, so it looks the same at 60 and 120 frames a second. Light adds up (`lighter`) the
+ * way light does.
  *
  * Invariants:
  * - Every colour is a theme colour read from the page's CSS variables (`colour`); the canvas
@@ -108,6 +109,15 @@ export function flash(strength = 1, ms = 750) {
   setup();
   blink = { strength, t0: performance.now(), ms };
   run();
+}
+
+/** Sparks spraying out of `at` in `tint`: `count` of them, flying about `reach` px (a podium place's burst, the reveal's pop). */
+export function spray(at, tint, count, reach) {
+  for (let i = 0; i < count; i += 1) {
+    const a = Math.random() * Math.PI * 2;
+    const v = reach * 3 * (0.6 + Math.random() * 0.5);
+    spark({ x: at.x, y: at.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 3, gravity: 160, life: 0.6 + Math.random() * 0.5, size: 2.4, tint, hot: 0.2 });
+  }
 }
 
 /**

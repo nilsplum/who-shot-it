@@ -83,7 +83,7 @@
   --color-bronze: #e0a070;
 
   /* A player's colour, picked by the avatar (`colourOf` in web/js/ui.js; a big game repeats
-     some, the avatars tell players apart), and the confetti. */
+     some, the avatars tell players apart). */
   --color-p0: #ff5a5f;
   --color-p1: #ffd23f;
   --color-p2: #3ddc97;
@@ -146,16 +146,17 @@
   --animate-deal: fade 0.3s; /* a photo dealt into the choice */
   --animate-flip: flip 0.5s ease-in-out; /* a photo swapped: the tile turns over like a card (views/lobby.js) */
   --animate-bump: bump 0.45s var(--ease-bounce); /* the swaps left, each time the number goes down */
-  --animate-jiggle: jiggle 0.5s ease-in-out; /* no swaps left: the count shakes (again on every refused tap) */
+  --animate-jiggle: jiggle 0.5s ease-in-out; /* no swaps left: the count shakes (again on every refused tap); my wrong pick on the reveal */
   --animate-appear: appear 0.35s var(--ease-bounce); /* the leaderboard: a round's points, a new rank */
   --animate-smash: smash 0.6s ease-out both; /* FINAL ROUND falling onto the leaderboard (it lands at 45%, main.js) */
   --animate-shake: shake 0.4s ease-out; /* the screen as FINAL ROUND lands */
-  --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal */
-  --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when I guessed right */
+  --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal, as it turns green (web/js/reveal.js) */
+  --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when it was my pick */
+  --animate-stamp: stamp 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; /* the reveal's ✓ or ✗, stamped onto its card */
+  --animate-result: result 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; /* the reveal: my points, or "Wrong", rising off my card */
   --animate-pop-in: pop-in 0.56s cubic-bezier(0.2, 0.8, 0.2, 1); /* a podium place's player bursting out of its orb, a little too big first (`--pop`, views/end.js) */
   --animate-rays: rays-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, turn 14s linear infinite; /* the rays behind the winner: they open up, then turn for as long as the podium shows */
   --animate-arrive: fade 0.5s ease-out; /* what follows the podium: the facts, the ranking, Play again */
-  --animate-burst: burst 0.9s ease-out forwards; /* a confetti piece */
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
   /* The 3-2-1, a film leader (views/overlays.js): per number (each is a new element) the hand
@@ -185,8 +186,10 @@
   @keyframes jiggle { 20% { transform: translateX(-3px) rotate(-8deg); } 40% { transform: translateX(3px) rotate(8deg); } 60% { transform: translateX(-2px) rotate(-5deg); } 80% { transform: translateX(2px) rotate(5deg); } }
   @keyframes pop { from { transform: scale(0.9); } to { transform: scale(1); } }
   @keyframes win { 0% { transform: scale(0.9); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
-  /* `--x` and `--y` (set on each piece, views/game.js) are where it flies. */
-  @keyframes burst { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(220deg); opacity: 0; } }
+  /* Lands from big and turned, overshoots a little, settles. */
+  @keyframes stamp { from { scale: 2.2; rotate: -25deg; opacity: 0; } 60% { scale: 0.9; rotate: 4deg; opacity: 1; } }
+  /* Centred on its left edge (`translate` -50%): pops up a little too big, floats up and fades. */
+  @keyframes result { from { translate: -50% 0; scale: 0.5; opacity: 0; } 18% { translate: -50% -55%; scale: 1.15; opacity: 1; } 70% { opacity: 1; } to { translate: -50% -170%; scale: 1; opacity: 0; } }
   @keyframes rise { 0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; } 12% { opacity: 1; transform: translate(-50%, -40px) scale(1.15); } 100% { transform: translate(-50%, -50vh); opacity: 0; } }
   @keyframes slide-up { from { transform: translateY(100%); } }
   /* The shadow is a circle half as wide as its stroke (a filled pie), its dash 100 long: it runs out once. */
@@ -245,6 +248,24 @@
 }
 @utility pb-safe {
   padding-bottom: max(--spacing(6), env(safe-area-inset-bottom));
+}
+
+/*
+ * The reveal of a round (views/game.js), played by `web/js/reveal.js` one step after the
+ * other: while the screen has `data-playing`, a card whose result is not out yet looks as it
+ * did in the round (`reveal-plain`; `reveal-mine`: still yellow, my pick), and its ✓ or ✗
+ * and the reactions wait (`reveal-wait`); `data-go` lets each one go, which plays its
+ * entrance. Without the story (a repaint, a reconnect, Reduce Motion) the screen has no
+ * `data-playing` and simply shows the result.
+ */
+@utility reveal-plain {
+  [data-playing] &:not([data-go]) { border-color: transparent; background-color: var(--color-card); }
+}
+@utility reveal-mine {
+  [data-playing] &:not([data-go]) { border-color: var(--color-yellow); background-color: var(--color-picked); }
+}
+@utility reveal-wait {
+  [data-playing] &:not([data-go], [data-go] *) { visibility: hidden; }
 }
 
 /*

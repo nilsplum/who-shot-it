@@ -5,8 +5,9 @@
  * photos dealt with "Play with these?" (ready at once on Yes), reload, "Is everyone here?"
  * answered No and "Start now" (greyed while someone changes their photos), the start
  * behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
- * Delete), five rounds with their leaderboards (one ending in the new order, "Show again"
- * held on one phone and seen on another, FINAL ROUND before the last photo), the podium's
+ * Delete), five rounds with their reveals (played step by step, the verdict felt) and
+ * leaderboards (one ending in the new order, "Show again" held on one phone and seen on
+ * another, FINAL ROUND before the last photo), the podium's
  * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. A leaderboard
  * that waits for a phone still loading the next photos. A full table of 16 (three phones of
@@ -170,9 +171,11 @@ test('friends play a full game and start another one', async ({ browser }) => {
     }
     for (const page of everyone) await expect(page.locator('[aria-label$=": their photo"]')).toHaveCount(1);
     // Everyone answered: the time to look at the answer has the cool look, on the reveal and
-    // the leaderboard, and the host felt the verdict (one firm pulse right, two wrong).
+    // the leaderboard. The reveal plays step by step (web/js/reveal.js): the host felt the
+    // verdict as their card popped (one firm pulse right, two wrong), then the reactions came.
     await expect(bar).toHaveAttribute('data-kind', 'look');
     await expect.poll(() => host.evaluate(() => window.felt.at(-1))).toBe('MEDIUM');
+    await expect(host.locator('[data-after]')).toHaveAttribute('data-go', '');
     if (round === 2) {
       // The leaderboard after the reveal: everyone ranked, with this round's pick.
       await expect(host.getByRole('heading', { name: 'Round 2 of 5' })).toBeVisible();

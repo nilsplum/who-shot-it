@@ -15,17 +15,20 @@
  *   `session.view`, hands the game's photos to the queue that loads them ahead
  *   (`upcoming.js`), tells the room which round this phone is ready for (`loaded`,
  *   `reportReady`), deals photos when the lobby needs a set (`dealIfNeeded`),
- *   lets the phone feel the room's moments (`moments`: a new photo, the reveal) and
- *   repaints. Actions are sent as small messages; the server decides what happens.
+ *   lets the phone feel the room's moments (`moments`: a new photo) and repaints. Actions
+ *   are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
- *   (`moments`), each new number of the 3-2-1 (when it is painted, `paintStart`), a swap's
- *   flip or refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the podium's
- *   charges, bursts and first fireworks (`podium.js`, which `startPodium` hands `buzz`).
- * - Entrances: a screen that tells a story when it appears (the leaderboard: who overtakes
- *   whom; FINAL ROUND; the podium's charges) is painted in its final state, and
- *   `startBoard` or `startPodium` plays the story over it once (`session.shown`), so a
- *   repaint or a reconnect never plays it again or cuts it. The podium's sparks and
- *   fireworks (`sparks.js`) end the moment another screen is painted.
+ *   (`moments`), each new number of the 3-2-1 (when it is painted, `paintStart`), the
+ *   reveal's verdict (as my card pops, `reveal.js`, which `startReveal` hands `buzz`), a
+ *   swap's flip or refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the
+ *   podium's charges, bursts and first fireworks (`podium.js`, which `startPodium` hands
+ *   `buzz`).
+ * - Entrances: a screen that tells a story when it appears (the reveal: the answer, my
+ *   card, its pop; the leaderboard: who overtakes whom; FINAL ROUND; the podium's charges)
+ *   is painted in its final state, and `startReveal`, `startBoard` or `startPodium` plays
+ *   the story over it once (`session.shown`), so a repaint or a reconnect never plays it
+ *   again or cuts it. Their sparks and fireworks (`sparks.js`) end the moment another screen
+ *   is painted.
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
@@ -76,6 +79,7 @@ import { startEffect, stopEffects } from './effects.js';
 import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
+import { playReveal } from './reveal.js';
 import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
 import { device, keyFor, saveDevice, session } from './store.js';
@@ -284,6 +288,26 @@ function startBoard() {
 }
 
 /**
+ * The reveal's story, once per round (`session.shown`): `reveal.js` plays it over the round's
+ * screen just painted in its final state (`views/game.js`), in the same task as the paint,
+ * and makes the verdict felt as my card pops: one firm pulse for a right guess, two for
+ * anything else (the room's own results, never the optimistic pick). With Reduce Motion the
+ * result simply stays and the verdict is felt at once; a reveal already shown (a repaint, a
+ * reconnect) is neither played nor felt again.
+ */
+function startReveal() {
+  const v = session.view;
+  const key = `reveal|${v.code}|${v.round.n}`;
+  const screenEl = $('app').firstElementChild;
+  if (v.phase !== 'reveal' || !screenEl || session.shown.has(key)) return;
+  session.shown.add(key);
+  const mine = v.round.results && v.round.results[v.me.id];
+  const verdict = !mine || !mine.pick ? 'none' : mine.pick === v.round.owner ? 'right' : 'wrong';
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) buzz(verdict === 'right' ? 'yes' : 'no');
+  else playReveal(screenEl, { verdict, points: mine ? mine.points : 0 }, buzz);
+}
+
+/**
  * The podium's reveal, once per game end (`session.shown`): `podium.js` plays it over the
  * end screen just painted in its final state (`views/end.js`), in the same task as the
  * paint. Reduce Motion, or an end screen already shown, keeps the final state.
@@ -345,6 +369,7 @@ function render() {
   // Another screen: the podium's light (sparks, fireworks) belongs to the one before.
   if (changed.includes('layout')) clearSparks();
   if (changed.includes('stage')) startStage();
+  if (changed.includes('opts')) startReveal();
   if (changed.includes('board')) startBoard();
   if (changed.includes('podium')) startPodium();
   paintSheet(sheetScreen(context()));
@@ -516,18 +541,13 @@ function onMessage(msg) {
 }
 
 /**
- * What the phone feels when the room moves on, once per moment and round: a light tap when a
- * new photo appears for everyone (`show` starts), one pulse for a right guess and two for
- * anything else when the round is revealed (the room's own results, never the optimistic
- * pick). Only a change between two views counts, so a repaint never vibrates.
+ * What the phone feels when the room moves on, once per round: a light tap when a new photo
+ * appears for everyone (`show` starts). Only a change between two views counts, so a
+ * repaint never vibrates. (The reveal's verdict is felt with its story, `startReveal`.)
  */
 function moments(previous, v) {
   const round = (x, phase) => (x && x.phase === phase && x.round ? x.round.n : null);
   if (round(v, 'show') && round(previous, 'show') !== round(v, 'show')) buzz('tap');
-  if (round(v, 'reveal') && round(previous, 'reveal') !== round(v, 'reveal')) {
-    const mine = v.round.results && v.round.results[v.me.id];
-    buzz(mine && mine.pick && mine.pick === v.round.owner ? 'yes' : 'no');
-  }
 }
 
 // ---------- Photos ----------

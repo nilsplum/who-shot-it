@@ -8,13 +8,23 @@
  * (`state.src`), and while the room waits for the phones to be ready for the round (`load`)
  * it shows how far the whole table is (`ui.progress`). `main.js` starts the effect when
  * the `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when
- * the photo appears and on the reveal (`main.js` `moments`). The bar is a part of its own:
- * on the reveal it changes from the answer time's look to the look time's
- * (`ui.timerBar`). Tapping a player in the "who has answered" row opens "Remove?"
- * (`views/sheets.js`) for the host, and for everyone while that player is offline. Scores
- * live on the leaderboard between the rounds, not here. While
- * someone else flagged the photo (`round.flag`, not mine), the stage says so instead of
- * showing it and the cards wait; the flagger keeps the photo under the report sheet.
+ * the photo appears (`main.js` `moments`). The bar is a part of its own: on the reveal it
+ * changes from the answer time's look to the look time's (`ui.timerBar`). Tapping a player
+ * in the "who has answered" row opens "Remove?" (`views/sheets.js`) for the host, and for
+ * everyone while that player is offline. The scores live on the leaderboard between the
+ * rounds; the reveal shows only my own points of the round, rising off my card for a
+ * moment. While someone else flagged the photo (`round.flag`, not mine), the stage says so
+ * instead of showing it and the cards wait; the flagger keeps the photo under the report
+ * sheet.
+ *
+ * The reveal is painted in its final state, and `web/js/reveal.js` plays it over it once
+ * per round (`main.js` `startReveal`, `session.shown`), one step after the other: the
+ * owner's card (`data-card="owner"`) turns green, then my wrong pick (`data-card="mine"`)
+ * turns red, then my own card pops in my result's colour, then the reactions come. While it
+ * plays (`data-playing` on the screen) the cards look as they did in the round and the ✓,
+ * the ✗ and the reactions wait (the `reveal-` utilities in styles/app.css); `data-go` lets
+ * each go and plays its entrance. A repaint, a reconnect or Reduce Motion simply shows the
+ * result.
  *
  * Layout: the photo takes all the height the rest leaves free (the screen has its exact
  * height) and is the one thing that gives way, so the page never scrolls. The cards get
@@ -30,11 +40,10 @@
  *
  * Invariants: a card shows only the avatar and the name, in the same place before and
  * after the reveal, so the eye stays where it was. On the reveal the owner's card turns
- * green with a ✓, my wrong pick red with a ✗ (colour never carries the meaning alone);
- * a right pick also makes the owner's card pop and throw a little confetti.
+ * green with a ✓, my wrong pick red with a ✗ (colour never carries the meaning alone).
  */
 
-import { CONFETTI, LEAVE_BUTTON, SPINNER, avatar, barTitle, canRemove, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
+import { LEAVE_BUTTON, SPINNER, avatar, barTitle, canRemove, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -86,15 +95,15 @@ const densityOf = (count) => (count <= 4 ? DENSITIES.roomy : count <= 9 ? DENSIT
  * A card's inside: avatar, name and (on the reveal) the badge, side by side; when the card is
  * narrower than 7.5rem (a container query on the card, `@container`) they stack, the name
  * under the avatar and the badge in the top corner, so a name stays readable on a small
- * phone. The card is `relative`, which places the stacked badge and the confetti.
+ * phone. The card is `relative`, which places the stacked badge.
  */
 function inside(p, d, badge = '') {
   return `<span class="grid grid-cols-[auto_1fr_auto] items-center gap-2 @max-[7.5rem]:grid-cols-1 @max-[7.5rem]:content-center @max-[7.5rem]:justify-items-center @max-[7.5rem]:gap-0">${avatar(p, d.avatar)}<span class="max-w-full min-w-0 truncate leading-tight ${d.name}">${esc(p.name)}</span>${badge}</span>`;
 }
 
-/** The ✓ or ✗ of the reveal, in the colour that says the same. */
+/** The ✓ or ✗ of the reveal, in the colour that says the same; it waits while the reveal plays and is stamped on as its card goes. */
 const badge = (d, glyph, colour) =>
-  `<span class="leading-none font-extrabold ${d.badge} ${colour} @max-[7.5rem]:absolute @max-[7.5rem]:top-0.5 @max-[7.5rem]:right-1 @max-[7.5rem]:text-md">${glyph}</span>`;
+  `<span class="leading-none font-extrabold ${d.badge} ${colour} reveal-wait in-data-go:animate-stamp motion-reduce:animate-none @max-[7.5rem]:absolute @max-[7.5rem]:top-0.5 @max-[7.5rem]:right-1 @max-[7.5rem]:text-md">${glyph}</span>`;
 
 /**
  * A card: its size by the density, its look (border and background) one of the states below.
@@ -117,6 +126,11 @@ function pickCard(view, d, id, { picked, late, hidden, wait }) {
   return `<button class="${CARD} ${d.card} ${look}" data-act="answer" data-v="${esc(id)}" ${picked || late || hidden || wait ? 'disabled' : ''}>${inside(p, d)}</button>`;
 }
 
+/**
+ * A card of the reveal, in its final state. While the reveal plays (`web/js/reveal.js`) the
+ * owner's card looks plain (or yellow, when it was my pick) until it goes green and pops
+ * (bounces, when it was my pick); my wrong pick stays yellow until it goes red and shakes.
+ */
 function revealCard(view, d, id) {
   const p = player(view, id);
   const r = view.round;
@@ -124,9 +138,9 @@ function revealCard(view, d, id) {
   const name = esc(p.name);
   if (id === r.owner) {
     const won = mine === id;
-    return `<div class="${CARD} ${d.card} ${LOOK.right} ${won ? 'z-1 animate-win' : 'animate-reveal'} motion-reduce:animate-none" aria-label="${name}: their photo">${inside(p, d, badge(d, '✓', 'text-green'))}${won ? CONFETTI : ''}</div>`;
+    return `<div class="${CARD} ${d.card} ${LOOK.right} ${won ? 'z-1 reveal-mine data-go:animate-win' : 'reveal-plain data-go:animate-reveal'} motion-reduce:animate-none" data-card="owner" aria-label="${name}: their photo">${inside(p, d, badge(d, '✓', 'text-green'))}</div>`;
   }
-  if (id === mine) return `<div class="${CARD} ${d.card} ${LOOK.wrong}" aria-label="${name}: your pick, wrong">${inside(p, d, badge(d, '✗', 'text-red'))}</div>`;
+  if (id === mine) return `<div class="${CARD} ${d.card} ${LOOK.wrong} reveal-mine data-go:animate-jiggle motion-reduce:animate-none" data-card="mine" aria-label="${name}: your pick, wrong">${inside(p, d, badge(d, '✗', 'text-red'))}</div>`;
   return `<div class="${CARD} ${d.card} ${LOOK.plain}">${inside(p, d)}</div>`;
 }
 
@@ -156,8 +170,9 @@ function dots(view) {
   return `<div class="flex flex-wrap justify-center gap-1">${view.players.map(dot).join('')}</div>`;
 }
 
+/** On the reveal, the reactions: they wait while the reveal plays and fade in at its end (`data-after`). */
 function after(view, reactions) {
-  return view.phase === 'reveal' ? reactionsRow(reactions) : '';
+  return view.phase === 'reveal' ? `<div class="reveal-wait data-go:animate-fade motion-reduce:animate-none" data-after>${reactionsRow(reactions)}</div>` : '';
 }
 
 /**
