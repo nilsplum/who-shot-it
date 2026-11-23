@@ -17,8 +17,9 @@
  *   per kind of work on `loader.js`, so a slow job never holds up a quick one of another kind:
  *   1. `held`: the big version of the photo a finger holds (downloaded if needed);
  *   2. `deal`: previews for a set being dealt ("No", the first set), when the bucket is short;
- *   3. `sharp`: the big versions of the set on screen, for "Yes": those on the phone first
- *      (quick), then those kept only in iCloud (downloaded); not for a set being replaced;
+ *   3. `sharp`: the big versions of the set on screen, for "Yes": each first from the phone
+ *      alone (quick, and a photo kept only in iCloud says so at once), then the iCloud ones
+ *      downloaded; not for a set being replaced;
  *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: previews until
  *      LIMITS.readySets more sets are ready (so "No" is instant), then the next set's big
  *      versions (from the phone only), then previews up to LIMITS.bucketPreviews.
@@ -149,10 +150,14 @@ function pick(open) {
   const held = photos.chosen.find((c) => c.id === heldId);
   if (free('held') && needsFull(held)) return { key: `full:${held.id}`, kind: 'held', run: () => fetchFull(held, true) };
   if (free('deal') && dealShort()) return { key: 'deal', kind: 'deal', run: () => fetchPreviews() };
-  // The set on screen, unless it is being replaced: those on the phone first, then the downloads.
+  // The set on screen, unless it is being replaced. Every photo is first asked for from the
+  // phone alone, which is quick (one kept only in iCloud says so at once and becomes
+  // `failed: 'ahead'`); only then do those download. So the photos on the phone are ready
+  // for "Yes" within moments, whatever order the set is in.
   const set = dealing ? [] : photos.chosen;
-  const next = set.find((c) => needsFull(c) && !c.failed) || set.find(needsFull);
-  if (free('sharp') && next) return { key: `full:${next.id}`, kind: 'sharp', run: () => fetchFull(next, true) };
+  const local = set.find((c) => needsFull(c) && !c.failed);
+  const next = local || set.find(needsFull);
+  if (free('sharp') && next) return { key: `full:${next.id}`, kind: 'sharp', run: () => fetchFull(next, !local) };
   if (!free('fill') || !readable || needs.paused || needsFull(held) || dealShort() || next) return null;
   if (bucket.length < needs.size * LIMITS.readySets && !exhausted) return { key: 'fill', kind: 'fill', run: () => fetchPreviews() };
   const ahead = bucket.slice(0, needs.size).find((e) => needsFull(e) && !e.failed);
@@ -198,10 +203,10 @@ function showSharp(c) {
 }
 
 /**
- * A photo's big version. Ahead of time only from what the phone stores (`download` false:
- * an iCloud original would cost mobile data for a photo that may never be shown); for the
- * set on screen also from iCloud. A failure ahead of time is tried again with the download
- * once the photo is on screen; a failure then is final (the photo is left out of the upload).
+ * A photo's big version. Without `download` only from what the phone stores (quick, and no
+ * mobile data for a photo that may never be shown): ahead of time, and first for the set on
+ * screen too. A failure without the download is tried again with it once the photo is on
+ * screen; a failure then is final (the photo is left out of the upload).
  */
 async function fetchFull(entry, download) {
   entry.pending = true;
