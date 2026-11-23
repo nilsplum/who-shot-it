@@ -28,7 +28,7 @@ const promotionalText = 'Your next party game is already on your phones: random 
  * What players notice in this version, in plain sentences: the App Store's "What's New"
  * (Apple takes it only for updates) and TestFlight's "What to Test" for this version's build.
  */
-const whatsNew = 'In the lobby, the players now take two rows that you can swipe sideways, with an arrow to go through them, so your photos stay big even with 16 players. The arrow of the reactions now turns round too.';
+const whatsNew = 'The 3, 2, 1 before the first photo now runs like the countdown at the start of an old film. Each answer comes step by step: first the card of whoever took the photo turns green, then yours if you were wrong, and your points rise off your card (or “Wrong”). In the lobby, the players take two rows that you can swipe sideways, so your photos stay big even with 16 players.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */
 const howToTest = `HOW TO TEST
