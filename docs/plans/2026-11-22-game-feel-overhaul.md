@@ -4,9 +4,11 @@ Status: planned on 22 November 2026, implemented on the branch `feat/game-feel-o
 (all thirteen commits, each with `docs/prompts/implement.md`, its decisions in the decision
 log at the end) and merged into `main` on 22 November 2026. Testing 1.0.3 on a real iPhone
 showed waits everywhere photos are involved; the follow-up on the branch `fix/no-waiting`
-(section 13, version 1.0.4) removes their causes and is on `main` too. Its server is deployed
-and 1.0.4 is in TestFlight (23 November); the store release waits for the operator's test
-(Operator handoff, below).
+(section 13, version 1.0.4) removes their causes and is on `main` too. Testing 1.0.4 brought
+a second follow-up on the branch `feat/start-flow` (section 14, version 1.0.5: offline
+players, the start, "No" again and again), also on `main`. Its server is deployed and 1.0.5
+is in TestFlight (23 November); the store release waits for the operator's test (Operator
+handoff, below).
 
 ## Operator handoff
 
@@ -14,21 +16,34 @@ What only the operator can do, and the decisions made while implementing that ar
 knowing. Kept up to date with every commit.
 
 **Done on 23 November 2026**
-- The server of `fix/no-waiting` is deployed (`./scripts/deploy.sh` from its worktree,
-  Cloudflare version `bb4e9792`; it replaced `e697ec83`, the server of 1.0.3). It keeps every
-  installed app working (1.0.2, the 1.0.3 TestFlight build), which simply get fewer updates,
-  only real changes. If it ever has to go back: `npx wrangler rollback` (a critical command,
-  ask first). The other session's podium and drafts commits, merged into `main` after it,
-  change only the app, so the live server matches `main`.
-- `main` holds both sessions' work (the podium and the drafts first, then section 13's
-  commits on top) and is pushed to GitHub.
-- The iPhone app 1.0.4 (build 10004) is in TestFlight, not sent to App Review. Build 1.0.3
-  (10003) showed the waits that section 13 removes; it is not to be released.
+- The server of `feat/start-flow` is deployed (`./scripts/deploy.sh` from its worktree,
+  Cloudflare version `156ab504`; it replaced `bb4e9792`, the server of 1.0.4, which had
+  replaced `e697ec83`, the server of 1.0.3). It keeps every installed app working (1.0.2 in
+  the store, the 1.0.4 TestFlight build): the room asks "Is everyone here?" only while an
+  app there can show it, and their "Yes" still counts. If it ever has to go back:
+  `npx wrangler rollback` (a critical command, ask first). The live server matches `main`.
+- `main` holds both sessions' work (the podium and the drafts, then section 13's and
+  section 14's commits) and is pushed to GitHub.
+- The iPhone app 1.0.5 (build 10005) is in TestFlight, not sent to App Review. Builds 1.0.3
+  (10003) and 1.0.4 (10004) are not to be released: 1.0.5 replaces them. Apple's upload
+  warned that from April 2027 iPhone apps must be built with the iOS 27 SDK (a newer Xcode).
+- Not in 1.0.5 and not live: the other session's work on the store release (the listings,
+  the screenshots, "Gameplay Content" in the privacy manifest, the App Store button on the
+  invite page) was not committed when 1.0.5 was built and deployed, and stays uncommitted in
+  the main folder as it was. The privacy manifest is part of the iPhone app and must match
+  the App Privacy answers, so the build sent to App Review with those answers must be built
+  after it is committed (a new version, 1.0.6: the build number follows the version).
 
 **To do by hand, in this order**
-1. Try 1.0.4 on a real iPhone (TestFlight, against the live server) and a real Android phone
+1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone
    (`./scripts/dev.sh android`, the game from this Mac), right after starting the app, with
    the test players (`docs/guides/demo-players.md`); the browser tests cannot show or feel:
+   - The lobby and the start (section 14): a phone that goes offline turns red and glows,
+     with "Offline, tap to remove", and anyone can remove it; "Yes" shows "✓ Ready" at once;
+     in a group's first game "Is everyone here?" comes up on every phone once everyone said
+     Yes, and after "No, wait" the glowing "Start now" is greyed until everyone did; "Get
+     ready", then 3, 2, 1, each number once, and the first photo right after; "No" twenty
+     times and more stays instant.
    - Waiting (section 13): tap "No" many times in a row, hold a photo, tap "Yes": all at
      once; the 3-2-1 counts 3, 2, 1; the photos and leaderboards never stand still. The
      speed test checks this at phone speed, but only a real phone has the real plugin.
@@ -44,14 +59,17 @@ knowing. Kept up to date with every commit.
      the podium's reveal.
    - The screen edges (commit 9): screens start right under the status bar and end right
      above the home indicator (checked in the iPhone simulator); also look on the iPad.
-2. Record the App Review video again with the 1.0.4 TestFlight build before sending it to
-   review (`docs/guides/demo-players.md`, "Record the video for App Review"): the review
-   notes say the attached video was made with the build under review, and the flag, the
-   leaderboard and the end of a game look different now. If it is not needed any more
-   (the app is already live), change the first review note in `store/ios_listing.js` instead.
+2. Record the App Review video again with the build that goes to App Review
+   (`docs/guides/demo-players.md`, "Record the video for App Review"): the review notes say
+   the attached video was made with the build under review, and the start ("Is everyone
+   here?"), the flag, the leaderboard and the end of a game look different now. If it is not
+   needed any more (the app is already live), change the first review note in
+   `store/ios_listing.js` instead.
 3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
-   Store page and sends the TestFlight build 10004 to App Review (no new upload; it goes
-   live by itself once approved).
+   Store page and sends the TestFlight build of `package.json`'s version (now 10005) to App
+   Review (no new upload; it goes live by itself once approved). With the privacy manifest's
+   change (above), commit it, raise the version to 1.0.6 and run
+   `./scripts/release-apps.sh ios --submit` instead (builds, uploads and submits).
 4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
@@ -106,6 +124,12 @@ knowing. Kept up to date with every commit.
   player (if players leave the lobby afterwards, a game can end a round or two early); the
   room waits for each phone's next photo only, not three; big versions are prepared only
   for the next set. A speed test now holds every wait to a limit.
+- Section 14 (the second follow-up): nobody is removed for being offline any more; the
+  host's removal stays a block, anyone's removal of an offline player is not. "Yes" is told
+  to the room at once and the photos follow in the background. The start is a ready check
+  (every photo in, every phone holding the first photo), then one 3-2-1 on the server's
+  clock. "Is everyone here?" comes only in a group's first game and only for apps that can
+  show it. No small versions first (why: section 14).
 
 This plan turns the operator's request of 22 November 2026, and his answers to the
 questions that followed, into thirteen commits. For every change it says what it is, why,
