@@ -30,8 +30,10 @@
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
  *   terms are accepted), the photo bucket fills by itself (`photos.startPhotos`), for the
- *   room's "Which photos" or this phone's own setting (`syncPhotoFilter`). "Yes" shows how
- *   far it is (`session.progress`): the big versions getting ready, then the upload.
+ *   room's "Which photos" and "Photos per player" or this phone's own settings, and rests
+ *   while a game runs (`syncPhotoNeeds`). "Yes" sends no more photos than the game can show
+ *   of this player (`sendCount`) and shows how far it is (`session.progress`): the big
+ *   versions getting ready, then the upload.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from the round's timer on the server's clock (`clock.js`,
@@ -56,14 +58,14 @@
  */
 
 import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
+import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
 import { shuffle } from '../shared/random.js';
 import { createRoom, uploadPhotos } from './api.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { startEffect, stopEffects } from './effects.js';
 import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
-import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setFilter, startPhotos, swap } from './photos.js';
+import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
 import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
@@ -77,13 +79,14 @@ import { landingScreen } from './views/landing.js';
 import { lobbyScreen } from './views/lobby.js';
 import { newGameScreen } from './views/newgame.js';
 import { boardScreen } from './views/board.js';
-import { awayScreen, bannerHtml, countdownHtml, joiningScreen, lookHtml } from './views/overlays.js';
+import { awayScreen, bannerHtml, countdownHtml, joiningScreen, lookScreen } from './views/overlays.js';
 import { inviteLink, sheetScreen } from './views/sheets.js';
 import { welcomeScreen } from './views/welcome.js';
 
 const $ = (id) => document.getElementById(id);
 const paintApp = createPainter($('app'));
 const paintSheet = createPainter($('sheet'));
+const paintLook = createPainter($('look'));
 
 let socket = null;
 let lastReactAt = 0;
@@ -271,17 +274,20 @@ function startPodium() {
 }
 
 /**
- * The photo shown big, as layers for `overlays.lookHtml`: a photo of the choice this phone
- * holds (its preview, then its sharp version above it), the round's photo this phone holds
- * with "Show again", or the one another phone holds (`round.peek`); else none.
+ * The photo shown big, for `overlays.lookScreen`: a photo of the choice this phone holds
+ * (its preview, and its sharp version above it once decoded), the round's photo this phone
+ * holds with "Show again", or the one another phone holds (`round.peek`); else null.
  */
 function lookLayers() {
   const v = session.view;
   const look = session.look;
-  if (look && look.tile !== undefined) return heldLayers(look.tile);
+  if (look && look.tile !== undefined) {
+    const [base, sharp = null] = heldLayers(look.tile);
+    return base ? { key: `tile|${look.tile}`, base, sharp } : null;
+  }
   const link = look ? look.photo : v && v.phase === 'board' && v.round.peek ? v.round.photo : null;
   const url = link ? photoUrl(link) : null;
-  return url ? [url] : [];
+  return url ? { key: link, base: url, sharp: null } : null;
 }
 
 function render() {
@@ -295,7 +301,7 @@ function render() {
   // The 3-2-1 paints a new number each second: each one is felt, a little longer than a tap.
   const cover = countdownHtml(session.view, leftNow());
   if (setHtml($('cover'), cover) && cover) buzz('count');
-  setHtml($('look'), lookHtml(lookLayers()));
+  paintLook(lookScreen(lookLayers()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
 
@@ -344,7 +350,7 @@ function exitRoom(message, { forget = false } = {}) {
   saveDevice();
   // The set on screen goes with the room; the bucket stays for the next game.
   leaveSet();
-  syncPhotoFilter();
+  syncPhotoNeeds();
   // The game's photos leave memory with the game.
   syncUpcoming([], render);
   keepAwake(false);
@@ -447,7 +453,7 @@ function onMessage(msg) {
   roomMark = mark;
   syncUpcoming(v.upcoming || [], onPhotos);
   reportReady();
-  syncPhotoFilter();
+  syncPhotoNeeds();
   dealIfNeeded();
   render();
 }
@@ -478,10 +484,29 @@ function photoSettings(v) {
   return { size, filter };
 }
 
-/** The "Which photos" the bucket gathers for: the room's in a game, else this phone's own for its next one. */
-function syncPhotoFilter() {
+/**
+ * What the photo bucket gathers for: the room's "Which photos" and "Photos per player" in a
+ * game, else this phone's own for its next one. It rests from the 3-2-1 until the end
+ * screen: the game's photos need the phone then, and nobody chooses photos.
+ */
+function syncPhotoNeeds() {
   const v = session.view;
-  setFilter(v && v.me ? photoSettings(v).filter : normalizeSettings(device.settings).filter);
+  const { size, filter } = photoSettings(v && v.me ? v : { settings: device.settings });
+  setNeeds({ filter, size, paused: Boolean(v && v.me && (v.phase === 'countdown' || inRound(v))) });
+}
+
+/**
+ * How many of the set on screen "Yes" sends: no more than the game can show of one player
+ * (`balancedRange`, counting everyone here who may still bring photos; every photo when all
+ * are played), and at least an equal share rounded up, so together the photos always fill
+ * every round. Fewer photos leave the phone and "Yes" is quicker. If players leave the
+ * lobby afterwards, the game may end a round or two earlier.
+ */
+function sendCount(v) {
+  const s = normalizeSettings(v.settings);
+  if (!s.rounds) return photos.chosen.length;
+  const owners = Math.max(1, v.players.filter((p) => !(p.ready && p.photoCount === 0)).length);
+  return s.fair ? Math.max(Math.ceil(s.rounds / owners), balancedRange(s.rounds, owners).high) : s.rounds;
 }
 
 /** Deals a fresh set when the lobby needs one and the app may read photos. */
@@ -625,7 +650,7 @@ const ACTIONS = {
     if (!preset) return;
     device.settings = { ...preset.settings };
     saveDevice();
-    syncPhotoFilter();
+    syncPhotoNeeds();
     render();
   },
   async start() {
@@ -678,7 +703,7 @@ const ACTIONS = {
     if (session.view && session.view.me) send({ type: 'setting', key, value: parsed });
     device.settings = { ...device.settings, [key]: parsed };
     saveDevice();
-    syncPhotoFilter();
+    syncPhotoNeeds();
     render();
   },
   invite: () => openSheet('invite'),
@@ -697,7 +722,7 @@ const ACTIONS = {
     const { size, filter } = photoSettings(v);
     roll(size, filter, render);
   },
-  yes: () => readyWith(chosenBlobs),
+  yes: () => readyWith((onProgress) => chosenBlobs(sendCount(session.view), onProgress)),
   /** A tap on a photo of the choice: it flips to another one (a light tap), or the refusal is felt twice. */
   swap: (index) => {
     if (session.uploading) return;
@@ -900,7 +925,7 @@ if (!inApp()) {
   const code = location.pathname.slice(1).toUpperCase();
   paintApp(landingScreen(isRoomCode(code) ? code : null));
 } else {
-  syncPhotoFilter();
+  syncPhotoNeeds();
   // The photo bucket starts filling as soon as the terms are accepted and the app may read photos.
   if (device.agreed === termsToken()) checkAccess();
   if (device.room && device.name && device.agreed === termsToken()) enterRoom(device.room);

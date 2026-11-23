@@ -8,6 +8,9 @@
 // - Photos are read only on the phone. Previews and photos leave this file as JPEGs at
 //   most `side` / `maxSide` pixels on their longest side, re-encoded from their pixels only,
 //   so location and all other metadata never reach JavaScript, and so never the server.
+// - Previews are quick: Photos hands over the nearest size it keeps ready (the usual choice
+//   for photo grids), which is scaled here to fit exactly, like the Android twin does with
+//   the phone's thumbnails; only the upload size is resized exactly by Photos.
 // - Every photo of the library has the same chance: previews come from what the phone keeps
 //   on the device, and a photo kept only in iCloud ("Optimize iPhone Storage", mostly older
 //   photos) fetches its small preview from iCloud, at most `cloudMs` per photo and twice
@@ -89,10 +92,10 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
             var cloudBudget = cloudSeconds * 2
             while photos.count < count, let asset = Self.pick(from: assets, skipping: skip) {
                 skip.insert(asset.localIdentifier)
-                var data = Self.jpeg(asset, side: side, quality: quality, download: false)
+                var data = Self.jpeg(asset, side: side, quality: quality, download: false, quick: true)
                 if data == nil && cloudBudget > 0 {
                     let started = Date()
-                    data = Self.jpeg(asset, side: side, quality: quality, download: true, within: min(cloudSeconds, cloudBudget))
+                    data = Self.jpeg(asset, side: side, quality: quality, download: true, quick: true, within: min(cloudSeconds, cloudBudget))
                     cloudBudget -= Date().timeIntervalSince(started)
                 }
                 guard let data else { continue }
@@ -128,15 +131,17 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// The asset upright, at most `side` pixels on its longest side, as a fresh JPEG (pixels
-    /// only). Blocks the calling queue until the image is there (or nil). With `within`, it
+    /// only). `quick` (the previews): Photos answers with the nearest size it keeps ready
+    /// (`.fast`), scaled here to fit `side`; otherwise Photos resizes exactly (the upload
+    /// size). Blocks the calling queue until the image is there (or nil). With `within`, it
     /// waits at most that many seconds and then cancels the request (a download that does
     /// not come); the request then runs asynchronously and Photos answers on another queue
     /// (never this one, so waiting here cannot block the answer).
-    private static func jpeg(_ asset: PHAsset, side: CGFloat, quality: CGFloat, download: Bool, within seconds: Double? = nil) -> Data? {
+    private static func jpeg(_ asset: PHAsset, side: CGFloat, quality: CGFloat, download: Bool, quick: Bool = false, within seconds: Double? = nil) -> Data? {
         let request = PHImageRequestOptions()
         request.isSynchronous = seconds == nil
         request.deliveryMode = .highQualityFormat
-        request.resizeMode = .exact
+        request.resizeMode = quick ? .fast : .exact
         request.isNetworkAccessAllowed = download
         var image: UIImage?
         let arrived = DispatchSemaphore(value: 0)
@@ -151,7 +156,23 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
             PHImageManager.default().cancelImageRequest(id)
             return nil
         }
-        return image?.jpegData(compressionQuality: quality)
+        guard let image else { return nil }
+        return (quick ? fit(image, side: side) : image).jpegData(compressionQuality: quality)
+    }
+
+    /// Scaled down to fit `side` pixels on its longest side (a quick answer may come a little
+    /// larger than asked for), drawn upright and without any of the photo's data.
+    private static func fit(_ image: UIImage, side: CGFloat) -> UIImage {
+        let width = image.size.width * image.scale
+        let height = image.size.height * image.scale
+        let scale = side / max(width, height)
+        if scale >= 1 { return image }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: (width * scale).rounded(), height: (height * scale).rounded())
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 
     /// A few random tries first; when nearly everything is excluded, one pass from a random start.

@@ -127,8 +127,9 @@ function mine({ view, session }) {
   const ready = '<div class="mt-4 text-center"><b class="text-green">✓ Ready</b></div><button class="link" data-act="unready">Change</button>';
   if (me.ready) {
     if (!me.photoCount) return { ...parts, pick: ready };
-    // Without the local previews (the app was closed meanwhile), neutral tiles stand in.
-    const tiles = photos.chosen.length === me.photoCount && photos.chosen.every((c) => c.url)
+    // The set as it was chosen ("Yes" sends no more of it than the game can show); without
+    // the local previews (the app was closed meanwhile), neutral tiles stand in.
+    const tiles = photos.chosen.length >= me.photoCount && photos.chosen.every((c) => c.url)
       ? chosenTiles(true)
       : Array.from({ length: me.photoCount }, () => `<div class="${TILE}">📷</div>`);
     return { ...parts, pick: grid(tiles, view.settings.photos), note: ready };

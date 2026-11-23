@@ -1,7 +1,7 @@
 /**
  * The pure parts of the game's photo queue (web/js/upcoming.js): which round a phone is
- * ready for, and how far along it is for the loading bar; and the loader it runs on
- * (web/js/loader.js), which always takes the most wanted job next.
+ * ready for, and its share of the loading bar; and the loader both photo stores run on
+ * (web/js/loader.js): the most wanted job next, one per kind at a time.
  */
 import { expect, test } from 'vitest';
 import { createLoader } from '../../web/js/loader.js';
@@ -29,17 +29,32 @@ test('the loading bar counts whether this phone holds the waited-for round\'s ph
   expect(shareFor(3, ['p3'], 4, holding())).toBe(1);
 });
 
-test('the loader runs one job at a time, always the one wanted most when it asks', async () => {
-  const wanted = ['b', 'a'];
+test('the loader runs one job per kind at a time, the one wanted most, and a slow kind never holds up another', async () => {
+  const wanted = { slow: ['s1', 's2'], quick: ['q1', 'q2'] };
   const ran = [];
-  const loader = createLoader(() => {
-    const key = wanted.shift();
-    return key ? { key, run: async () => ran.push(key) } : null;
-  });
+  let finishSlow;
+  const loader = createLoader((open) => {
+    for (const kind of open) {
+      const key = wanted[kind].shift();
+      if (!key) continue;
+      const run = key === 's1' ? () => new Promise((resolve) => { finishSlow = resolve; }).then(() => ran.push(key)) : async () => ran.push(key);
+      return { key, kind, run };
+    }
+    return null;
+  }, { slow: 1, quick: 1 });
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
   loader.wake();
-  // A newly urgent job jumps the queue: it is picked next, not after what was listed before.
-  wanted.unshift('urgent');
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(ran).toEqual(['b', 'urgent', 'a']);
-  expect(loader.running).toBeNull();
+  await settle();
+  // The slow job still runs; the quick kind did all its work meanwhile.
+  expect(ran).toEqual(['q1', 'q2']);
+  expect(loader.running).toEqual(['s1']);
+  // A newly urgent job is picked at once, not after what was listed before.
+  wanted.quick.push('urgent');
+  loader.wake();
+  await settle();
+  expect(ran).toEqual(['q1', 'q2', 'urgent']);
+  finishSlow();
+  await settle();
+  expect(ran).toEqual(['q1', 'q2', 'urgent', 's1', 's2']);
+  expect(loader.running).toEqual([]);
 });

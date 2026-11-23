@@ -25,7 +25,7 @@
 
 import { TIMING } from '../shared/config.js';
 import { serverUrl } from './api.js';
-import { createLoader } from './loader.js';
+import { createLoader, paintable } from './loader.js';
 
 /** The photos by link: { state: 'loading' | 'retry' | 'ok' | 'error', url, abort, tries }. */
 const photos = new Map();
@@ -34,10 +34,11 @@ let wanted = [];
 /** Called whenever a photo arrived or failed (`main.js` reports and repaints). */
 let changed = () => {};
 
+/** One download at a time: the photo needed first gets the whole connection. */
 const loader = createLoader(() => {
   const link = wanted.find((l) => !photos.has(l) || photos.get(l).state === 'retry');
-  return link ? { key: link, run: () => load(link) } : null;
-});
+  return link ? { key: link, kind: 'photo', run: () => load(link) } : null;
+}, { photo: 1 });
 
 /** Fetches one photo into memory; holds nothing across its waits but its own entry (checked after each). */
 async function load(link) {
@@ -51,11 +52,8 @@ async function load(link) {
     const res = await fetch(serverUrl(link), { cache: 'no-store', signal: controller.signal });
     if (res.status === 404) entry.tries = Infinity;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const url = URL.createObjectURL(await res.blob());
     // Decoded before it counts as there, so the stage shows it at once when its round comes.
-    const img = new Image();
-    img.src = url;
-    await img.decode();
+    const url = await paintable(await res.blob());
     if (!current()) {
       URL.revokeObjectURL(url);
       return;

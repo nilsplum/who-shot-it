@@ -1,32 +1,39 @@
 /**
  * The player's photo choice, and the bucket that keeps it instant: n random photos from the
  * phone, shown with "Play with these?" No/Yes without waiting, sharp when held, and ready to
- * upload on Yes.
+ * send on Yes.
  *
  * Mechanisms:
- * - The bucket: as soon as the app may read photos (`startPhotos`: from the app's start and
- *   whenever it comes back, on every screen, in and out of games) it fills by itself with up
- *   to LIMITS.bucketPreviews previews (`phone.randomPhotos`). Each one is checked once (the
- *   phone marks screenshots, `textcheck.js` counts its lines of text) and kept while it fits
- *   the current "Which photos" (the room's, or this phone's own setting outside a game,
- *   `setFilter`). The first LIMITS.bucketFulls of them also get their big version
- *   (`phone.photo`, the upload size) ahead, from photos stored on the phone only.
- * - One queue does all of the phone's work, in two lanes on `loader.js`. The now lane does
- *   what a player waits for: the photo being held, then the set on screen's big versions
- *   (iCloud downloads allowed: these may be uploaded), then previews for a set being dealt.
- *   The ahead lane (big versions, then previews) starts a job only while the now lane has
- *   nothing more to do, so at most one job of each runs at a time.
+ * - The bucket: whenever the app may read photos (`startPhotos`: from the app's start and
+ *   whenever it comes back) it fills by itself with up to LIMITS.bucketPreviews previews
+ *   (`phone.randomPhotos`). Each one is checked once (the phone marks screenshots,
+ *   `textcheck.js` counts its lines of text) and kept while it fits the current "Which
+ *   photos". The next set, the front of the bucket, also gets its big versions ahead
+ *   (`phone.photo`, the upload size), from photos stored on the phone only. The bucket
+ *   gathers for the room's "Which photos" and "Photos per player", or this phone's own
+ *   settings outside a game, and rests from the 3-2-1 until the end screen, when the game's
+ *   photos need the phone and nobody chooses (`setNeeds`).
+ * - One list of work, in the order of what a player waits for (`pick`), done by one worker
+ *   per kind of work on `loader.js`, so a slow job never holds up a quick one of another kind:
+ *   1. `held`: the big version of the photo a finger holds (downloaded if needed);
+ *   2. `deal`: previews for a set being dealt ("No", the first set), when the bucket is short;
+ *   3. `sharp`: the big versions of the set on screen, for "Yes": those on the phone first
+ *      (quick), then those kept only in iCloud (downloaded); not for a set being replaced;
+ *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: previews until
+ *      LIMITS.readySets more sets are ready (so "No" is instant), then the next set's big
+ *      versions (from the phone only), then previews up to LIMITS.bucketPreviews.
  * - `roll` deals a set from the front of the bucket, so its big versions are usually there
  *   already; `swap` replaces one photo with the bucket's next (the tile turns over, its old
  *   preview as the back face until the turn is done) or counts a refusal; `holdPhoto` puts
- *   a photo's big version first (the view shows the preview until it is there, then the
- *   sharp one above it); `chosenBlobs` waits for the set's big versions for "Yes", counting
- *   them.
+ *   a photo's big version first and makes it paintable (decoded, `loader.paintable`) before
+ *   the view lays it over the preview; `chosenBlobs` gives "Yes" the big versions that are
+ *   there first, waiting only while fewer than it sends are ready.
  *
  * Invariants:
  * - Nothing leaves the phone before "Yes": previews and big versions are Blobs in this
- *   page's memory. Only the photos of the set on screen are uploaded; one the phone cannot
- *   hand over is left out, never replaced by one the player did not see.
+ *   page's memory. Only photos of the set on screen are sent, at most as many as the game
+ *   can show of this player; one the phone cannot hand over is left out, never replaced by
+ *   one the player did not see.
  * - A set prefers photos not shown yet (`seen`, for as long as the app runs); only when the
  *   phone has none left do earlier ones come back, never the set on screen if there are
  *   others.
@@ -39,15 +46,16 @@
  */
 
 import { LIMITS } from '../shared/config.js';
-import { createLoader } from './loader.js';
+import { createLoader, paintable } from './loader.js';
 import { photo, randomPhotos } from './phone.js';
 import { grayOf, textLines } from './textcheck.js';
 
 export const photos = {
   /**
    * The set on screen: the bucket's own entries, each with { url (the preview as a link),
-   * fullUrl (the big version as a link, once there), anim ('in' | 'flip' while it is dealt
-   * or swapped in), from (while it turns in: the preview it replaced, as a link) } added.
+   * sharp (the big version as a decoded link, made when the photo is held), anim ('in' |
+   * 'flip' while it is dealt or swapped in), from (while it turns in: the preview it
+   * replaced, as a link) } added.
    */
   chosen: [],
   /** Swaps left in this set. */
@@ -66,6 +74,9 @@ export const photos = {
   rollId: 0,
 };
 
+/** How many previews the phone is asked for at once: a few, so results keep flowing. */
+const BATCH = 6;
+
 /**
  * Checked previews that fit the current filter, in draw order: { id, blob, screenshot,
  * lines, full (the big version, a Blob, once there), pending (being fetched), failed
@@ -73,9 +84,9 @@ export const photos = {
  * it will not come) }.
  */
 let bucket = [];
-/** The "Which photos" the bucket gathers for (`setFilter`); the set on screen keeps its own (`photos.filter`). */
-let gathering = null;
-/** Ids that do not fit `gathering`: the phone is not asked for them again until it changes. */
+/** What the bucket gathers for: "Which photos", the set size, and whether it rests (a game runs). */
+const needs = { filter: null, size: 0, paused: false };
+/** Ids that do not fit `needs.filter`: the phone is not asked for them again until it changes. */
 let unfit = new Set();
 /** Ids already dealt in this run of the app. */
 let seen = new Set();
@@ -120,51 +131,46 @@ function fits(entry, filter) {
   return entry.lines < LIMITS.textLines;
 }
 
-// ---------- The two lanes ----------
+// ---------- The list of work ----------
 
-/** A big version the now lane should fetch (download allowed), or null: the held photo, then the set on screen. */
-function fullWanted() {
-  const missing = (c) => c && !c.full && !c.pending && c.failed !== true;
-  const held = photos.chosen.find((c) => c.id === heldId);
-  if (missing(held)) return held;
-  return photos.chosen.find(missing) || null;
-}
+/** A photo still needs its big version: none there, none on its way, and it has not failed for good. */
+const needsFull = (e) => Boolean(e) && !e.full && !e.pending && e.failed !== true;
 
-/** Whether a set being dealt needs more previews than the bucket holds. */
-const previewsWanted = () => bucket.length < dealing && !exhausted && readable;
-
-function pickNow() {
-  const c = fullWanted();
-  if (c) return { key: `full:${c.id}`, run: () => fetchFull(c, true) };
-  if (previewsWanted()) return { key: 'previews', run: () => fetchPreviews(6) };
-  return null;
-}
+/** A set being dealt needs more previews than the bucket holds. */
+const dealShort = () => readable && dealing > 0 && bucket.length < dealing && !exhausted;
 
 /**
- * The ahead lane's next job, only while the now lane has nothing more to do (its last job may
- * still be running: waiting for it to end too would need a second wake-up, and an ahead job
- * beside it costs nothing a player waits for).
+ * The next job for a free worker (`open`: the kinds with a free slot), in the order of what
+ * a player waits for; see the header. Background work (`fill`) starts only while nothing a
+ * player waits for is left to start, so it never takes the phone's time from them.
  */
-function pickAhead() {
-  if (!readable || pickNow()) return null;
-  const entry = bucket.slice(0, LIMITS.bucketFulls).find((e) => !e.full && !e.pending && !e.failed);
-  if (entry) return { key: `full:${entry.id}`, run: () => fetchFull(entry, false) };
-  if (bucket.length < LIMITS.bucketPreviews && !exhausted) return { key: 'previews', run: () => fetchPreviews(6) };
+function pick(open) {
+  const free = (kind) => open.includes(kind);
+  const held = photos.chosen.find((c) => c.id === heldId);
+  if (free('held') && needsFull(held)) return { key: `full:${held.id}`, kind: 'held', run: () => fetchFull(held, true) };
+  if (free('deal') && dealShort()) return { key: 'deal', kind: 'deal', run: () => fetchPreviews() };
+  // The set on screen, unless it is being replaced: those on the phone first, then the downloads.
+  const set = dealing ? [] : photos.chosen;
+  const next = set.find((c) => needsFull(c) && !c.failed) || set.find(needsFull);
+  if (free('sharp') && next) return { key: `full:${next.id}`, kind: 'sharp', run: () => fetchFull(next, true) };
+  if (!free('fill') || !readable || needs.paused || needsFull(held) || dealShort() || next) return null;
+  if (bucket.length < needs.size * LIMITS.readySets && !exhausted) return { key: 'fill', kind: 'fill', run: () => fetchPreviews() };
+  const ahead = bucket.slice(0, needs.size).find((e) => needsFull(e) && !e.failed);
+  if (ahead) return { key: `full:${ahead.id}`, kind: 'fill', run: () => fetchFull(ahead, false) };
+  if (bucket.length < LIMITS.bucketPreviews && !exhausted) return { key: 'fill', kind: 'fill', run: () => fetchPreviews() };
   return null;
 }
 
-const now = createLoader(pickNow);
-const ahead = createLoader(pickAhead);
+const worker = createLoader(pick, { held: 1, deal: 1, sharp: 1, fill: 1 });
 
-/** Something changed: both lanes look again, waiting promises are checked, the view repaints. */
+/** Something changed: the workers look again, waiting promises are checked, the view repaints. */
 function poke() {
   for (const w of [...waiters]) {
     if (!w.check()) continue;
     waiters.delete(w);
     w.resolve();
   }
-  now.wake();
-  ahead.wake();
+  worker.wake();
   changed();
 }
 
@@ -172,6 +178,23 @@ function poke() {
 function until(check) {
   if (check()) return Promise.resolve();
   return new Promise((resolve) => waiters.add({ check, resolve }));
+}
+
+/**
+ * A held photo's sharp layer: its big version, decoded before the view shows it, so it
+ * appears at once over the preview instead of a blank frame. Made once per photo of the set.
+ */
+function showSharp(c) {
+  if (!c.full || c.sharp || c.sharpening) return;
+  c.sharpening = true;
+  paintable(c.full).then((url) => {
+    c.sharpening = false;
+    if (photos.chosen.includes(c)) c.sharp = url;
+    else URL.revokeObjectURL(url);
+    changed();
+  }, () => {
+    c.sharpening = false;
+  });
 }
 
 /**
@@ -186,18 +209,17 @@ async function fetchFull(entry, download) {
   entry.pending = false;
   if (blob) entry.full = blob;
   else entry.failed = download ? true : 'ahead';
-  // Dealt meanwhile: the set on screen shows it sharp when held.
-  if (blob && photos.chosen.includes(entry) && !entry.fullUrl) entry.fullUrl = URL.createObjectURL(blob);
+  if (blob && entry.id === heldId && photos.chosen.includes(entry)) showSharp(entry);
   poke();
 }
 
 /** One batch of previews, each checked once; the ones that fit go to the end of the bucket. */
-async function fetchPreviews(count) {
+async function fetchPreviews() {
   let batch;
   try {
     // The set on screen is in `seen`; only `roll`'s last pass (nothing else left) lets it come back.
     const exclude = [...seen, ...unfit, ...bucket.map((e) => e.id)];
-    batch = await randomPhotos(count, exclude);
+    batch = await randomPhotos(BATCH, exclude);
     failures = 0;
   } catch {
     failures += 1;
@@ -208,7 +230,7 @@ async function fetchPreviews(count) {
     const entry = { ...preview, lines: await linesOf(preview.blob), full: null, failed: false };
     // The filter may have changed while the phone answered: the entry is sorted by today's.
     if (!readable || seen.has(entry.id) || bucket.some((e) => e.id === entry.id)) continue;
-    if (fits(entry, gathering)) bucket.push(entry);
+    if (fits(entry, needs.filter)) bucket.push(entry);
     else unfit.add(entry.id);
   }
   poke();
@@ -218,20 +240,17 @@ async function fetchPreviews(count) {
 
 function release(set) {
   for (const c of set) {
-    for (const url of [c.url, c.fullUrl, c.from]) if (url) URL.revokeObjectURL(url);
+    for (const url of [c.url, c.sharp, c.from]) if (url) URL.revokeObjectURL(url);
   }
 }
 
 /**
  * A bucket entry joins the set on screen (`anim` is its entrance): the same object, so a big
- * version still being fetched for it lands in the set too. One not stored on the phone may
- * now be downloaded.
+ * version still being fetched for it lands in the set too. One not stored on the phone
+ * (`failed: 'ahead'`) may now be downloaded.
  */
 function slot(entry, anim) {
-  return Object.assign(entry, {
-    url: URL.createObjectURL(entry.blob), fullUrl: entry.full ? URL.createObjectURL(entry.full) : null,
-    failed: entry.failed === true, anim, from: null,
-  });
+  return Object.assign(entry, { url: URL.createObjectURL(entry.blob), sharp: null, anim, from: null });
 }
 
 /**
@@ -266,21 +285,27 @@ export function startPhotos(canRead, onChange) {
 }
 
 /**
- * The "Which photos" the bucket gathers for: the room's, or this phone's own setting outside
- * a game. A new one drops what no longer fits (from the checks already made) and lets the
- * phone offer what the old one left out.
+ * What the bucket gathers for: `filter` ("Which photos") and `size` ("Photos per player",
+ * the next set's size) of the room, or this phone's own settings outside a game; `paused`
+ * while a game runs. Any of them may be left out. A new filter drops what no longer fits
+ * (from the checks already made) and lets the phone offer what the old one left out.
  */
-export function setFilter(filter) {
-  if (filter === gathering) return;
-  gathering = filter;
-  unfit = new Set();
-  const kept = [];
-  for (const e of bucket) {
-    if (fits(e, filter)) kept.push(e);
-    else unfit.add(e.id);
+export function setNeeds(next) {
+  const filter = next.filter ?? needs.filter;
+  const size = next.size ?? needs.size;
+  const paused = next.paused ?? needs.paused;
+  if (filter === needs.filter && size === needs.size && paused === needs.paused) return;
+  if (filter !== needs.filter) {
+    unfit = new Set();
+    const kept = [];
+    for (const e of bucket) {
+      if (fits(e, filter)) kept.push(e);
+      else unfit.add(e.id);
+    }
+    bucket = kept;
+    exhausted = false;
   }
-  bucket = kept;
-  exhausted = false;
+  Object.assign(needs, { filter, size, paused });
   poke();
 }
 
@@ -312,14 +337,14 @@ export function resetPhotos() {
 export async function roll(size, filter, onChange) {
   changed = onChange;
   const id = ++photos.rollId;
-  setFilter(filter);
+  setNeeds({ filter, size });
   const onScreen = photos.chosen.map((c) => c.id);
   Object.assign(photos, { size, filter, spent: false, rolling: true });
   dealing = size;
   changed();
   // Unseen photos first; once the phone has none left, earlier ones (`seen` then holds only
   // the set on screen); and only then the set on screen again. Waits only when the bucket
-  // is short, so "No" with a full bucket is instant.
+  // is short, so "No" with the bucket's ready sets is instant.
   for (const reuse of [null, onScreen, []]) {
     if (reuse) {
       seen = new Set(reuse);
@@ -361,41 +386,47 @@ export function swap(index, onChange) {
   seen.add(next.id);
   const c = Object.assign(slot(next, 'flip'), { from: old.url });
   photos.chosen = photos.chosen.map((x, i) => (i === index ? c : x));
-  // The old photo's big version goes now; its preview with the turn (`settleLater`), and a
+  // The old photo's sharp layer goes now; its preview with the turn (`settleLater`), and a
   // turn it was still in the middle of ends by its own timer.
-  if (old.fullUrl) URL.revokeObjectURL(old.fullUrl);
+  if (old.sharp) URL.revokeObjectURL(old.sharp);
   photos.swaps -= 1;
   settleLater(c);
   poke();
   return true;
 }
 
-/** Photo `index` of the set is held big: its big version comes first; null lets go. */
+/** Photo `index` of the set is held big: its big version comes first (and is made paintable); null lets go. */
 export function holdPhoto(index) {
   const c = index === null ? null : photos.chosen[index];
   heldId = c ? c.id : null;
+  if (c) showSharp(c);
   poke();
 }
 
-/** What a held photo shows, bottom layer first: its preview, and its big version above it once there. */
+/** What a held photo shows, bottom layer first: its preview, and its decoded big version above it once there. */
 export function heldLayers(index) {
   const c = photos.chosen[index];
-  return c ? [c.url, c.fullUrl].filter(Boolean) : [];
+  return c ? [c.url, c.sharp].filter(Boolean) : [];
 }
 
 /**
- * The big versions of the set on screen, for "Yes": waits for the ones still coming,
- * telling `onProgress` how many are there (0 to 1). Throws when none of them could be read.
+ * The big versions "Yes" sends: `count` of the set on screen (at most as many as the game
+ * can show of this player, `main.js`), those already there first, in the set's order. Waits
+ * only while fewer than that are ready and more may come, telling `onProgress` how far it is
+ * (0 to 1). Throws when none of them could be read.
  */
-export async function chosenBlobs(onProgress = () => {}) {
+export async function chosenBlobs(count, onProgress = () => {}) {
   const set = photos.chosen;
-  const settled = () => set.filter((c) => c.full || c.failed).length;
-  onProgress(set.length ? settled() / set.length : 1);
+  const want = Math.min(count, set.length);
+  const ready = () => set.filter((c) => c.full);
+  const settled = () => set.filter((c) => c.full || c.failed === true).length;
+  const report = () => onProgress(want ? Math.min(1, ready().length / want) : 1);
+  report();
   await until(() => {
-    onProgress(set.length ? settled() / set.length : 1);
-    return settled() === set.length || photos.chosen !== set;
+    report();
+    return ready().length >= want || settled() === set.length || photos.chosen !== set;
   });
-  const blobs = set.map((c) => c.full).filter(Boolean);
-  if (set.length && !blobs.length) throw new Error('unreadable');
+  const blobs = ready().slice(0, want).map((c) => c.full);
+  if (want && !blobs.length) throw new Error('unreadable');
   return blobs;
 }

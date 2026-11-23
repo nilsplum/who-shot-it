@@ -220,20 +220,21 @@ export const LIMITS = {
   /** A photo with this many lines of text or more counts as full of text ("Which photos"). */
   textLines: 6,
   /**
-   * The phone's bucket of checked previews, filled whenever the app may read photos, so a
-   * set, "No" and a swap never wait (`web/js/photos.js`): about 10 MB of small JPEGs.
+   * The phone's bucket of checked previews, filled in the background whenever the app may
+   * read photos and no game runs, so a set, "No" and a swap never wait (`web/js/photos.js`):
+   * about 10 MB of small JPEGs. Only the next set (the front of the bucket) also gets its
+   * big versions ahead, so holding a photo is sharp at once and "Yes" sends at once.
    */
   bucketPreviews: 250,
   /**
-   * The first this many previews of the bucket also get their big version (the upload size)
-   * ahead, from photos stored on the phone only, so holding a photo is sharp and "Yes"
-   * uploads at once: about 25 MB.
+   * How many sets of previews the bucket keeps ready beyond the one on screen before it does
+   * anything else, so "No" is instant even when tapped again and again.
    */
-  bucketFulls: 100,
+  readySets: 2,
   /**
    * "Photo mix: Balanced": each player's photos come up between 60% and 140% of an equal
    * share of the rounds (rounded; 15 rounds and 4 players: 2 to 5 each), so counting whose
-   * photos were shown never tells whose comes next (`src/game/plan.js`).
+   * photos were shown never tells whose comes next (`balancedRange`).
    */
   balancedSpread: 0.4,
   /** How many single photos a player may swap in one set (tap a photo); a new set starts over. */
@@ -243,6 +244,17 @@ export const LIMITS = {
   /** Largest WebSocket message the room accepts from an app (all of them are tiny). */
   messageMaxBytes: 2048,
 };
+
+/**
+ * "Photo mix: Balanced": how many of one owner's photos a game of `count` rounds with
+ * `owners` players who brought photos plays, at least and at most (LIMITS.balancedSpread).
+ * The one formula both sides use: the room picks each player's photos within it
+ * (`src/game/plan.js`), and on "Yes" a phone sends no more than the most (`web/js/main.js`).
+ */
+export function balancedRange(count, owners) {
+  const share = count / owners;
+  return { low: Math.round(share * (1 - LIMITS.balancedSpread)), high: Math.round(share * (1 + LIMITS.balancedSpread)) };
+}
 
 /** All durations in milliseconds. The server owns every timer; apps only display them. */
 export const TIMING = {

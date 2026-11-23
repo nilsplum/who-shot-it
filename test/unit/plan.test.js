@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import { arrange, buildPlan } from '../../src/game/plan.js';
+import { balancedRange } from '../../web/shared/config.js';
 import { shuffle } from '../../web/shared/random.js';
 import { seededRandom } from '../helpers.js';
 
@@ -59,6 +60,17 @@ describe('buildPlan', () => {
     const few = buildPlan(players({ a: 3, b: 3, c: 3, d: 3, e: 3 }), settings({ rounds: 4 }), seededRandom(3));
     expect(few).toHaveLength(4);
     expect(new Set(few.map((e) => e.owner)).size).toBe(4);
+  });
+
+  test('players who send only what "Balanced" can show of them still fill every round', () => {
+    // What a phone sends on "Yes" (web/js/main.js `sendCount`): the range's most, at least an equal share.
+    for (const owners of [2, 3, 4, 7, 9, 14, 15, 16]) {
+      for (const rounds of [5, 10, 15, 20, 30]) {
+        const sent = Math.max(Math.ceil(rounds / owners), balancedRange(rounds, owners).high);
+        const counts = Object.fromEntries(Array.from({ length: owners }, (_, i) => [`p${i}`, sent]));
+        expect(buildPlan(players(counts), settings({ rounds }), seededRandom(owners + rounds)), `${owners} players, ${rounds} rounds`).toHaveLength(rounds);
+      }
+    }
   });
 
   test('"Random" can take anyone\'s photos', () => {

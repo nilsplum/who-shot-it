@@ -92,13 +92,14 @@ changed (with the photo's owner hidden until the reveal) and counts every timer 
 end on the server's clock.
 
 **Photos.** With the player's permission, the app picks n random photos on the phone and
-shows small previews. A bucket of checked previews (and the big versions of the first
-ones, from photos on the phone) fills in the background on every screen, so No, a swap and
-Yes never wait; holding a photo shows it big and sharpens it in place. The host's "Which
-photos" decides what may come up: all, little text (default: photos with 6 or more lines of
-text, like chats and emails, stay out) or no screenshots either; the check runs on the
-phone. Yes uploads exactly the photos shown, shrunk to at most 1080 px JPEG without
-location data. A photo is deleted right after its round (its reveal and leaderboard), and
+shows small previews. A bucket of checked previews (and the big versions of the next set,
+from photos on the phone) fills in the background whenever no game runs, in the order a
+player needs things (what a finger holds, then the set being dealt, then the set on screen,
+then the bucket), so No, a swap and Yes never wait; holding a photo shows it big and
+sharpens it in place. The host's "Which photos" decides what may come up: all, little text
+(default: photos with 6 or more lines of text, like chats and emails, stay out) or no
+screenshots either; the check runs on the phone. Yes uploads photos shown, as many as the
+game can show of this player, shrunk to at most 1080 px JPEG without location data. A photo is deleted right after its round (its reveal and leaderboard), and
 also when reported, on "Change", "Leave", removal, a new photo count and at the game's end.
 A room keeps its code for 24 hours after its last activity, even when everyone left, so the
 same group can play again the next day; then it is deleted. From the 3-2-1 on, every phone

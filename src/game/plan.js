@@ -7,14 +7,15 @@
  * Invariants:
  * - Rounds = all photos, or the "Rounds" setting if that is smaller.
  * - When not every photo is played, "Photo mix: Balanced" gives each player between 60% and
- *   140% of an equal share (LIMITS.balancedSpread), drawn at random, so counting whose
+ *   140% of an equal share (`balancedRange` in web/shared/config.js, the same formula the
+ *   phones use to send no more photos than can come up), drawn at random, so counting whose
  *   photos were already shown never tells whose comes next; "Random" draws from all photos
  *   alike, so one player may come up a lot and another hardly.
  * - The order avoids the same owner twice in a row whenever the photos allow it, so a
  *   streak of one person's photos never gives the answer away.
  */
 
-import { LIMITS } from '../../web/shared/config.js';
+import { balancedRange } from '../../web/shared/config.js';
 import { shuffle } from '../../web/shared/random.js';
 
 /**
@@ -25,9 +26,7 @@ import { shuffle } from '../../web/shared/random.js';
  */
 function pickBalanced(byOwner, count, rng) {
   const owners = shuffle([...byOwner.entries()], rng).map(([owner, photos]) => ({ owner, photos: shuffle(photos, rng), take: 0 }));
-  const share = count / owners.length;
-  const low = Math.round(share * (1 - LIMITS.balancedSpread));
-  const high = Math.round(share * (1 + LIMITS.balancedSpread));
+  const { low, high } = balancedRange(count, owners.length);
   let left = count;
   // With more players than rounds the lower bounds may add up to more than the rounds; the
   // shuffled order then decides who gets one.
