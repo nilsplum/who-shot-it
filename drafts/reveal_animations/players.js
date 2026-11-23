@@ -2,9 +2,9 @@
  * A stand-in game for the reveal (never real people): up to twelve players, each with an
  * avatar of the app's list, a score before this round, what they picked and the points it
  * won. The round's photo is Ben's, and I am Ana. "Your guess" decides my pick: right (Ben,
- * the most points of the round, which rise off my card) or wrong (Lena, where the light
- * stops one card too early). Lena, Ben and Ana come first, so every number of players has
- * them. The leaderboard's draft plays the same game (drafts/leaderboard_animations).
+ * the most points of the round, which rise off my card in gold) or wrong (Lena, my card
+ * turns red and +0 rises off it). Lena, Ben and Ana come first, so every number of players
+ * has them. The leaderboard's draft plays the same game (drafts/leaderboard_animations).
  */
 
 /** Name, avatar, score before this round, whether they picked the owner (`null`: no answer), the points it won. Ana's are set by "Your guess". */

@@ -1,23 +1,14 @@
 /**
- * The moves the reveal is made of: the app's easings, where an element is, the timer bar
- * running down, and a burst of sparks.
+ * The moves the reveal is made of: where an element is, the timer bar running down, and a
+ * burst of sparks.
  *
- * Mechanisms: reveal.js imports these; its light comes from the
- * app's own canvas (web/js/sparks.js) and their vibrations and pauses from the kit
- * (/kit/screen.js).
+ * Mechanisms: reveal.js imports these; its light comes from the app's own canvas
+ * (web/js/sparks.js), its vibrations and pauses from the kit (/kit/screen.js).
  *
  * Invariant: every move is transform or opacity only (and the canvas), so the phone moves
  * them without laying out the page again.
  */
 import { spark } from '/js/sparks.js';
-
-/** The app's two easings (styles/app.css) and two more: a quick start with a soft landing, and a slow start. */
-export const EASE = {
-  bounce: 'cubic-bezier(0.3, 1.6, 0.5, 1)',
-  spring: 'cubic-bezier(0.3, 1.2, 0.5, 1)',
-  out: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-  in: 'cubic-bezier(0.6, 0, 0.9, 0.4)',
-};
 
 /** The middle of an element on the screen, and its box. */
 export function centre(el) {

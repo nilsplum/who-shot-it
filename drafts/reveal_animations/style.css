@@ -34,17 +34,3 @@
 @utility rv-hold-chosen {
   [data-playing] &:not([data-go]) { border-color: var(--color-yellow); background-color: var(--color-picked); }
 }
-
-/* The reveal's light, a frame of white light the size of a card; `data-off` while it holds on the near miss. */
-@utility rv-seek {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 20;
-  pointer-events: none;
-  border: 3px solid var(--color-white);
-  background-color: color-mix(in srgb, var(--color-white) 10%, transparent);
-  box-shadow: 0 0 22px 3px color-mix(in srgb, var(--color-white) 45%, transparent), inset 0 0 14px color-mix(in srgb, var(--color-white) 22%, transparent);
-  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
-  &[data-off] { border-color: var(--color-line-strong); background-color: transparent; box-shadow: none; }
-}
