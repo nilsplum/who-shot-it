@@ -8,7 +8,8 @@ showed waits everywhere photos are involved; the follow-up on the branch `fix/no
 a second follow-up on the branch `feat/start-flow` (section 14, version 1.0.5: offline
 players, the start, "No" again and again), also on `main`. Its server is deployed and 1.0.5
 is in App Review (23 November); 1.0.6 (the lobby's players in two rows that swipe
-sideways) is in TestFlight and follows once 1.0.5 is live (Operator handoff, below).
+sideways) and 1.0.7 (the 3-2-1 as a film leader, the reveal step by step, chosen from the
+drafts) are in TestFlight, and 1.0.7 follows once 1.0.5 is live (Operator handoff, below).
 
 ## Operator handoff
 
@@ -65,15 +66,45 @@ knowing. Kept up to date with every commit.
   "What to Test" is the version's What's New in `store/ios_listing.js`, which names only
   the lobby's rows and the reactions' arrow (the changes since 1.0.5). It is not sent to
   App Review: Apple takes one App Store version at a time (to do 3).
-- `main` is 1.0.6 now, so an Android release from it is 1.0.6 as well.
+- `main` was 1.0.6 then; it is 1.0.7 now (below).
 - The test players fill a game up to its 16 players (`scripts/helpers/demo-players.mjs`;
   only this Mac runs them, nothing to release).
 
+**1.0.7, in TestFlight since 23 November (1.0.5 stays in App Review)**
+- What it adds to 1.0.6, both chosen in the drafts (`./scripts/dev.sh drafts`, where each
+  shows "…, in the app" beside the draft it came from):
+  - The 3-2-1 is a film leader (`drafts/countdown_animations`, "Film leader"): a frame over
+    the screen with crosshairs and two circles, a hand that goes round once per number and
+    leaves its shadow, the number changing with a cut, and one white frame that cuts to the
+    first photo. `web/js/countdown.js` keeps it on the room's second: a number painted late
+    starts as far into its round as its second is, and the next one is painted right on its
+    second. The vibrations are as before.
+  - The reveal plays step by step (`drafts/reveal_animations`, "Who shot it?",
+    `web/js/reveal.js`): the owner's card turns green, then my wrong pick red, then my own
+    card pops in my result's colour (gold coins and my points rising, or "Wrong"), then the
+    reactions come; the verdict is felt with the pop. The confetti of a right guess is gone.
+  - The drafts' dashboard (`./scripts/dev.sh drafts`): every draft one click away in its top
+    bar, one kind of animation per draft; nothing plays until Play.
+- The server is unchanged (both are the app's own drawing), so nothing to deploy.
+- Build 1.0.7 (10007) is uploaded (`./scripts/release-apps.sh ios` from `main`, every test
+  green) and in TestFlight for the team; it is in the public group "Friends", sent to
+  Apple's beta check (`app-store.mjs testflight`), behind 1.0.6's, which is still waiting:
+  the public link gives the newest approved build. Its "What to Test", the version's What's
+  New in `store/ios_listing.js`, names everything since 1.0.5 (the film countdown, the
+  reveal, the lobby's rows), since 1.0.7 may follow 1.0.5 into the App Store. Apple's
+  upload warned again about the iOS 27 SDK from April 2027 (to do 5).
+- `main` is 1.0.7, so an Android release from it is 1.0.7 as well.
+
 **To do by hand, in this order**
-1. Try 1.0.6 on a real iPhone (TestFlight, against the live server; it holds all of 1.0.5)
+1. Try 1.0.7 on a real iPhone (TestFlight, against the live server; it holds all of 1.0.6)
    and a real Android phone (`./scripts/dev.sh android`, the game from this Mac), right after
    starting the app, with the test players (`docs/guides/demo-players.md`); the browser tests
    cannot show or feel:
+   - The 3-2-1 (1.0.7): the film leader's hand and its shadow go round once per number,
+     each number on its second, the frame weaves a little, and one white frame cuts to the
+     first photo; with Reduce Motion on (iOS settings) the leader stands still.
+   - The reveal (1.0.7): the owner's card turns green first, then a wrong pick red, then my
+     card pops (coins and my points, or "Wrong"), felt as it pops; the reactions come after.
    - The lobby's two rows (1.0.6): with 15 test players, swipe them and tap the arrow to the
      right end and back (it turns at each end); the photos keep their size as players join.
    - The lobby and the start (section 14): a phone that goes offline turns red and glows,
@@ -104,12 +135,12 @@ knowing. Kept up to date with every commit.
    needed any more (the app is already live), change the first review note in
    `store/ios_listing.js` instead.
 3. Wait for App Review (done: 1.0.5 is sent). If Apple only writes back, answer in App Store
-   Connect. `submit` takes the version from `package.json`, which is 1.0.6 now: after a
-   rejection it sends 1.0.6 (build 10006) in 1.0.5's place, so first make the first review
-   note true for it (record with 10006, or say what differs). Once 1.0.5 is live, the invite
+   Connect. `submit` takes the version from `package.json`, which is 1.0.7 now: after a
+   rejection it sends 1.0.7 (build 10007) in 1.0.5's place, so first make the first review
+   note true for it (record with 10007, or say what differs). Once 1.0.5 is live, the invite
    page's App Store button works without another step, and `node scripts/helpers/app-store.mjs
-   submit` sends 1.0.6 as the update (its What's New is ready), again with a fitting first
-   review note.
+   submit` sends 1.0.7 as the update (its What's New names everything since 1.0.5), again
+   with a fitting first review note.
 4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
