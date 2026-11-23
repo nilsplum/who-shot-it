@@ -34,7 +34,7 @@ function driver(room, now = T0) {
   return d;
 }
 
-/** Everyone ready with two photos each, the countdown run, the first round loaded. */
+/** Everyone ready with two photos each, the start run, the first round loaded. */
 function started(names = ['Ann', 'Ben', 'Cleo'], settings = {}) {
   const d = driver(roomWith(names, { settings }));
   for (const name of names) d.by(name, 'ready', { photos: [`${name.toLowerCase()}1`, `${name.toLowerCase()}2`] });
@@ -82,7 +82,7 @@ describe('joining', () => {
   });
 });
 
-describe('lobby and countdown', () => {
+describe('lobby and start', () => {
   test('starts by itself when everyone is ready and someone has photos', () => {
     const d = driver(roomWith(['Ann', 'Ben']));
     d.by('Ann', 'ready', { photos: ['a1'] });
@@ -105,7 +105,7 @@ describe('lobby and countdown', () => {
     expect(noPhotos.room.phase).toBe('lobby');
   });
 
-  test('the countdown stops when someone unreadies, joins or goes offline', () => {
+  test('the start stops when someone unreadies, joins or goes offline', () => {
     const d = driver(roomWith(['Ann', 'Ben'])).by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] });
     d.by('Ben', 'unready');
     expect(d.room.phase).toBe('lobby');
@@ -124,7 +124,7 @@ describe('lobby and countdown', () => {
     expect(d.room.settings.time).toBe(10);
     d.by('Ann', 'setting', { key: 'time', value: 31 });
     expect(d.room.settings.time).toBe(10);
-    // A valid change restarts the countdown from the top.
+    // A valid change starts the start over from the top.
     d.wait(2000).by('Ann', 'setting', { key: 'time', value: 30 });
     expect(d.room).toMatchObject({ phase: 'countdown', deadline: d.now + TIMING.countdownMs });
     d.by('Ann', 'setting', { key: 'photos', value: 4 });
@@ -293,8 +293,73 @@ describe('rounds', () => {
   });
 });
 
-describe('the deal at the 3-2-1, and the photos ahead', () => {
-  test('the game is dealt when the 3-2-1 starts, and dealt afresh whenever the deal stops holding', () => {
+describe('the start, and the photos ahead', () => {
+  test('"Yes" counts at once; the start waits for photos on their way, then for the first photo on every phone, then counts 3-2-1', () => {
+    const d = driver(roomWith(['Ann', 'Ben'], { ahead: true }));
+    d.by('Ann', 'sending', { upload: 'upload0000ann' });
+    expect(d.room.phase).toBe('lobby');
+    d.by('Ben', 'sending', { upload: 'upload0000ben' });
+    // Both said Yes: the start begins with their photos still on their way, without a timer
+    // (every upload ends by itself), and nothing is dealt yet.
+    expect(d.room).toMatchObject({ phase: 'countdown', game: null, deadline: null });
+    expect(nextWake(d.room)).toBe(d.room.touchedAt + TIMING.roomIdleMs);
+    d.by('Ann', 'ready', { photos: ['a1', 'a2'], upload: 'upload0000ann' });
+    expect(d.room.game).toBeNull();
+    d.by('Ben', 'ready', { photos: ['b1'], upload: 'upload0000ben' });
+    // Every photo is in: dealt, and the phones get the first photo before the 3-2-1.
+    expect(d.room).toMatchObject({ phase: 'countdown', game: { round: 0, waiting: true }, deadline: d.now + TIMING.loadMaxMs });
+    d.wait(500).by('Ann', 'loaded', { round: 1 });
+    expect(d.room.game.waiting).toBe(true);
+    d.by('Ben', 'loaded', { round: 1 });
+    // The 3-2-1 runs exactly its length from now, and round 1 shows the moment it ends.
+    expect(d.room).toMatchObject({ game: { waiting: false }, deadline: d.now + TIMING.countdownMs });
+    d.wait(TIMING.countdownMs);
+    expect(d.room).toMatchObject({ phase: 'show', game: { round: 1 } });
+  });
+
+  test('a phone that does not get the first photo holds up the start at most the load limit', () => {
+    const d = driver(roomWith(['Ann', 'Ben'], { ahead: true }));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).by('Ann', 'loaded', { round: 1 });
+    d.wait(TIMING.loadMaxMs - 1);
+    expect(d.room.game.waiting).toBe(true);
+    d.wait(1);
+    expect(d.room).toMatchObject({ phase: 'countdown', game: { waiting: false }, deadline: d.now + TIMING.countdownMs });
+  });
+
+  test('only the upload a player last said "Yes" to counts', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo']));
+    const ann = () => d.room.players[0];
+    // "Change" while the photos are on their way: the upload that comes in afterwards does not count.
+    d.by('Ann', 'sending', { upload: 'firstupload1' }).by('Ann', 'unready').by('Ann', 'ready', { photos: ['a1'], upload: 'firstupload1' });
+    expect(ann()).toMatchObject({ ready: false, sending: null, photos: [] });
+    // A newer "Yes" overtakes an older upload; one without an id counts only while none was said.
+    d.by('Ann', 'sending', { upload: 'secondupload' }).by('Ann', 'sending', { upload: 'thirdupload1' });
+    d.by('Ann', 'ready', { photos: ['a2'], upload: 'secondupload' }).by('Ann', 'ready', { photos: ['a2'] });
+    expect(ann()).toMatchObject({ ready: false, sending: 'thirdupload1', photos: [] });
+    d.by('Ann', 'ready', { photos: ['a3'], upload: 'thirdupload1' });
+    expect(ann()).toMatchObject({ ready: true, sending: null, photos: ['a3'] });
+    // A "Yes" replaces the set that was in; ids are letters and digits only.
+    d.by('Ann', 'sending', { upload: 'fourthupload' });
+    expect(ann()).toMatchObject({ ready: false, sending: 'fourthupload', photos: [] });
+    d.by('Ben', 'sending', { upload: 'x' }).by('Ben', 'sending', { upload: 'Not An Id!!' });
+    expect(d.room.players[1].sending).toBeNull();
+  });
+
+  test('a hello says which upload is still on its way', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo']));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'sending', { upload: 'benupload01' });
+    // Ben's app was closed meanwhile: its next hello names no upload, so nobody waits for one.
+    d.by('Ben', 'disconnect').do('join', { key: 'key-Ben-0000000000', name: 'Ben', avatar: '🐼' });
+    expect(d.room.players[1]).toMatchObject({ ready: false, sending: null });
+    // Cleo said Yes while her connection was down: her hello brings it.
+    d.by('Cleo', 'disconnect').do('join', { key: 'key-Cleo-0000000000', name: 'Cleo', avatar: '🐸', uploading: 'cleoupload1' });
+    expect(d.room.players[2].sending).toBe('cleoupload1');
+    // A player whose photos are in keeps them.
+    d.by('Ann', 'disconnect').do('join', { key: 'key-Ann-0000000000', name: 'Ann', avatar: '🦊' });
+    expect(d.room.players[0]).toMatchObject({ ready: true, photos: ['a1'] });
+  });
+
+  test('the game is dealt once every photo is in, and dealt afresh whenever the deal stops holding', () => {
     const d = driver(roomWith(['Ann', 'Ben', 'Cleo']));
     d.by('Ann', 'ready', { photos: ['a1', 'a2'] }).by('Ben', 'ready', { photos: ['b1'] }).by('Cleo', 'ready', { photos: [] });
     expect(d.room).toMatchObject({ phase: 'countdown', game: { round: 0 } });
@@ -302,7 +367,7 @@ describe('the deal at the 3-2-1, and the photos ahead', () => {
     // The photos are the players' until the game starts, but every phone may load them now.
     expect(referencedPhotoIds(d.room).sort()).toEqual(['a1', 'a2', 'b1']);
     expect(['a1', 'a2', 'b1'].every((id) => isServablePhoto(d.room, id))).toBe(true);
-    // Ben says Yes to other photos: the deal no longer holds, a new 3-2-1 deals them.
+    // Ben says Yes to other photos: the deal no longer holds, a new start deals them.
     d.wait(1000).by('Ben', 'ready', { photos: ['b9'] });
     expect(d.room).toMatchObject({ phase: 'countdown', deadline: d.now + TIMING.countdownMs });
     expect(d.room.game.plan.map((e) => e.photo)).toContain('b9');
@@ -319,7 +384,7 @@ describe('the deal at the 3-2-1, and the photos ahead', () => {
   test('phones that load ahead: round 1 starts when all are ready, a leaderboard waits for the next round, at most the load limit', () => {
     const d = driver(roomWith(['Ann', 'Ben'], { ahead: true }));
     d.by('Ann', 'ready', { photos: ['a1', 'a2', 'a3'] }).by('Ben', 'ready', { photos: ['b1', 'b2', 'b3'] });
-    // Both loaded what round 1 needs during the 3-2-1: it shows at once.
+    // Both loaded what round 1 needs before the 3-2-1: it shows the moment the 3-2-1 ends.
     d.by('Ann', 'loaded', { round: 1 }).by('Ben', 'loaded', { round: 1 }).wait(TIMING.countdownMs);
     expect(d.room).toMatchObject({ phase: 'show', game: { round: 1 } });
     // The leaderboard's time is up and Ben is not ready for round 2: it waits, without a timer.

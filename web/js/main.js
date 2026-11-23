@@ -31,9 +31,13 @@
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
  *   terms are accepted), the photo bucket fills by itself (`photos.startPhotos`), for the
  *   room's "Which photos" and "Photos per player" or this phone's own settings, and rests
- *   while a game runs (`syncPhotoNeeds`). "Yes" sends no more photos than the game can show
- *   of this player (`sendCount`) and shows how far it is (`session.progress`): the big
- *   versions getting ready, then the upload.
+ *   while a game runs (`syncPhotoNeeds`).
+ * - "Yes" never waits (`readyWith`): the player is ready at once and tells the room so
+ *   (`sending`, with the id the upload carries), then the photos go in the background, no
+ *   more than the game can show of this player (`sendCount`). Only if the group then waits
+ *   for them does the start show how far they are (`views/overlays.js` `startScreen`).
+ *   "Change" cancels an upload still on its way. Every hello names the upload in flight,
+ *   so the room never waits for one this phone no longer sends.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from the round's timer on the server's clock (`clock.js`,
@@ -59,7 +63,7 @@
 
 import { CLOSE } from '../shared/api.js';
 import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
-import { shuffle } from '../shared/random.js';
+import { makeId, shuffle } from '../shared/random.js';
 import { createRoom, uploadPhotos } from './api.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
@@ -79,7 +83,7 @@ import { landingScreen } from './views/landing.js';
 import { lobbyScreen } from './views/lobby.js';
 import { newGameScreen } from './views/newgame.js';
 import { boardScreen } from './views/board.js';
-import { awayScreen, bannerHtml, countdownHtml, joiningScreen, lookScreen } from './views/overlays.js';
+import { awayScreen, bannerHtml, joiningScreen, lookScreen, startScreen } from './views/overlays.js';
 import { inviteLink, sheetScreen } from './views/sheets.js';
 import { welcomeScreen } from './views/welcome.js';
 
@@ -87,6 +91,7 @@ const $ = (id) => document.getElementById(id);
 const paintApp = createPainter($('app'));
 const paintSheet = createPainter($('sheet'));
 const paintLook = createPainter($('look'));
+const paintCover = createPainter($('cover'));
 
 let socket = null;
 let lastReactAt = 0;
@@ -133,6 +138,17 @@ function loadShare(v) {
   const counted = v.me.loaded >= target;
   const others = v.waiting.ready - (counted ? 1 : 0);
   return (others + (counted ? 1 : shareFor(v.round.n, v.upcoming, target))) / v.waiting.of;
+}
+
+/**
+ * While the start waits for photos still on their way (`view.uploads`), how far the group
+ * is, 0 to 1: the others by whether theirs are in, this phone by how much of its upload is
+ * sent (`session.sending`); else null.
+ */
+function sendShare(v) {
+  if (!v || !v.uploads || !v.uploads.of) return null;
+  const mine = v.me.sending && session.sending ? session.sending.share : 0;
+  return (v.uploads.done + mine) / v.uploads.of;
 }
 
 // ---------- Rendering ----------
@@ -299,8 +315,8 @@ function render() {
   if (changed.includes('podium')) startPodium();
   paintSheet(sheetScreen(context()));
   // The 3-2-1 paints a new number each second: each one is felt, a little longer than a tap.
-  const cover = countdownHtml(session.view, leftNow());
-  if (setHtml($('cover'), cover) && cover) buzz('count');
+  const start = startScreen(session.view, leftNow(), sendShare(session.view));
+  if (paintCover(start).includes('count') && start.parts.count) buzz('count');
   paintLook(lookScreen(lookLayers()));
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
@@ -320,9 +336,14 @@ function frame() {
 
 // ---------- Room ----------
 
-/** The first message of every connection; `ahead`: this app loads the game's photos ahead (`upcoming.js`). */
+/**
+ * The first message of every connection; `ahead`: this app loads the game's photos ahead
+ * (`upcoming.js`); `uploading`: its upload still on its way, so the room waits for that one
+ * and no other (`readyWith`).
+ */
 function hello() {
-  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true };
+  const uploading = session.sending ? session.sending.upload : null;
+  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true, uploading };
 }
 
 function openSocket(code) {
@@ -344,6 +365,7 @@ function enterRoom(code) {
 function exitRoom(message, { forget = false } = {}) {
   if (socket) socket.end();
   socket = null;
+  cancelSending();
   Object.assign(session, { code: null, view: null, sheet: null, pick: null, conn: 'connecting', shownAt: {} });
   device.room = null;
   if (forget) device.lastRoom = null;
@@ -388,7 +410,7 @@ function onEnd(code) {
  * Tells the room the round this phone is ready for (it holds that round's photo,
  * `upcoming.readyFor`), counted no further than the round after the one on screen: the
  * furthest the room ever waits for. So a phone sends one message per round (during the
- * 3-2-1 for round 1, then in each round for the next), however fast its photos arrive, and
+ * start for round 1, then in each round for the next), however fast its photos arrive, and
  * never one the room already has or that is still on its way (`reported`).
  */
 function reportReady() {
@@ -488,7 +510,7 @@ function photoSettings(v) {
 
 /**
  * What the photo bucket gathers for: the room's "Which photos" and "Photos per player" in a
- * game, else this phone's own for its next one. It rests from the 3-2-1 until the end
+ * game, else this phone's own for its next one. It rests from the start until the end
  * screen: the game's photos need the phone then, and nobody chooses photos.
  */
 function syncPhotoNeeds() {
@@ -507,14 +529,15 @@ function syncPhotoNeeds() {
 function sendCount(v) {
   const s = normalizeSettings(v.settings);
   if (!s.rounds) return photos.chosen.length;
-  const owners = Math.max(1, v.players.filter((p) => !(p.ready && p.photoCount === 0)).length);
+  // Everyone may still bring photos but those who said "Yes" without any.
+  const owners = Math.max(1, v.players.filter((p) => !(p.ready && !p.sending && p.photoCount === 0)).length);
   return s.fair ? Math.max(Math.ceil(s.rounds / owners), balancedRange(s.rounds, owners).high) : s.rounds;
 }
 
 /** Deals a fresh set when the lobby needs one and the app may read photos. */
 function dealIfNeeded() {
   const v = session.view;
-  if (!v || !v.me || !inLobby(v) || v.me.ready || v.me.onResults || session.uploading) return;
+  if (!v || !v.me || !inLobby(v) || v.me.ready || v.me.onResults || session.sending) return;
   if (session.access === null) {
     checkAccess();
     return;
@@ -548,35 +571,51 @@ async function checkAccess() {
 }
 
 /**
- * "Yes" (or playing without photos): waits for the photos' big versions, then uploads
- * them, showing how far it is in place of No and Yes (`session.progress`).
+ * "Yes" (or playing without photos, `count` 0): the player is ready at once. The room hears
+ * it first (`sending`, with a new upload id), then the photos' big versions are gathered
+ * (`blobsOf`; usually there already) and uploaded in the background with that id. The lobby
+ * shows "✓ Ready" meanwhile, and the start shows how far the upload is only if the group
+ * waits for it. If it fails, the player is not ready any more (the room hears "unready")
+ * and is told; after "Change" (`cancelSending`) it ends without a word. It holds nothing
+ * of the room across its waits: what it finds afterwards it reads from `session` again.
  */
-async function readyWith(blobsOf) {
-  if (session.uploading || !session.code) return;
-  session.uploading = true;
-  const step = (label) => (share) => {
-    session.progress = { label, share };
-    render();
-  };
-  step('Getting photos ready')(0);
+async function readyWith(count, blobsOf) {
+  if (session.sending || !session.code) return;
+  const code = session.code;
+  const job = { upload: makeId(Math.random, 16), count, share: 0, stop: new AbortController() };
+  session.sending = job;
+  send({ type: 'sending', upload: job.upload });
+  render();
+  let problem = 'Upload failed. Try again.';
   try {
     let blobs;
     try {
-      blobs = await blobsOf(step('Getting photos ready'));
+      blobs = await blobsOf();
     } catch {
-      toast('These photos would not load. Tap No for others.');
-      return;
+      problem = 'These photos would not load. Tap No for others.';
+      throw new Error('unreadable');
     }
-    // The label turns at once: the first upload progress can take a moment to come.
-    step('Sending photos')(0);
-    await uploadPhotos(session.code, keyFor(session.code), blobs, step('Sending photos'));
+    if (session.sending !== job) return;
+    const onProgress = (share) => {
+      job.share = share;
+      render();
+    };
+    await uploadPhotos(code, keyFor(code), blobs, { upload: job.upload, signal: job.stop.signal, onProgress });
   } catch {
-    toast('Upload failed. Try again.');
+    if (session.sending !== job) return;
+    send({ type: 'unready' });
+    toast(problem);
   } finally {
-    session.uploading = false;
-    session.progress = null;
+    if (session.sending === job) session.sending = null;
     render();
   }
+}
+
+/** "Change" (or leaving the room): an upload still on its way is cancelled and will not count. */
+function cancelSending() {
+  const job = session.sending;
+  session.sending = null;
+  if (job) job.stop.abort();
 }
 
 // ---------- Actions ----------
@@ -717,20 +756,29 @@ const ACTIONS = {
     render();
   },
   opensettings: openSettings,
-  guess: () => readyWith(async () => []),
+  guess: () => readyWith(0, async () => []),
   no: () => {
     const v = session.view;
     if (!v || !v.me) return;
     const { size, filter } = photoSettings(v);
     roll(size, filter, render);
   },
-  yes: () => readyWith((onProgress) => chosenBlobs(sendCount(session.view), onProgress)),
+  yes: () => {
+    const v = session.view;
+    if (!v || !v.me) return;
+    const count = Math.min(sendCount(v), photos.chosen.length);
+    readyWith(count, () => chosenBlobs(count));
+  },
   /** A tap on a photo of the choice: it flips to another one (a light tap), or the refusal is felt twice. */
   swap: (index) => {
-    if (session.uploading) return;
+    if (session.sending) return;
     buzz(swap(Number(index), render) ? 'tap' : 'no');
   },
-  unready: () => send({ type: 'unready' }),
+  unready: () => {
+    cancelSending();
+    send({ type: 'unready' });
+    render();
+  },
   answer: (id) => {
     const v = session.view;
     if (!v || v.phase !== 'show' || myPick(v) || isLate(v)) return;

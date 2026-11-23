@@ -89,21 +89,38 @@ test('a flag: the others learn only that the photo is flagged, the flagger also 
   expect(Object.keys(other.round.flag).sort()).toEqual(['left', 'mine']);
 });
 
-test('the photos a phone may load: the whole game from the 3-2-1 on, then from the round on screen, and nothing about owners', () => {
+test('a "Yes" shows as ready at once, and the start says how many have their photos in', () => {
+  let room = roomWith(['Ann', 'Ben']);
+  const [ann, ben] = room.players.map((p) => p.id);
+  room = apply(room, { type: 'sending', playerId: ann, upload: 'annupload01' }, T0, rng);
+  expect(viewFor(room, ben, T0)).toMatchObject({ phase: 'lobby', uploads: null, players: [{ ready: true, sending: true, photoCount: 0 }, { ready: false, sending: false }] });
+  // Everyone said Yes, Ann's photos are still on their way: the start waits, without a 3-2-1 yet.
+  room = apply(room, { type: 'ready', playerId: ben, photos: [] }, T0, rng);
+  expect(viewFor(room, ann, T0)).toMatchObject({ phase: 'countdown', uploads: { done: 1, of: 2 }, me: { ready: true, sending: true }, left: null, upcoming: [] });
+  // Her photos are in: dealt, and (her phone does not load ahead) the 3-2-1 runs.
+  room = apply(room, { type: 'ready', playerId: ann, photos: ['a1'], upload: 'annupload01' }, T0 + 1000, rng);
+  expect(viewFor(room, ann, T0 + 1000)).toMatchObject({ phase: 'countdown', uploads: null, me: { ready: true, sending: false }, total: TIMING.countdownMs });
+});
+
+test('the photos a phone may load: the whole game from the deal on, then from the round on screen, and nothing about owners', () => {
   let room = roomWith(['Ann', 'Ben', 'Cleo'], { ahead: true });
   room.players.forEach((p, i) => {
     room = apply(room, { type: 'ready', playerId: p.id, photos: [`p${i}`] }, T0, rng);
   });
   const link = (e) => `/api/rooms/ABCD/photos/${e.photo}`;
   const dealt = viewFor(room, idOf(room, 'Ann'), T0);
-  expect(dealt).toMatchObject({ phase: 'countdown', upcoming: room.game.plan.map(link), waiting: null, me: { loaded: 0 } });
-  // The 3-2-1 is over: round 1 waits for the phones; Ann is ready for it.
+  // The start's wait for the first photo is not counted to the apps (every report would repaint every phone).
+  expect(dealt).toMatchObject({ phase: 'countdown', upcoming: room.game.plan.map(link), waiting: null, left: null, me: { loaded: 0 } });
+  // Only Ann gets the first photo: the start waits the load limit, then the 3-2-1, then round 1
+  // waits for the phones, and Ann is ready for it.
   room = apply(room, { type: 'loaded', playerId: idOf(room, 'Ann'), round: 1 }, T0, rng);
-  room = apply(room, { type: 'tick' }, T0 + TIMING.countdownMs, rng);
-  const ann = viewFor(room, idOf(room, 'Ann'), T0 + TIMING.countdownMs);
+  room = apply(room, { type: 'tick' }, T0 + TIMING.loadMaxMs, rng);
+  const start = T0 + TIMING.loadMaxMs + TIMING.countdownMs;
+  room = apply(room, { type: 'tick' }, start, rng);
+  const ann = viewFor(room, idOf(room, 'Ann'), start);
   expect(ann).toMatchObject({ phase: 'load', waiting: { ready: 1, of: 3 }, me: { loaded: 1 } });
   // Round 1's photo is deleted: the list starts at round 2, the deleted one is gone from it.
-  room = apply(room, { type: 'report', playerId: idOf(room, 'Ben') }, T0 + TIMING.countdownMs, rng);
-  expect(viewFor(room, idOf(room, 'Ann'), T0 + TIMING.countdownMs).upcoming).toEqual(room.game.plan.slice(1).map(link));
+  room = apply(room, { type: 'report', playerId: idOf(room, 'Ben') }, start, rng);
+  expect(viewFor(room, idOf(room, 'Ann'), start).upcoming).toEqual(room.game.plan.slice(1).map(link));
   expect(JSON.stringify(ann.upcoming)).not.toContain(idOf(room, 'Ann'));
 });

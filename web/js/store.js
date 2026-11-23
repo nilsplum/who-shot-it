@@ -92,7 +92,7 @@ export const session = {
   avatarOrder: [],
   /** The setting whose "?" explanation is open in the settings sheet, or null. */
   helpKey: null,
-  /** The player the host is about to remove ('remove' sheet). */
+  /** The player about to be removed ('remove' sheet). */
   target: null,
   /** The round whose photo this phone flagged, while its report sheet is open; else null. */
   flagged: null,
@@ -114,8 +114,11 @@ export const session = {
   pick: null,
   /** performance.now() when each photo was first shown, for effects without a timer. */
   shownAt: {},
-  uploading: false,
-  /** While "Yes" works: how far it is (`share`, 0 to 1) and at what (`label`), shown in place of No and Yes; else null. */
-  progress: null,
+  /**
+   * This phone's "Yes" while its photos are on their way (`main.js` `readyWith`): `{ upload
+   * (its id, also in every hello), count (photos it sends), share (how much is sent, 0 to
+   * 1), stop (an AbortController, for "Change") }`; else null.
+   */
+  sending: null,
   creating: false,
 };

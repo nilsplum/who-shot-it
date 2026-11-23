@@ -10,8 +10,8 @@
  * Invariants: the player's key travels only in the `Authorization` header, never in a
  * URL. Every call has a timeout, and a failed call throws, so the caller can show one
  * short message and let the player try again. The upload goes through `XMLHttpRequest`,
- * the one way a page learns how much of a body is sent (`fetch` cannot tell), so "Yes"
- * shows a real percentage.
+ * the one way a page learns how much of a body is sent (`fetch` cannot tell), so the start
+ * shows a real percentage while the group waits for this phone's photos.
  */
 
 import { API } from '../shared/api.js';
@@ -38,11 +38,14 @@ export async function createRoom(settings) {
 }
 
 /**
- * "Yes": the chosen JPEGs become the player's set and the player is ready (none = just
- * guess). `onProgress` hears how much is sent, 0 to 1.
+ * The upload after "Yes": the chosen JPEGs become the player's set and the player is ready
+ * (none = just guess), if `upload` is still the "Yes" the room knows (`sending`, see
+ * `web/shared/api.js`). `onProgress` hears how much is sent, 0 to 1; `signal` cancels it
+ * ("Change").
  */
-export function uploadPhotos(code, key, blobs, onProgress = () => {}) {
+export function uploadPhotos(code, key, blobs, { upload, signal, onProgress = () => {} }) {
   const form = new FormData();
+  form.append('upload', upload);
   blobs.forEach((blob, i) => form.append('photo', blob, `${i + 1}.jpg`));
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -55,6 +58,8 @@ export function uploadPhotos(code, key, blobs, onProgress = () => {}) {
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
     xhr.onerror = () => reject(new Error('network'));
     xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.onabort = () => reject(new Error('cancelled'));
+    if (signal) signal.addEventListener('abort', () => xhr.abort(), { once: true });
     xhr.send(form);
   });
 }

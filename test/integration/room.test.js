@@ -68,8 +68,10 @@ async function connect(code, name) {
   return player;
 }
 
-function upload(code, key, blobs) {
+/** The upload after "Yes"; `id` is the one the app said with `sending` (none: an app that does not say so). */
+function upload(code, key, blobs, id = null) {
   const form = new FormData();
+  if (id) form.append('upload', id);
   blobs.forEach((b, i) => form.append('photo', new Blob([b], { type: 'image/jpeg' }), `${i}.jpg`));
   return call(API.photos(code), { method: 'PUT', headers: { Authorization: `Bearer ${key}` }, body: form });
 }
@@ -166,6 +168,23 @@ describe('uploads', () => {
     await ann.until((v) => !v.me.ready);
     expect(await countRows(code, 'photos')).toBe(0);
   });
+
+  test('"Yes" counts at once; an upload that "Change" overtook is refused, and its photos go at once', async () => {
+    const code = await createRoom({ photos: 4 });
+    const ann = await connect(code, 'Ann');
+    await ann.until((v) => v.me);
+    ann.send({ type: 'sending', upload: 'annupload001' });
+    await ann.until((v) => v.me.ready && v.me.sending);
+    ann.send({ type: 'unready' });
+    await ann.until((v) => !v.me.ready);
+    expect((await upload(code, ann.key, JPEGS, 'annupload001')).status).toBe(409);
+    expect(await countRows(code, 'photos')).toBe(0);
+    ann.send({ type: 'sending', upload: 'annupload002' });
+    await ann.until((v) => v.me.sending);
+    expect((await upload(code, ann.key, JPEGS, 'annupload002')).status).toBe(204);
+    await ann.until((v) => v.me.ready && !v.me.sending && v.me.photoCount === 2);
+    expect(await countRows(code, 'photos')).toBe(2);
+  });
 });
 
 describe('what the room stores and sends', () => {
@@ -199,7 +218,7 @@ describe('what the room stores and sends', () => {
     const dealt = { ann: views(ann), ben: views(ben) };
     ann.send({ type: 'loaded', round: 1 });
     await ann.until((v) => v.me.loaded === 1);
-    // A change both see (the host's setting, which also starts the 3-2-1 over): one view each.
+    // A change both see (the host's setting, which also begins the start again): one view each.
     ann.send({ type: 'setting', key: 'rounds', value: 5 });
     await ben.until((v) => v.settings.rounds === 5);
     await ann.until((v) => v.settings.rounds === 5);
@@ -209,14 +228,14 @@ describe('what the room stores and sends', () => {
 });
 
 describe('a full game', () => {
-  test('countdown, rounds, photo access, reveal, end, and every photo deleted', async () => {
+  test('start, rounds, photo access, reveal, end, and every photo deleted', async () => {
     const code = await createRoom({ photos: 4, auto: false });
     const ann = await connect(code, 'Ann');
     const ben = await connect(code, 'Ben');
     await ann.until((v) => v.players.length === 2);
     expect((await upload(code, ann.key, JPEGS)).status).toBe(204);
     expect((await upload(code, ben.key, [JPEGS[0]])).status).toBe(204);
-    // The 3-2-1 deals the game: from now on every phone may load all of its photos, and
+    // The start deals the game: from now on every phone may load all of its photos, and
     // nothing on the way may store them.
     const dealt = await ann.until((v) => v.phase === 'countdown');
     expect(dealt.upcoming).toHaveLength(3);

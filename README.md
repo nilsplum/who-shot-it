@@ -80,8 +80,10 @@ would be okay with). "Create game", pick Classic or Tricky (or tune the settings
 game": a 4-letter code (no look-alike letters). Friends join with the code, a shared link
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
-lobby → 3-2-1 once everyone (at least two) is ready (the game is dealt then: which photos,
-in which random order) → per round *load* (every phone holds the photo) → *show* →
+lobby → start once everyone (at least two) said "Yes" (*Get ready*: the photos still on
+their way come in, the game is dealt, which photos in which random order, and every phone
+gets the first photo; then the 3-2-1, the same on every phone) → per round *load* (every
+phone holds the photo, at once for round 1) → *show* →
 *reveal* → *board* (the leaderboard; holding "Show again" shows the photo to everyone and
 stops the clock; when its time is up it waits until every phone holds the next round's
 photo) → *end*. The last photo's reveal goes straight to *end*, and the board before it says
@@ -98,13 +100,16 @@ player needs things (what a finger holds, then the set being dealt, then the set
 then the bucket), so No, a swap and Yes never wait; holding a photo shows it big and
 sharpens it in place. The host's "Which photos" decides what may come up: all, little text
 (default: photos with 6 or more lines of text, like chats and emails, stay out) or no
-screenshots either; the check runs on the phone. Yes uploads photos shown, as many as the
-game can show of this player, shrunk to at most 1080 px JPEG without location data. A photo is deleted right after its round (its reveal and leaderboard), and
-also when reported, on "Change", "Leave", removal, a new photo count and at the game's end.
+screenshots either; the check runs on the phone. Yes makes the player ready at once; the
+photos shown (as many as the game can show of this player, shrunk to at most 1080 px JPEG
+without location data) upload in the background ("Change" cancels it; the start shows how
+far it is only if the group waits for it). A photo is deleted right after its round (its
+reveal and leaderboard), and also when reported, on "Change", "Leave", removal, a new photo
+count and at the game's end.
 A room keeps its code for 24 hours after its last activity, even when everyone left, so the
-same group can play again the next day; then it is deleted. From the 3-2-1 on, every phone
-loads the game's photos in play order and keeps them in memory only; a photo's link works
-only until its round is over.
+same group can play again the next day; then it is deleted. From the game's deal on (right
+before the 3-2-1), every phone loads the game's photos in play order and keeps them in
+memory only; a photo's link works only until its round is over.
 
 **Keeping it friendly.** Anyone can flag the photo on screen (⚑): the others stop seeing
 it and the round waits; Delete photo deletes it for everyone at once, and after 15 s it goes

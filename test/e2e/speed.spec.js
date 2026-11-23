@@ -42,6 +42,8 @@ const LIMITS = {
   /** The preview shows at once; the sharp version follows (a photo kept only in iCloud downloads first). */
   heldPreview: 500,
   heldSharp: 5000,
+  /** "Yes" makes the player ready at once: no bar, the photos go in the background. */
+  ready: 300,
   yes: 3000,
   /** How long the room may stand in `load` (or a leaderboard wait) for phones that all kept up. */
   roomWait: 1000,
@@ -78,10 +80,13 @@ function measure() {
     }
   };
   document.addEventListener('DOMContentLoaded', () => {
+    // Each number of the 3-2-1 as it is painted (a new element each, `views/overlays.js`).
     const cover = document.getElementById('cover');
+    let number = null;
     new MutationObserver(() => {
-      const n = cover.textContent.trim();
-      if (n) m.cover.push([now(), n]);
+      const n = cover.querySelector('[data-count]');
+      if (n && n !== number) m.cover.push([now(), n.textContent.trim()]);
+      number = n;
     }).observe(cover, { childList: true, subtree: true, characterData: true });
     // Each round's photo, the moment it is on screen (`data-round` comes with the photo, views/game.js).
     let last = null;
@@ -171,9 +176,14 @@ test('a game at phone speed: what the players wait for stays within its limits',
     report.preview = Math.max(0, (await msUntil(host, () => document.querySelectorAll('#look img').length >= 1)) - 350);
     report.sharp = report.preview + (await msUntil(host, () => document.querySelectorAll('#look img').length >= 2));
     await host.mouse.up();
-    // Yes: Ann is the last one, so her photos being sent starts the 3-2-1.
+    // Yes: Ann is the last one, so the start begins: her photos still on their way, then the
+    // first photo on every phone, then the 3-2-1.
     await host.getByRole('button', { name: 'Yes' }).click();
-    report.yes = await msUntil(host, () => document.getElementById('cover').textContent.trim() !== '', null, 60_000);
+    const tapped = Date.now();
+    await msUntil(host, () => document.getElementById('app').textContent.includes('✓ Ready'));
+    report.ready = Date.now() - tapped;
+    await msUntil(host, () => Boolean(document.querySelector('#cover [data-count]')), null, 60_000);
+    report.yes = Date.now() - tapped;
     // The game: everyone answers each photo at once, so the rounds run on the room's own timers.
     for (let round = 1; round <= ROUNDS; round++) {
       await expect(host.getByText(`${round} / ${ROUNDS}`, { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -216,7 +226,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
     `  first set after entering the lobby  ${report.firstSet} ms`,
     `  "No" ${SKIPS} times, a glance apart     ${report.no.join(', ')} ms`,
     `  holding a photo: preview, sharp     ${report.preview} ms, ${report.sharp} ms`,
-    `  "Yes" until the 3-2-1               ${report.yes} ms`,
+    `  "Yes" until "✓ Ready", the 3-2-1     ${report.ready} ms, ${report.yes} ms`,
     `  the 3-2-1 as painted                ${report.countdown}`,
     `  the room waiting for phones         ${report.roomWaits.map((w) => `${w.label} ${w.ms} ms`).join(', ') || 'never'}`,
     `  leaderboards                        ${report.boards.join(', ')} ms`,
@@ -232,6 +242,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
   for (const ms of report.no) expect(ms, '"No"').toBeLessThanOrEqual(LIMITS.no);
   expect(report.preview, 'a held photo\'s preview').toBeLessThanOrEqual(LIMITS.heldPreview);
   expect(report.sharp, 'a held photo turning sharp').toBeLessThanOrEqual(LIMITS.heldSharp);
+  expect(report.ready, '"Yes" until "✓ Ready"').toBeLessThanOrEqual(LIMITS.ready);
   expect(report.yes, '"Yes" until the 3-2-1').toBeLessThanOrEqual(LIMITS.yes);
   expect(report.countdown, 'the 3-2-1, each number once').toBe('3 2 1');
   for (const w of report.roomWaits) expect(w.ms, `the room waiting (${w.label})`).toBeLessThanOrEqual(LIMITS.roomWait);

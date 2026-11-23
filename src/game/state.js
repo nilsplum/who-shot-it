@@ -21,34 +21,29 @@
  *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline,
  *     players: [Player], banned: [key], game: Game | null, final: Final | null }
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
- *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, photos: [id],
+ *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, sending, photos: [id],
  *             score, streak, onResults, ahead }
- *   (onResults: still on the last game's end screen; ahead: the app loads the game's
- *   photos ahead and says which round it is ready for, see `holdsRound`)
+ *   (ready: their chosen photos are in; sending: they said "Yes" and their photos are on
+ *   their way, the id their upload carries, else null; onResults: still on the last game's
+ *   end screen; ahead: the app loads the game's photos ahead and says which round it is
+ *   ready for, see `holdsRound`)
  *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: { [id]: round }, waiting, shownAt,
  *             results: { [id]: { pick, points } } | null,
  *             peeks: { [id]: until }, flag: { by, until } | null, pausedAt: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
- *   (The game exists from the 3-2-1 on: it is dealt then, `round` 0 until it starts.
- *   `loaded`: the round each phone is ready for; `waiting`: a leaderboard whose time is up
- *   waits for the phones to be ready for the next round. `peeks`: who holds "Show again"
+ *   (The game exists from its deal on: once everyone's photos are in during the start
+ *   (`countdown`), `round` 0 until it starts. `loaded`: the round each phone is ready for;
+ *   `waiting`: during the start, the phones are getting the first photo before the 3-2-1;
+ *   in a game, a leaderboard whose time is up waits for the phones to be ready for the next
+ *   round. `peeks`: who holds "Show again"
  *   and until when; `flag`: who flagged the photo on screen and when it is deleted unless
  *   they cancel. While either holds the round, its clock stands still: `pausedAt` says
  *   since when, `rules.js` `settleClock`.)
  */
 
 import { BLOCKED_WORDS, EMOJIS, LIMITS, TIMING, normalizeSettings } from '../../web/shared/config.js';
-
-const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-/** A random id from `rng` (the server passes a crypto-backed one, so ids are unguessable). */
-export function makeId(rng, length = 12) {
-  let id = '';
-  for (let i = 0; i < length; i++) id += ID_ALPHABET[Math.floor(rng() * ID_ALPHABET.length)];
-  return id;
-}
 
 /** A room code from the unambiguous code alphabet. */
 export function makeCode(rng) {
@@ -84,6 +79,7 @@ export function newPlayer({ id, key, name, avatar, now, ahead = false }) {
     connected: true,
     goneAt: null,
     ready: false,
+    sending: null,
     photos: [],
     score: 0,
     streak: 0,
@@ -147,8 +143,9 @@ export function nextEntry(room) {
 }
 
 /**
- * The plan entries every phone may load now, in play order: from the 3-2-1 on (the game is
- * dealt) all of them, during a game the round on screen and every later one; else none.
+ * The plan entries every phone may load now, in play order: from the deal on (the game's
+ * start, right before its 3-2-1) all of them, during a game the round on screen and every
+ * later one; else none.
  * The one answer to "which photos may reach the phones": the photo route serves exactly
  * these (`isServablePhoto`) and the view lists them (`view.upcoming`). All of them become
  * loadable at the same moment and in a random order, so nothing tells whose a photo is.
@@ -166,14 +163,15 @@ export function answerTimeMs(settings, untimedReferenceMs) {
 
 /**
  * The full length of the timer the players see in the room's phase (ms), or null when the
- * phase has none: the 3-2-1, the answer time (when there is a clock), the reveal, and the
- * leaderboard (when the next round comes by itself, and not while it waits for the phones'
- * photos). The one place that says how long each phase's timer runs: `rules.js` sets its
- * deadlines from it, `view.js` hands it to the apps as the timer bar's length.
+ * phase has none: the 3-2-1 (not while the start still waits for photos or phones), the
+ * answer time (when there is a clock), the reveal, and the leaderboard (when the next round
+ * comes by itself, and not while it waits for the phones' photos). The one place that says
+ * how long each phase's timer runs: `rules.js` sets its deadlines from it, `view.js` hands
+ * it to the apps as the timer bar's length.
  */
 export function timerMs(room) {
   switch (room.phase) {
-    case 'countdown': return TIMING.countdownMs;
+    case 'countdown': return room.game && !room.game.waiting ? TIMING.countdownMs : null;
     case 'show': return room.settings.time ? room.settings.time * 1000 : null;
     case 'reveal': return TIMING.revealMs;
     case 'board': return room.settings.auto && !room.game.waiting ? TIMING.boardMs : null;
@@ -182,7 +180,7 @@ export function timerMs(room) {
 }
 
 /**
- * Every photo id the room still needs. Lobby and 3-2-1: each ready player's chosen photos
+ * Every photo id the room still needs. Lobby and start: each ready player's chosen photos
  * (they are theirs until the game starts). During a game: the photo on screen and all
  * photos of later rounds (earlier ones are deleted as soon as their round is over). After
  * the game: none.
@@ -218,9 +216,11 @@ export function phonesReady(room, r) {
 }
 
 /**
- * While the room waits for the phones' photos, which round it waits for and how many
- * phones hold it: `{ round, ready, of }`, else null. It waits in `load` (for that round) and
- * on a leaderboard whose time is up (`game.waiting`, for the next round).
+ * While a game waits for the phones' photos, which round it waits for and how many phones
+ * hold it: `{ round, ready, of }`, else null. It waits in `load` (for that round) and on a
+ * leaderboard whose time is up (`game.waiting`, for the next round). The start's own wait
+ * for the first photo is not counted to the apps: it is short, and every phone's report
+ * would otherwise repaint every phone (`view.js`).
  */
 export function photoWait(room) {
   const g = room.game;
@@ -228,11 +228,36 @@ export function photoWait(room) {
   return r === null ? null : { round: r, ...phonesReady(room, r) };
 }
 
-/** Everyone (at least two) is here and ready, and at least one photo is in the game. */
-export function canStart(room) {
+/** The player said "Yes" (or "Play without photos"): their photos are in, or on their way. */
+export const saidYes = (p) => p.ready || Boolean(p.sending);
+
+/**
+ * The game may start: everyone (at least two) is here and said "Yes", and at least one
+ * photo is in the game or on its way.
+ */
+export function everyoneSaidYes(room) {
   if (room.phase !== 'lobby' && room.phase !== 'countdown') return false;
   const ps = room.players;
   return ps.length >= LIMITS.minPlayers
-    && ps.every((p) => p.connected && p.ready)
-    && ps.some((p) => p.photos.length > 0);
+    && ps.every((p) => p.connected && saidYes(p))
+    && ps.some((p) => p.photos.length > 0 || p.sending);
 }
+
+/** Every photo is in: nobody's upload is still on its way, so the game can be dealt. */
+export const photosIn = (room) => room.players.every((p) => !p.sending);
+
+/**
+ * While the start waits for photos still on their way: how many of the players who said
+ * "Yes" have their photos in, `{ done, of }`; else null.
+ */
+export function uploadWait(room) {
+  if (room.phase !== 'countdown' || room.game) return null;
+  return { done: room.players.filter((p) => p.ready).length, of: room.players.length };
+}
+
+/**
+ * An upload's id as the app makes it (`makeId`, `web/js/main.js` "Yes"): it only tells one
+ * upload of this player from another, so it needs no secrecy (the player's key authorises
+ * the upload).
+ */
+export const isUploadId = (value) => typeof value === 'string' && /^[a-z0-9]{8,32}$/.test(value);

@@ -11,7 +11,7 @@
  *   photos". The next set, the front of the bucket, also gets its big versions ahead
  *   (`phone.photo`, the upload size), from photos stored on the phone only. The bucket
  *   gathers for the room's "Which photos" and "Photos per player", or this phone's own
- *   settings outside a game, and rests from the 3-2-1 until the end screen, when the game's
+ *   settings outside a game, and rests from the start until the end screen, when the game's
  *   photos need the phone and nobody chooses (`setNeeds`).
  * - One list of work, in the order of what a player waits for (`pick`), done by one worker
  *   per kind of work on `loader.js`, so a slow job never holds up a quick one of another kind:
@@ -425,20 +425,15 @@ export function heldLayers(index) {
 /**
  * The big versions "Yes" sends: `count` of the set on screen (at most as many as the game
  * can show of this player, `main.js`), those already there first, in the set's order. Waits
- * only while fewer than that are ready and more may come, telling `onProgress` how far it is
- * (0 to 1). Throws when none of them could be read.
+ * only while fewer than that are ready and more may come (the player sees "✓ Ready"
+ * meanwhile: the upload runs in the background). Throws when none of them could be read.
  */
-export async function chosenBlobs(count, onProgress = () => {}) {
+export async function chosenBlobs(count) {
   const set = photos.chosen;
   const want = Math.min(count, set.length);
   const ready = () => set.filter((c) => c.full);
   const settled = () => set.filter((c) => c.full || c.failed === true).length;
-  const report = () => onProgress(want ? Math.min(1, ready().length / want) : 1);
-  report();
-  await until(() => {
-    report();
-    return ready().length >= want || settled() === set.length || photos.chosen !== set;
-  });
+  await until(() => ready().length >= want || settled() === set.length || photos.chosen !== set);
   const blobs = ready().slice(0, want).map((c) => c.full);
   if (want && !blobs.length) throw new Error('unreadable');
   return blobs;

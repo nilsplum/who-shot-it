@@ -259,13 +259,13 @@ export function balancedRange(count, owners) {
 
 /** All durations in milliseconds. The server owns every timer; apps only display them. */
 export const TIMING = {
-  /** 3-2-1 before the first round once everyone is ready. */
+  /** The 3-2-1 before the first round, once every phone holds its photo (`src/game/rules.js`, the start). */
   countdownMs: 3000,
   /**
-   * Longest wait for every phone to hold the photo of the round about to start: before
-   * round 1 shows, and after a leaderboard's time is up. Every phone loads the whole game's
-   * photos from the 3-2-1 on, in play order (`web/js/upcoming.js`), so the room only waits
-   * for a phone far behind; that one catches up while the others play.
+   * Longest wait for every phone to hold the photo of the round about to start: before the
+   * 3-2-1 (the start), when round 1 shows, and after a leaderboard's time is up. Every phone
+   * loads the whole game's photos from the deal on, in play order (`web/js/upcoming.js`), so
+   * the room only waits for a phone far behind; that one catches up while the others play.
    */
   loadMaxMs: 6000,
   /** Extra time after the answer timer, for answers still on the wire. */

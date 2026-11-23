@@ -158,7 +158,7 @@
   --animate-burst: burst 0.9s ease-out forwards; /* a confetti piece */
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
-  --animate-count: count 1s ease-out infinite; /* the 3-2-1 */
+  --animate-count: count 1s ease-out; /* a number of the 3-2-1, once (each number is a new element) */
   --animate-beacon: beacon 1.6s ease-in-out infinite; /* an offline player (red): a slow glow, like a warning light at sea */
 
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }

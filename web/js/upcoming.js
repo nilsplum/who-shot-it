@@ -2,20 +2,21 @@
  * The game's photos on this phone: loaded from the server ahead of their rounds, in play
  * order, and kept in memory only.
  *
- * Mechanisms: from the 3-2-1 on, every view lists the photos this phone may load now
- * (`view.upcoming`: the whole game during the 3-2-1, then from the round on screen;
- * `src/game/view.js`). `syncUpcoming` takes that list; one loader (`loader.js`) fetches the
- * photos one at a time in play order, so the photo on screen comes first, the next one
- * right after it, and the rest follow without a break, the whole game during the 3-2-1 and
- * the first rounds. Each one becomes an object URL that the stage, the photo effects and
- * "Show again" paint from (`photoUrl`). `readyFor` says up to which round this phone holds
- * the photos; `main.js` reports that to the room (`loaded`, once per round), which starts
- * round 1 and ends a leaderboard only when every phone holds the photo it is about to show.
+ * Mechanisms: from the game's deal on (its start, right before the 3-2-1), every view lists
+ * the photos this phone may load now (`view.upcoming`: the whole game during the start,
+ * then from the round on screen; `src/game/view.js`). `syncUpcoming` takes that list; one
+ * loader (`loader.js`) fetches the photos one at a time in play order, so the first photo
+ * comes before the 3-2-1 (the room waits for it), the next one right after it, and the rest
+ * follow without a break, during the 3-2-1 and the first rounds. Each one becomes an object
+ * URL that the stage, the photo effects and "Show again" paint from (`photoUrl`).
+ * `readyFor` says up to which round this phone holds the photos; `main.js` reports that to
+ * the room (`loaded`, once per round), which starts the 3-2-1 and ends a leaderboard only
+ * when every phone holds the photo it is about to show.
  *
  * Invariants:
  * - Memory only: photos are fetched with `cache: 'no-store'` (the server says `no-store`
  *   too) and kept as Blobs behind object URLs. A photo that leaves the list (its round is
- *   over, it was deleted, the game ended, the 3-2-1 stopped) is aborted or dropped and its
+ *   over, it was deleted, the game ended, the start stopped) is aborted or dropped and its
  *   URL revoked at once, so a phone never keeps a photo longer than its round.
  * - Every fetch has a time limit (TIMING.photoFetchMs) and a second try; a photo that still
  *   fails counts as done, so it never holds up the room (the stage says it could not load).

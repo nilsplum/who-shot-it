@@ -43,23 +43,34 @@
  *   standings stay secret until the podium (the board before it is the apps' "FINAL
  *   ROUND", `views/board.js`). "Last" is the plan as it is then: a player who left took
  *   their later rounds with them.
- * - The game is dealt when the 3-2-1 starts (`deal`: which photos, in which order), so the
- *   phones load its photos during the countdown. The countdown runs only while its deal
- *   holds: everyone is ready and every dealt photo is still in its owner's hands
- *   (`dealHolds`); anything else (someone unreadies, leaves, is removed, a setting changes)
- *   returns to the lobby, and the next 3-2-1 deals afresh.
+ * - "Yes" is known before its photos are in: the app says so at once (`sending`, with the
+ *   id its upload will carry) and uploads in the background; the upload counts only if it
+ *   is the one the player last said "Yes" to (`ready`), so a "Change" or a newer "Yes" that
+ *   overtook it on the way wins. A phone's hello says which of its uploads is still on its
+ *   way (`join`), so a "Yes" whose app was closed meanwhile is not waited for.
+ * - The start (`countdown`), once everyone said "Yes" (`everyoneSaidYes`), in three steps
+ *   the whole group goes through together, so the 3-2-1 is the same on every phone and the
+ *   first photo is there the moment it ends: (1) photos still on their way come in (no
+ *   timer: every upload ends by itself, the app's own time limit or "Change"); (2) the game
+ *   is dealt (`deal`: which photos, in which order) and every phone gets the first photo
+ *   (`game.waiting`, at most TIMING.loadMaxMs); (3) the 3-2-1, exactly TIMING.countdownMs,
+ *   during which the phones load the next photos. The start goes on only while everyone
+ *   still said "Yes" and every dealt photo is still in its owner's hands (`dealHolds`);
+ *   anything else (someone unreadies, leaves, is removed, goes offline, a setting changes)
+ *   returns to the lobby, and the next start deals afresh.
  * - The photos never make a round wait mid-way: round 1 shows once every connected phone is
- *   ready for it, and a leaderboard whose time is up waits (`game.waiting`) until every
- *   connected phone is ready for the next round; both at most TIMING.loadMaxMs.
+ *   ready for it (normally at once: the start waited for that), and a leaderboard whose
+ *   time is up waits (`game.waiting`) until every connected phone is ready for the next
+ *   round; each at most TIMING.loadMaxMs.
  */
 
 import { EFFECTS, LIMITS, TIMING, normalizeSetting, normalizeSettings } from '../../web/shared/config.js';
-import { shuffle } from '../../web/shared/random.js';
+import { makeId, shuffle } from '../../web/shared/random.js';
 import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
 import {
-  answerTimeMs, canStart, cleanName, connectedPlayers, currentEntry, freeAvatar, inGame, makeId,
-  newGame, newPlayer, phonesReady, playerById, playerByKey, timerMs,
+  answerTimeMs, cleanName, connectedPlayers, currentEntry, everyoneSaidYes, freeAvatar, inGame, isUploadId,
+  newGame, newPlayer, phonesReady, photosIn, playerById, playerByKey, timerMs,
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
@@ -78,25 +89,32 @@ const timerEnd = (room, now, extra = 0) => {
 
 // ---------- Phase transitions ----------
 
-/** Back to the lobby with everyone's readiness kept (a 3-2-1 that stops); its deal is dropped. */
+/** Back to the lobby with everyone's "Yes" kept (a start that stops); its deal is dropped. */
 function backToLobby(room) {
   room.phase = 'lobby';
   room.deadline = null;
   room.game = null;
 }
 
+/** Everyone said "Yes": the start begins, first with the photos still on their way. */
+function begin(room) {
+  room.phase = 'countdown';
+  room.deadline = null;
+  room.game = null;
+}
+
 /**
- * Everyone is ready: the game is dealt now (which photos come up, in which random order)
- * and the 3-2-1 starts, so every phone loads the photos during the countdown. The players
- * keep their photos until it ends (`startGame`).
+ * Every photo is in: the game is dealt now (which photos come up, in which random order),
+ * and every phone gets the first one before the 3-2-1 (`game.waiting`, at most
+ * TIMING.loadMaxMs). The players keep their photos until the game starts (`startGame`).
  */
 function deal(room, now, rng) {
   room.game = newGame(buildPlan(room.players, room.settings, rng));
-  room.phase = 'countdown';
-  room.deadline = timerEnd(room, now);
+  room.game.waiting = true;
+  room.deadline = now + TIMING.loadMaxMs;
 }
 
-/** The 3-2-1's deal still holds: every dealt photo is still in its owner's hands. */
+/** The start's deal still holds: every dealt photo is still in its owner's hands. */
 function dealHolds(room) {
   return room.game.plan.every((e) => {
     const owner = playerById(room, e.owner);
@@ -292,8 +310,8 @@ function endGame(room) {
  * Removes a player for good: their photos go at once (the round on screen moves on if it
  * was theirs and still being guessed), and so do their answers. Their later rounds leave the
  * plan, which renumbers the rounds after the current one, so the phones' readiness marks
- * start over (the apps report again, `view.me.loaded`). During the 3-2-1 the deal no longer
- * holds and the countdown starts over (`dealHolds`).
+ * start over (the apps report again, `view.me.loaded`). During the start the deal no longer
+ * holds and the start begins again (`dealHolds`).
  */
 function removePlayer(room, playerId, now, rng) {
   if (!playerById(room, playerId)) return;
@@ -319,9 +337,12 @@ const HANDLERS = {
   /**
    * First message of every socket: joins the room, or resumes the player with this key.
    * `ahead` says the app loads the game's photos ahead (`holdsRound`); an app that was
-   * updated meanwhile says so on its next connection.
+   * updated meanwhile says so on its next connection. `uploading` is the upload this phone
+   * still has on its way, if any: a "Yes" whose upload is gone (the app was closed
+   * meanwhile) is not waited for any more, and one the room missed (said while the
+   * connection was down) counts from now on.
    */
-  join(room, { key, name, avatar, ahead }, now, rng) {
+  join(room, { key, name, avatar, ahead, uploading }, now, rng) {
     const clean = cleanName(name);
     if (!clean || typeof key !== 'string' || !key || room.banned.includes(key)) return;
     const existing = playerByKey(room, key);
@@ -333,6 +354,7 @@ const HANDLERS = {
       if (inLobby(room)) {
         existing.name = clean;
         if (freeAvatar(room, avatar, rng, existing.id) === avatar) existing.avatar = avatar;
+        if (!existing.ready) existing.sending = isUploadId(uploading) ? uploading : null;
       }
       return;
     }
@@ -353,18 +375,39 @@ const HANDLERS = {
     removePlayer(room, playerId, now, rng);
   },
 
-  /** The player's chosen photos are stored; zero photos means "just guess". */
-  ready(room, { playerId, photos }) {
+  /**
+   * "Yes": the player's photos are on their way, in the upload with this id. From now on
+   * they count as having said "Yes" (`saidYes`); a set they had in before is replaced. The
+   * same id again (a repeated message) changes nothing.
+   */
+  sending(room, { playerId, upload }) {
     const p = playerById(room, playerId);
-    if (!p || !inLobby(room) || !Array.isArray(photos)) return;
+    if (!p || !inLobby(room) || !isUploadId(upload) || p.sending === upload) return;
+    p.sending = upload;
+    p.ready = false;
+    p.photos = [];
+  },
+
+  /**
+   * An upload is in (`src/room.js`): the player's chosen photos are stored; zero photos
+   * means "just guess". It counts only if it is the upload the player last said "Yes" to
+   * (`sending`), or carries no id while they said none (apps that upload without saying so
+   * first): one that "Change" or a newer "Yes" overtook on the way is not theirs any more.
+   */
+  ready(room, { playerId, photos, upload = null }) {
+    const p = playerById(room, playerId);
+    if (!p || !inLobby(room) || !Array.isArray(photos) || upload !== (p.sending || null)) return;
+    p.sending = null;
     p.ready = true;
     p.photos = photos.filter((id) => typeof id === 'string').slice(0, room.settings.photos);
   },
 
+  /** "Change": the player chooses again; their photos go, and an upload still on its way will not count. */
   unready(room, { playerId }) {
     const p = playerById(room, playerId);
     if (!p || !inLobby(room)) return;
     p.ready = false;
+    p.sending = null;
     p.photos = [];
   },
 
@@ -373,20 +416,22 @@ const HANDLERS = {
     const v = normalizeSetting(key, value);
     if (v === undefined || room.settings[key] === v) return;
     room.settings[key] = v;
-    // Everyone chose a set of the old size, so a new size asks everyone to choose again.
+    // Everyone chose a set of the old size, so a new size asks everyone to choose again
+    // (an upload still on its way will not count either).
     if (key === 'photos') {
       for (const p of room.players) {
         p.ready = false;
+        p.sending = null;
         p.photos = [];
       }
     }
-    // Any change restarts a running countdown (and its deal), so nobody starts with settings they missed.
+    // Any change stops a running start (and its deal), so nobody starts with settings they missed.
     if (room.phase === 'countdown') backToLobby(room);
   },
 
   /**
    * A phone is ready for `round`: it holds that round's photo (and every one before it that
-   * is still to come). Marks only grow; from the 3-2-1 on, for any round of the plan.
+   * is still to come). Marks only grow; from the deal on, for any round of the plan.
    */
   loaded(room, { playerId, round }) {
     const g = room.game;
@@ -489,14 +534,27 @@ function transition(room, now, rng) {
   const connected = connectedPlayers(room);
   switch (room.phase) {
     case 'lobby':
-      if (canStart(room)) {
-        deal(room, now, rng);
+      if (everyoneSaidYes(room)) {
+        begin(room);
         return true;
       }
       return false;
     case 'countdown':
-      if (!canStart(room) || !dealHolds(room)) {
+      // The start's three steps (see the header): photos coming in, the first photo on every
+      // phone, the 3-2-1.
+      if (!everyoneSaidYes(room) || (g && !dealHolds(room))) {
         backToLobby(room);
+        return true;
+      }
+      if (!g) {
+        if (!photosIn(room)) return false;
+        deal(room, now, rng);
+        return true;
+      }
+      if (g.waiting) {
+        if (!due && !everyoneHolds(room, 1)) return false;
+        g.waiting = false;
+        room.deadline = timerEnd(room, now);
         return true;
       }
       if (due) {

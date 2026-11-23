@@ -5,11 +5,12 @@
  * Mechanisms: shown in the `lobby` and `countdown` phases. `main.js` deals the photos by
  * itself as soon as the app may read them (`photos.roll`); the first time, the player is
  * asked once ("Continue" shows the phone's own question), and if access is off, "Open
- * settings" leads to the switch. The game starts by itself when everyone is ready
- * (server rule `canStart`); the 3-2-1 is an overlay (`views/overlays.js`). Tapping the
- * code opens the invite sheet, tapping the settings summary opens the settings sheet
- * (read-only for everyone but the host), and tapping a player opens "Remove?" (the host may
- * remove anyone, everyone a player who is offline; nobody is removed for being offline).
+ * settings" leads to the switch. The game starts by itself when everyone said "Yes"
+ * (server rule `everyoneSaidYes`); its start ("Get ready", the 3-2-1) is an overlay
+ * (`views/overlays.js`). Tapping the code opens the invite sheet, tapping the settings
+ * summary opens the settings sheet (read-only for everyone but the host), and tapping a
+ * player opens "Remove?" (the host may remove anyone, everyone a player who is offline;
+ * nobody is removed for being offline).
  *
  * The players: a pill each, its border always 2 px (so nothing shifts): green when ready,
  * dashed grey while the game waits for them to be ready, red and glowing slowly with
@@ -22,18 +23,19 @@
  * swaps it (`photos.swap`): the tile turns over like a card, the old photo away and the new
  * one in. The line under the grid counts the swaps left ("(3 left)" in green, bumping as it
  * goes down, red and shaking at 0 and again on every refused tap); holding a photo shows it
- * big (`main.js`, hold to look). While "Yes" works, a bar takes the place of No and Yes and
- * says how far it is (`session.progress`: the big versions getting ready, then sending).
- * Every wait shows itself: "Picking photos…" under a spinner before the first set, and the
- * set dimmed under a spinner while No waits for new photos.
+ * big (`main.js`, hold to look). "Yes" makes the player ready at once: the set stays with
+ * "✓ Ready" while its photos go in the background (`session.sending`; only if the group
+ * waits for them does the start show how far they are, `views/overlays.js`). Every wait
+ * shows itself: "Picking photos…" under a spinner before the first set, and the set dimmed
+ * under a spinner while No waits for new photos.
  *
  * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so what
- * changes often (the progress, the swap counter) never repaints the grid and its photos.
+ * changes often (the swap counter) never repaints the grid and its photos.
  */
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
 import { photos } from '../photos.js';
-import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, progress, topBar } from '../ui.js';
+import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, topBar } from '../ui.js';
 
 const label = (key, value) => {
   const setting = SETTINGS.find((s) => s.key === key);
@@ -114,10 +116,9 @@ function card(icon, title, text, button) {
 
 const mainButton = (act, text) => `<button class="btn mt-4 bg-coral text-white" data-act="${act}">${text}</button>`;
 
-/** No and Yes, or while "Yes" works the bar in their place (as tall as the buttons, so nothing moves). */
-function actions(session) {
-  if (session.progress) return `<div class="mt-3.5 flex h-14 items-center">${progress(session.progress.share, session.progress.label)}</div>`;
-  const off = session.uploading || photos.rolling ? 'disabled' : '';
+/** No and Yes. */
+function actions() {
+  const off = photos.rolling ? 'disabled' : '';
   return `<div class="mt-3.5 grid grid-cols-2 gap-2.5"><button class="btn" data-act="no" ${off}>No</button><button class="btn bg-green text-navy" data-act="yes" ${off}>Yes</button></div>`;
 }
 
@@ -126,13 +127,15 @@ function mine({ view, session }) {
   const me = view.me;
   const parts = { title: '', pick: '', note: '', actions: '', links: '' };
   const ready = '<div class="mt-4 text-center"><b class="text-green">✓ Ready</b></div><button class="link" data-act="unready">Change</button>';
-  if (me.ready) {
-    if (!me.photoCount) return { ...parts, pick: ready };
+  // Ready from the moment "Yes" is tapped: the photos go in the background (`session.sending`).
+  if (me.ready || session.sending) {
+    const count = me.photoCount || (session.sending ? session.sending.count : 0);
+    if (!count) return { ...parts, pick: ready };
     // The set as it was chosen ("Yes" sends no more of it than the game can show); without
     // the local previews (the app was closed meanwhile), neutral tiles stand in.
-    const tiles = photos.chosen.length >= me.photoCount && photos.chosen.every((c) => c.url)
+    const tiles = photos.chosen.length >= count && photos.chosen.every((c) => c.url)
       ? chosenTiles(true)
-      : Array.from({ length: me.photoCount }, () => `<div class="${TILE}">📷</div>`);
+      : Array.from({ length: count }, () => `<div class="${TILE}">📷</div>`);
     return { ...parts, pick: grid(tiles, view.settings.photos), note: ready };
   }
   if (photos.chosen.length) {
@@ -143,7 +146,7 @@ function mine({ view, session }) {
       title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold short:mb-2 short:text-xl">Play with these?</h2>',
       pick: grid(chosenTiles(false), view.settings.photos, photos.rolling),
       note: swapsLine(),
-      actions: actions(session),
+      actions: actions(),
       links: `${limited}${withoutPhotos}`,
     };
   }
@@ -174,7 +177,7 @@ function status({ view }) {
   if (ps.length < 2) return line('Waiting for friends…');
   const waiting = ps.filter((p) => p.id !== view.me.id && (!p.ready || !p.connected));
   if (waiting.length) return `<div class="mt-2.5 text-center text-xs text-muted">Waiting on ${waiting.map((p) => esc(p.name)).join(', ')}</div>`;
-  if (view.me.ready && !ps.some((p) => p.photoCount > 0)) return line('Someone needs photos.');
+  if (view.me.ready && !ps.some((p) => p.photoCount > 0 || p.sending)) return line('Someone needs photos.');
   return '';
 }
 

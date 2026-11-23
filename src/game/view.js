@@ -25,15 +25,19 @@
  *   leaves them out when it decides whether a phone's view changed (`src/room.js`).
  * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
  * - `upcoming` lists the links of the photos a phone may load now, in play order (from the
- *   3-2-1 on: the whole game; then from the round on screen; `null` for a deleted one),
- *   with nothing about their owners (`upcomingEntries`). `round.next` stays for apps that
- *   load only the next photo. While the room waits for the phones to be ready for a round,
- *   `waiting` says how many are (`photoWait`); `me.loaded` is the round this phone said it
- *   is ready for, so an app reports again when the room forgot it (a changed plan).
+ *   deal on, during the start: the whole game; then from the round on screen; `null` for a
+ *   deleted one), with nothing about their owners (`upcomingEntries`). `round.next` stays
+ *   for apps that load only the next photo. While a game waits for the phones to be ready
+ *   for a round, `waiting` says how many are (`photoWait`); `me.loaded` is the round this
+ *   phone said it is ready for, so an app reports again when the room forgot it (a changed
+ *   plan).
+ * - A player's `ready` is their "Yes" (`saidYes`): their photos are in, or still on their
+ *   way (`sending`, the upload runs in the background). While the start waits for photos
+ *   still on their way, `uploads` says how many players have theirs in (`uploadWait`).
  */
 
 import { API } from '../../web/shared/api.js';
-import { currentEntry, inGame, nextEntry, photoWait, playerById, timerMs, upcomingEntries } from './state.js';
+import { currentEntry, inGame, nextEntry, photoWait, playerById, saidYes, timerMs, upcomingEntries, uploadWait } from './state.js';
 
 /**
  * The fields of a view that change by themselves with time (the server's time, and the
@@ -109,9 +113,11 @@ export function viewFor(room, playerId, now) {
     phase: room.phase,
     hostId: room.hostId,
     settings: room.settings,
-    me: me ? { id: me.id, ready: me.ready, photoCount: me.photos.length, onResults: me.onResults, loaded: g ? g.loaded[me.id] || 0 : 0 } : null,
+    me: me ? {
+      id: me.id, ready: saidYes(me), sending: Boolean(me.sending), photoCount: me.photos.length, onResults: me.onResults, loaded: g ? g.loaded[me.id] || 0 : 0,
+    } : null,
     players: room.players.map((p) => ({
-      id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: p.ready, photoCount: p.photos.length, score: p.score,
+      id: p.id, name: p.name, avatar: p.avatar, connected: p.connected, ready: saidYes(p), sending: Boolean(p.sending), photoCount: p.photos.length, score: p.score,
     })),
     now,
     left,
@@ -119,6 +125,7 @@ export function viewFor(room, playerId, now) {
     paused: isPaused(room),
     upcoming: upcomingEntries(room).map((e) => (e.photo ? API.photo(room.code, e.photo) : null)),
     waiting: wait ? { ready: wait.ready, of: wait.of } : null,
+    uploads: uploadWait(room),
     round: inGame(room) ? roundView(room, playerId, now) : null,
     final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };

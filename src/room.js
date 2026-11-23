@@ -32,14 +32,16 @@
 import { DurableObject } from 'cloudflare:workers';
 import { CLOSE, matchRoomRoute } from '../web/shared/api.js';
 import { LIMITS, REACTIONS, TIMING } from '../web/shared/config.js';
+import { makeId } from '../web/shared/random.js';
 import { apply, nextWake } from './game/rules.js';
-import { cleanName, isServablePhoto, makeId, newRoom, playerById, playerByKey, referencedPhotoIds } from './game/state.js';
+import { cleanName, isServablePhoto, newRoom, playerById, playerByKey, referencedPhotoIds } from './game/state.js';
 import { CLOCK_FIELDS, viewFor } from './game/view.js';
 import { bearerKey, cryptoRandom, fail, isJpeg, isPlayerKey, json, tooLarge } from './http.js';
 
 /** App messages that become events, each with exactly the fields the rules read. */
 const CLIENT_EVENTS = {
   leave: () => ({}),
+  sending: (m) => ({ upload: m.upload }),
   unready: () => ({}),
   setting: (m) => ({ key: m.key, value: m.value }),
   loaded: (m) => ({ round: m.round }),
@@ -206,13 +208,20 @@ export class Room extends DurableObject {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /** "Yes" in the lobby: the player's chosen JPEGs replace their set and make them ready. */
+  /**
+   * The upload after "Yes" in the lobby: the player's chosen JPEGs replace their set and make
+   * them ready, if it is the upload they last said "Yes" to (`upload`, the id the app sent
+   * with `sending`; `rules.js` `ready`). A refused upload's photos are deleted at once.
+   */
   async setPhotos(request) {
     const limit = this.room.settings.photos * LIMITS.photoMaxBytes + 64 * 1024;
     if (tooLarge(request, limit)) return fail(413, 'too_large');
     let files;
+    let upload;
     try {
-      files = (await request.formData()).getAll('photo');
+      const form = await request.formData();
+      files = form.getAll('photo');
+      upload = form.get('upload');
     } catch {
       return fail(400, 'bad_form');
     }
@@ -233,9 +242,13 @@ export class Room extends DurableObject {
       this.sql.exec('INSERT INTO photos (id, data) VALUES (?, ?)', id, bytes);
       return id;
     });
-    this.dispatch({ type: 'ready', playerId: player.id, photos: ids });
+    this.dispatch({ type: 'ready', playerId: player.id, photos: ids, upload: typeof upload === 'string' ? upload : null });
     const after = playerByKey(this.room || { players: [] }, player.key);
-    return after && after.ready ? new Response(null, { status: 204 }) : fail(409, 'not_in_lobby');
+    if (after && after.ready && JSON.stringify(after.photos) === JSON.stringify(ids)) return new Response(null, { status: 204 });
+    // Not taken (no longer in the lobby, or overtaken by "Change" or a newer "Yes"): nothing
+    // references these photos, and a refused event changed nothing that would delete them.
+    if (ids.length) this.sql.exec('DELETE FROM photos WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids));
+    return fail(409, 'not_taken');
   }
 
   photo(id) {
@@ -286,12 +299,12 @@ export class Room extends DurableObject {
     if (msg.type === 'leave') ws.close(CLOSE.left, 'left');
   }
 
-  hello(ws, { key, name, avatar, ahead }) {
+  hello(ws, { key, name, avatar, ahead, uploading }) {
     if (!isPlayerKey(key) || !cleanName(name)) {
       ws.close(1008, 'bad_hello');
       return;
     }
-    this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true });
+    this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true, uploading });
     const player = this.room && playerByKey(this.room, key);
     if (!player) {
       if (this.room && this.room.banned.includes(key)) ws.close(CLOSE.removed, 'removed');
