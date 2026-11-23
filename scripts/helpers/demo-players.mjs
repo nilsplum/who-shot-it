@@ -8,8 +8,8 @@
  * Each player is the real app page in a headless browser with the end-to-end tests' fake
  * photo plugin (`test/e2e/fake-phone.js`) and drawn stand-in photos (`demo-photos.mjs`),
  * so they upload nobody's real photos. They accept the terms, join, wait half a minute
- * before they say Yes to their photos (the game starts by itself once everyone is ready, so
- * the host has time to show the lobby, for example removing a player), guess a random
+ * before they say Yes to their photos (so the host has time to show the lobby, for example
+ * removing a player; then the person answers "Is everyone here?"), guess a random
  * player a moment after each photo appears, wait through each leaderboard, and stay on the
  * end screen for two minutes (joining the next game when anyone taps "Play again") before
  * they leave. They also stop when the
@@ -71,7 +71,8 @@ async function player(browser, library, [name, avatar]) {
     if (Date.now() - joined > READY_AFTER_MS) {
       const proceed = page.getByRole('button', { name: 'Continue' });
       if (await proceed.count()) await proceed.click();
-      const yes = page.getByRole('button', { name: 'Yes' });
+      // Exactly "Yes": "Is everyone here?" is the person's to answer, not the demo players'.
+      const yes = page.getByRole('button', { name: 'Yes', exact: true });
       if (await yes.count() && await yes.isEnabled()) await yes.click();
     }
     // Read without waiting: a locator would wait for a photo the lobby does not show. The

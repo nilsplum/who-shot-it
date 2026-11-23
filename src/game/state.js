@@ -18,15 +18,19 @@
  * - `final` (the last game's standings) exists only while someone is on the end screen.
  *
  * Room shape:
- *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline,
+ *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline, start,
  *     players: [Player], banned: [key], game: Game | null, final: Final | null }
+ *   start: how the next game starts once everyone said "Yes" (`startMode`): 'ask' (the
+ *   first game of a group asks "Is everyone here?"), 'button' (someone answered No: the
+ *   group starts with "Start now") or 'auto' (by itself; a room saved before this existed)
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, sending, photos: [id],
- *             score, streak, onResults, ahead }
+ *             score, streak, onResults, ahead, asks }
  *   (ready: their chosen photos are in; sending: they said "Yes" and their photos are on
  *   their way, the id their upload carries, else null; onResults: still on the last game's
  *   end screen; ahead: the app loads the game's photos ahead and says which round it is
- *   ready for, see `holdsRound`)
+ *   ready for, see `holdsRound`; asks: the app can ask "Is everyone here?" and show "Start
+ *   now", see `startMode`)
  *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: { [id]: round }, waiting, shownAt,
@@ -62,6 +66,7 @@ export function newRoom(code, now, settings) {
     settings: normalizeSettings(settings),
     phase: 'lobby',
     deadline: null,
+    start: 'ask',
     players: [],
     banned: [],
     game: null,
@@ -69,7 +74,7 @@ export function newRoom(code, now, settings) {
   };
 }
 
-export function newPlayer({ id, key, name, avatar, now, ahead = false }) {
+export function newPlayer({ id, key, name, avatar, now, ahead = false, asks = false }) {
   return {
     id,
     key,
@@ -85,6 +90,7 @@ export function newPlayer({ id, key, name, avatar, now, ahead = false }) {
     streak: 0,
     onResults: false,
     ahead,
+    asks,
   };
 }
 
@@ -241,6 +247,16 @@ export function everyoneSaidYes(room) {
   return ps.length >= LIMITS.minPlayers
     && ps.every((p) => p.connected && saidYes(p))
     && ps.some((p) => p.photos.length > 0 || p.sending);
+}
+
+/**
+ * How the next game starts once everyone said "Yes" (`room.start`): it asks, or waits for
+ * "Start now", only while some app here can show that (`player.asks`); a room of apps from
+ * before them starts by itself, as they expect.
+ */
+export function startMode(room) {
+  const mode = room.start || 'auto';
+  return mode !== 'auto' && connectedPlayers(room).some((p) => p.asks) ? mode : 'auto';
 }
 
 /** Every photo is in: nobody's upload is still on its way, so the game can be dealt. */

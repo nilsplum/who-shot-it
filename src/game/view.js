@@ -34,10 +34,15 @@
  * - A player's `ready` is their "Yes" (`saidYes`): their photos are in, or still on their
  *   way (`sending`, the upload runs in the background). While the start waits for photos
  *   still on their way, `uploads` says how many players have theirs in (`uploadWait`).
+ * - In the lobby, `start` says how the game will start (`startMode`: 'ask' shows "Is
+ *   everyone here?" once `everyone` said "Yes", 'button' shows "Start now", usable once
+ *   `everyone` did, 'auto' neither); else null.
  */
 
 import { API } from '../../web/shared/api.js';
-import { currentEntry, inGame, nextEntry, photoWait, playerById, saidYes, timerMs, upcomingEntries, uploadWait } from './state.js';
+import {
+  currentEntry, everyoneSaidYes, inGame, nextEntry, photoWait, playerById, saidYes, startMode, timerMs, upcomingEntries, uploadWait,
+} from './state.js';
 
 /**
  * The fields of a view that change by themselves with time (the server's time, and the
@@ -126,6 +131,7 @@ export function viewFor(room, playerId, now) {
     upcoming: upcomingEntries(room).map((e) => (e.photo ? API.photo(room.code, e.photo) : null)),
     waiting: wait ? { ready: wait.ready, of: wait.of } : null,
     uploads: uploadWait(room),
+    start: room.phase === 'lobby' ? { mode: startMode(room), everyone: everyoneSaidYes(room) } : null,
     round: inGame(room) ? roundView(room, playerId, now) : null,
     final: room.final && (room.phase === 'end' || (me && me.onResults)) ? finalView(room.final) : null,
   };

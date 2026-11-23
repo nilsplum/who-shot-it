@@ -33,10 +33,12 @@ const ROOM_ROUTES = [
  * (after Leave) and removed (the host removed this player).
  *
  * Messages on the socket are JSON. App to room: `{ type: 'hello', key, name, avatar, ahead,
- * uploading }` first (`ahead`: this app loads the game's photos ahead; `uploading`: the id
- * of its upload still on its way, or null), then `leave`, `sending {upload}` ("Yes": the
- * photos follow in the upload to `API.photos`, whose form carries the same id as `upload`
- * next to its `photo` files; ids as `isUploadId` in src/game/state.js), `unready`,
+ * uploading, asks }` first (`ahead`: this app loads the game's photos ahead; `uploading`:
+ * the id of its upload still on its way, or null; `asks`: it can ask "Is everyone here?"
+ * and show "Start now"), then `leave`, `start {go}` (the answer to that question, or "Start
+ * now"), `sending {upload}` ("Yes": the photos follow in the upload to `API.photos`, whose
+ * form carries the same id as `upload` next to its `photo` files; ids as `isUploadId` in
+ * src/game/state.js), `unready`,
  * `setting {key, value}`, `loaded {round}` (the round this phone is ready for: it holds
  * that round's photo; sent once per round, at most for the round after the one on screen;
  * apps without `ahead` send the round whose photo is on screen), `answer {pick}`,

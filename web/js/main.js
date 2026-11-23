@@ -339,11 +339,12 @@ function frame() {
 /**
  * The first message of every connection; `ahead`: this app loads the game's photos ahead
  * (`upcoming.js`); `uploading`: its upload still on its way, so the room waits for that one
- * and no other (`readyWith`).
+ * and no other (`readyWith`); `asks`: it can ask "Is everyone here?" and show "Start now"
+ * (`views/overlays.js`, `views/lobby.js`).
  */
 function hello() {
   const uploading = session.sending ? session.sending.upload : null;
-  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true, uploading };
+  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true, uploading, asks: true };
 }
 
 function openSocket(code) {
@@ -779,6 +780,10 @@ const ACTIONS = {
     send({ type: 'unready' });
     render();
   },
+  /** "Is everyone here?" Yes, or "Start now": the room starts the game if everyone still said "Yes". */
+  go: () => send({ type: 'start', go: true }),
+  /** "Is everyone here?" No: the group waits, and "Start now" appears on every phone. */
+  wait: () => send({ type: 'start', go: false }),
   answer: (id) => {
     const v = session.view;
     if (!v || v.phase !== 'show' || myPick(v) || isLate(v)) return;

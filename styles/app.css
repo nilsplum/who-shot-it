@@ -160,6 +160,7 @@
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
   --animate-count: count 1s ease-out; /* a number of the 3-2-1, once (each number is a new element) */
   --animate-beacon: beacon 1.6s ease-in-out infinite; /* an offline player (red): a slow glow, like a warning light at sea */
+  --animate-breathe: breathe 1.4s ease-in-out infinite; /* "Start now": a glow swells around it and fades, so nobody misses it */
 
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -186,6 +187,8 @@
   @keyframes count { from { transform: scale(1.4); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
   /* A red glow swells around the element and fades again; it moves nothing, so nothing jumps. */
   @keyframes beacon { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-red) 45%, transparent); } }
+  /* Only the glow moves, never the button, so it stays easy to hit (and its press, `active:scale-98`, works). */
+  @keyframes breathe { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-coral) 35%, transparent); } }
 }
 
 @layer base {

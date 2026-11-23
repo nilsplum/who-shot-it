@@ -90,7 +90,8 @@ async function takeScreens(browser, library) {
     await page.locator('[data-act="swap"]').nth(3).waitFor();
   }
   await snap(host, 'photos');
-  for (const page of everyone) await page.getByRole('button', { name: 'Yes' }).click();
+  for (const page of everyone) await page.getByRole('button', { name: 'Yes', exact: true }).click();
+  await host.getByRole('button', { name: 'Yes, start' }).click();
   await host.locator('[data-part="stage"] img').waitFor({ timeout: 30000 });
   await guests[0].locator('[data-act="answer"]').first().click();
   await snap(host, 'guess');

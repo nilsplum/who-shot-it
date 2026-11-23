@@ -32,7 +32,7 @@ const howToTest = `HOW TO TEST
 A game needs at least two devices, each with a few photos.
 Device A: accept the terms, enter a name, tap Create game, keep Classic, tap Start game. A four letter code appears.
 Device B: accept the terms, enter a name, type the code, tap Join.
-On both: tap Continue and allow photo access. Tap No for other random photos, or Yes to play with them. When everyone is ready, the game starts by itself. Tap the player you think took the photo.
+On both: tap Continue and allow photo access. Tap No for other random photos, or Yes to play with them. When everyone is ready, the app asks “Is everyone here?”: tap Yes, start. Tap the player you think took the photo.
 
 PHOTOS AND SAFETY
 Only photos a player confirms with Yes leave the phone, and only to the players of that one game. Each photo is deleted from our server right after its round.

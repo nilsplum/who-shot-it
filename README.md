@@ -80,11 +80,12 @@ would be okay with). "Create game", pick Classic or Tricky (or tune the settings
 game": a 4-letter code (no look-alike letters). Friends join with the code, a shared link
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
-lobby → start once everyone (at least two) said "Yes" (*Get ready*: the photos still on
-their way come in, the game is dealt, which photos in which random order, and every phone
-gets the first photo; then the 3-2-1, the same on every phone) → per round *load* (every
-phone holds the photo, at once for round 1) → *show* →
-*reveal* → *board* (the leaderboard; holding "Show again" shows the photo to everyone and
+lobby → start once everyone (at least two) said "Yes" (a group's first game asks every
+phone "Is everyone here?" first; after a No, anyone's "Start now" starts it): *Get ready*
+(the photos still on their way come in, the game is dealt, which photos in which random
+order, and every phone gets the first photo), then the 3-2-1, the same on every phone →
+per round *load* (every phone holds the photo, at once for round 1) → *show* → *reveal* →
+*board* (the leaderboard; holding "Show again" shows the photo to everyone and
 stops the clock; when its time is up it waits until every phone holds the next round's
 photo) → *end*. The last photo's reveal goes straight to *end*, and the board before it says
 only "FINAL ROUND", so the standings stay secret until the podium. "Play again" is

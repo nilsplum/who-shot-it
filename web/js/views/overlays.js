@@ -1,5 +1,6 @@
 /**
- * Everything drawn over the screens: the start of a game ("Get ready", then the 3-2-1),
+ * Everything drawn over the screens: the start of a game ("Is everyone here?" before a
+ * group's first game, "Get ready", then the 3-2-1),
  * the "Reconnecting…" banner, the photo held to look at, and the two full screens without
  * game content (joining, and "this game is open somewhere else": the same player connected
  * again, for example after the app was restored while an older connection was still alive).
@@ -22,15 +23,34 @@ import { SPINNER, esc, progress } from '../ui.js';
 export const BANNER_DELAY_MS = 1500;
 
 /**
- * The start of a game (`view.phase` 'countdown', the room's three steps in
- * `src/game/rules.js`), or null: "Get ready" while photos are still on their way (a bar:
- * how far the group's uploads are, `sendShare`, this phone's own counted exactly) or while
- * the phones get the first photo (a spinner: it takes a moment); then the 3-2-1 (`count`).
- * Each number is a new element, so its entrance plays once (a number that stays, the 1 until
- * the first photo appears, stays still), and `main.js` feels each one as it is painted.
+ * A group's first game asks before it starts, on every phone once everyone said "Yes"
+ * (`view.start`): Yes starts it, No lets the group wait for whoever is missing ("Start now"
+ * appears in the lobby, `views/lobby.js`). Anyone may answer for the group.
+ */
+const ASK = {
+  key: 'ask',
+  layout: `<div class="fixed inset-0 z-50 grid place-items-center bg-page px-6"><div class="w-full max-w-90 text-center">
+    <div class="text-6xl leading-none">🙋</div>
+    <h2 class="mt-4 font-display text-5xl font-extrabold">Is everyone here?</h2>
+    <p class="mt-2 mb-7 text-muted">Anyone who joins later plays without photos.</p>
+    <div class="flex flex-col gap-2.5"><button class="btn bg-green text-navy" data-act="go">Yes, start</button><button class="btn" data-act="wait">No, wait</button></div>
+  </div></div>`,
+  parts: {},
+};
+
+/**
+ * The start of a game, or null: "Is everyone here?" (`ASK`) in a group's first lobby, then
+ * the room's three steps (`view.phase` 'countdown', `src/game/rules.js`): "Get ready" while
+ * photos are still on their way (a bar: how far the group's uploads are, `sendShare`, this
+ * phone's own counted exactly) or while the phones get the first photo (a spinner: it takes
+ * a moment); then the 3-2-1 (`count`). Each number is a new element, so its entrance plays
+ * once (a number that stays, the 1 until the first photo appears, stays still), and
+ * `main.js` feels each one as it is painted.
  */
 export function startScreen(view, leftMs, sendShare) {
-  if (!view || view.phase !== 'countdown') return null;
+  if (!view || !view.me) return null;
+  if (view.phase === 'lobby' && view.start && view.start.mode === 'ask' && view.start.everyone && !view.me.onResults) return ASK;
+  if (view.phase !== 'countdown') return null;
   const n = leftMs === null ? null : Math.max(1, Math.ceil(leftMs / 1000));
   const wait = view.uploads && sendShare !== null ? progress(sendShare, 'Sending photos') : SPINNER;
   return {

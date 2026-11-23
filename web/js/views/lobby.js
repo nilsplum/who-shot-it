@@ -6,8 +6,9 @@
  * itself as soon as the app may read them (`photos.roll`); the first time, the player is
  * asked once ("Continue" shows the phone's own question), and if access is off, "Open
  * settings" leads to the switch. The game starts by itself when everyone said "Yes"
- * (server rule `everyoneSaidYes`); its start ("Get ready", the 3-2-1) is an overlay
- * (`views/overlays.js`). Tapping the code opens the invite sheet, tapping the settings
+ * (server rule `everyoneSaidYes`); a group's first game asks "Is everyone here?" first,
+ * and after a No it starts with "Start now" at the bottom (`startNow`). The start ("Get
+ * ready", the 3-2-1) is an overlay (`views/overlays.js`). Tapping the code opens the invite sheet, tapping the settings
  * summary opens the settings sheet (read-only for everyone but the host), and tapping a
  * player opens "Remove?" (the host may remove anyone, everyone a player who is offline;
  * nobody is removed for being offline).
@@ -181,6 +182,16 @@ function status({ view }) {
   return '';
 }
 
+/**
+ * "Start now", on every phone once someone answered "Is everyone here?" with No
+ * (`view.start.mode` 'button', `views/overlays.js`): big and pulsing at the bottom, greyed
+ * (and still) until everyone said "Yes". Anyone may tap it.
+ */
+function startNow({ view }) {
+  if (!view.start || view.start.mode !== 'button') return '';
+  return `<button class="btn mt-3 animate-breathe bg-coral text-white disabled:animate-none motion-reduce:animate-none" data-act="go" ${view.start.everyone ? '' : 'disabled'}>Start now</button>`;
+}
+
 /** From this many players on, the pills are compact: smaller avatar, text and padding. */
 const PILLS_COMPACT_FROM = 7;
 const PILLS = {
@@ -227,12 +238,14 @@ export function lobbyScreen(c) {
         <div data-part="links"></div>
       </div>
       <div data-part="status"></div>
+      <div data-part="go"></div>
     </div>`,
     parts: {
       cfg: `<button class="mx-auto block rounded-full border border-line bg-card px-3.5 py-1.75 text-xs ${host ? 'text-ink' : 'text-muted'}" data-act="settings">${esc(settingsSummary(view.settings))}${host ? ' ⚙︎' : ''}</button>`,
       chips: view.players.map((p) => chip(view, p)).join(''),
       ...mine(c),
       status: status(c),
+      go: startNow(c),
     },
   };
 }

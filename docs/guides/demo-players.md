@@ -22,8 +22,8 @@ browser), and internet. The computer must stay awake while they play.
 3. After a few seconds they appear in the lobby. They wait **half a minute** before they get
    ready, so there is time to show the lobby, for example to remove one (tap the name, then
    **Remove**).
-4. Choose your photos (**Continue**, then **Yes**). The game starts by itself once everyone
-   is ready.
+4. Choose your photos (**Continue**, then **Yes**). Once everyone is ready, the app asks
+   **Is everyone here?**: tap **Yes, start**.
 5. In each round they tap a random player a few seconds after the photo appears.
 6. After the podium they stay **two minutes**; when you tap **Play again** they join the next
    game. Otherwise they leave by themselves.
@@ -50,7 +50,8 @@ including reporting a photo and removing a player. What worked:
 4. Start the test players with the code (above). Keep recording; waiting time can be cut.
 5. Remove one of them (tap the name, **Remove**).
 6. **Continue**, allow access to all photos, tap **No** once, then **Yes**. Only your own
-   photos show up and only Apple sees the video: tap **No** until harmless ones come.
+   photos show up and only Apple sees the video: tap **No** until harmless ones come. When
+   the app asks **Is everyone here?**, tap **Yes, start**.
 7. In the first round tap the flag on the photo, then **Delete photo**.
 8. Play until the podium has revealed all three places and **Play again** appears (about
    six seconds), then stop the recording.

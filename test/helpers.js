@@ -23,11 +23,12 @@ export const T0 = Date.UTC(2026, 10, 21, 12, 0, 0);
 /**
  * A room where `names` have joined in order (keys are `key-<name>`), at time `now`.
  * `ahead`: their apps load the game's photos ahead (today's apps); without it they join
- * like an app that reports only the photo on screen.
+ * like an app that reports only the photo on screen. `asks`: their apps ask "Is everyone
+ * here?" before the first game (today's apps); without it the game starts by itself.
  */
-export function roomWith(names, { now = T0, settings = {}, rng = seededRandom(), ahead = false } = {}) {
+export function roomWith(names, { now = T0, settings = {}, rng = seededRandom(), ahead = false, asks = false } = {}) {
   let room = newRoom('ABCD', now, settings);
-  for (const name of names) room = apply(room, { type: 'join', key: `key-${name}-0000000000`, name, avatar: '🦊', ahead }, now, rng);
+  for (const name of names) room = apply(room, { type: 'join', key: `key-${name}-0000000000`, name, avatar: '🦊', ahead, asks }, now, rng);
   return room;
 }
 

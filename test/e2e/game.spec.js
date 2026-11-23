@@ -2,14 +2,16 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code, a
  * phone going offline (its red pill, removed by a guest), the host removing a player, the
- * photos dealt with "Play with these?", reload, the automatic
- * start behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
+ * photos dealt with "Play with these?" (ready at once on Yes), reload, "Is everyone here?"
+ * answered No and "Start now" (greyed while someone changes their photos), the start
+ * behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
  * Delete), five rounds with their leaderboards (one ending in the new order, "Show again"
  * held on one phone and seen on another, FINAL ROUND before the last photo), the podium's
  * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. A leaderboard
  * that waits for a phone still loading the next photos. A full table of 16 (three phones of
- * the smallest sizes and light bots, `bots.js`) on every screen of a game: nothing scrolls
+ * the smallest sizes and light bots, `bots.js`) on every screen of a game (the question
+ * before it too): nothing scrolls
  * the page, the lobby's photos are as wide as No and Yes, and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
  * swaps (the count, the turn, a refused tap) and the hold in the photo choice, the terms
@@ -47,7 +49,7 @@ async function dealPhotos(page, count) {
 /** The photos dealt (`dealPhotos`), then Yes. */
 async function choosePhotos(page, count) {
   await dealPhotos(page, count);
-  await page.getByRole('button', { name: 'Yes' }).click();
+  await page.getByRole('button', { name: 'Yes', exact: true }).click();
   await expect(page.getByText('✓ Ready')).toBeVisible();
 }
 
@@ -111,7 +113,18 @@ test('friends play a full game and start another one', async ({ browser }) => {
 
   const everyone = [host, ...guests];
   for (const page of everyone) await choosePhotos(page, 4);
-  // Everyone is ready: the 3-2-1 is a screen of its own, nothing of the lobby shows through.
+  // The group's first game asks first, on every phone. Cleo answers No: everyone gets "Start
+  // now", greyed while Ben changes his photos; once he said Yes again, the host starts.
+  for (const page of everyone) await expect(page.getByRole('heading', { name: 'Is everyone here?' })).toBeVisible();
+  await guests[1].getByRole('button', { name: 'No, wait' }).click();
+  const startNow = guests[1].getByRole('button', { name: 'Start now' });
+  await expect(startNow).toBeEnabled();
+  await guests[0].getByRole('button', { name: 'Change' }).click();
+  await expect(startNow).toBeDisabled();
+  await guests[0].getByRole('button', { name: 'Yes', exact: true }).click();
+  await expect(startNow).toBeEnabled();
+  await host.getByRole('button', { name: 'Start now' }).click();
+  // The start: a screen of its own, nothing of the lobby shows through.
   const cover = host.locator('#cover > div');
   await expect(cover).toBeVisible();
   expect(await styleOf(host, '#cover > div', 'backgroundColor')).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
@@ -235,7 +248,8 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
   });
   await join(guest, code);
   for (const page of [host, guest]) await choosePhotos(page, 4);
-  // Round 1 needs only its own photo, which both phones hold after the 3-2-1.
+  await guest.getByRole('button', { name: 'Yes, start' }).click();
+  // Round 1 needs only its own photo, which both phones hold before the 3-2-1.
   await expect(guest.getByText('1 / 5', { exact: true })).toBeVisible();
   for (const page of [host, guest]) await page.locator('[data-act="answer"]').first().click();
   // The leaderboard's time runs out, but Ben does not hold round 2's photo yet: it stays.
@@ -329,9 +343,13 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
       await expect.poll(() => gridEdges(page), 'the grid lines up with No and Yes').toEqual([0, 0]);
     }
     for (const page of phones) {
-      await page.getByRole('button', { name: 'Yes' }).click();
+      await page.getByRole('button', { name: 'Yes', exact: true }).click();
       await expect(page.getByText('✓ Ready')).toBeVisible();
     }
+    // The question before the first game: on the smallest phone too, all of it on screen.
+    await expect(host.getByRole('heading', { name: 'Is everyone here?' })).toBeVisible();
+    await fits(host);
+    await host.getByRole('button', { name: 'Yes, start' }).click();
     for (let round = 1; round <= 5; round++) {
       for (const page of phones) await expect(page.getByText(`${round} / 5`, { exact: true })).toBeVisible();
       if (round === 1) {

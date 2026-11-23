@@ -43,6 +43,7 @@ const CLIENT_EVENTS = {
   leave: () => ({}),
   sending: (m) => ({ upload: m.upload }),
   unready: () => ({}),
+  start: (m) => ({ go: m.go === true }),
   setting: (m) => ({ key: m.key, value: m.value }),
   loaded: (m) => ({ round: m.round }),
   answer: (m) => ({ pick: m.pick }),
@@ -299,12 +300,12 @@ export class Room extends DurableObject {
     if (msg.type === 'leave') ws.close(CLOSE.left, 'left');
   }
 
-  hello(ws, { key, name, avatar, ahead, uploading }) {
+  hello(ws, { key, name, avatar, ahead, uploading, asks }) {
     if (!isPlayerKey(key) || !cleanName(name)) {
       ws.close(1008, 'bad_hello');
       return;
     }
-    this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true, uploading });
+    this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true, uploading, asks: asks === true });
     const player = this.room && playerByKey(this.room, key);
     if (!player) {
       if (this.room && this.room.banned.includes(key)) ws.close(CLOSE.removed, 'removed');

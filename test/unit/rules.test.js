@@ -132,6 +132,42 @@ describe('lobby and start', () => {
     expect(d.room.players.every((p) => !p.ready && p.photos.length === 0)).toBe(true);
   });
 
+  test('a group\'s first game asks "Is everyone here?": No waits for "Start now", which works only while everyone said Yes', () => {
+    const d = driver(roomWith(['Ann', 'Ben'], { asks: true }));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'ask' });
+    // A Yes or No from someone who is not here counts for nothing; Ben answers No.
+    d.do('start', { playerId: 'nobody', go: true });
+    expect(d.room.phase).toBe('lobby');
+    d.by('Ben', 'start', { go: false });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'button' });
+    // "Start now" while Ben changes his photos does nothing; once he said Yes again, it starts.
+    d.by('Ben', 'unready').by('Ann', 'start', { go: true });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'button' });
+    d.by('Ben', 'ready', { photos: [] });
+    expect(d.room.phase).toBe('lobby');
+    d.by('Ben', 'start', { go: true });
+    expect(d.room.phase).toBe('countdown');
+    // The game (one photo) plays to its end; the next game starts by itself.
+    loadAll(d.wait(TIMING.countdownMs)).reveal().wait(TIMING.revealMs);
+    expect(d.room.phase).toBe('end');
+    d.by('Ann', 'again').by('Ben', 'again').by('Ann', 'ready', { photos: ['a2'] }).by('Ben', 'ready', { photos: [] });
+    expect(d.room).toMatchObject({ phase: 'countdown', start: 'auto' });
+  });
+
+  test('Yes starts the first game; without an app that can ask, it starts by itself; an empty room asks again', () => {
+    const d = driver(roomWith(['Ann', 'Ben'], { asks: true }));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).by('Ann', 'start', { go: true });
+    expect(d.room.phase).toBe('countdown');
+    // Apps from before the question (no `asks`): nobody could answer, so the room starts by itself.
+    const old = driver(roomWith(['Ann', 'Ben']));
+    old.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] });
+    expect(old.room).toMatchObject({ phase: 'countdown', start: 'ask' });
+    // Everyone leaves: the next group to use the code is asked again.
+    old.by('Ann', 'leave').by('Ben', 'leave');
+    expect(old.room).toMatchObject({ phase: 'lobby', start: 'ask', players: [] });
+  });
+
   test('a ready player keeps at most "Photos per player" photos', () => {
     const d = driver(roomWith(['Ann'], { settings: { photos: 4 } })).by('Ann', 'ready', { photos: ['1', '2', '3', '4', '5', 6] });
     expect(d.room.players[0].photos).toEqual(['1', '2', '3', '4']);

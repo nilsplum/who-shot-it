@@ -124,3 +124,16 @@ test('the photos a phone may load: the whole game from the deal on, then from th
   expect(viewFor(room, idOf(room, 'Ann'), start).upcoming).toEqual(room.game.plan.slice(1).map(link));
   expect(JSON.stringify(ann.upcoming)).not.toContain(idOf(room, 'Ann'));
 });
+
+test('the lobby says how the game will start: the question once everyone said Yes, after a No "Start now"', () => {
+  let room = roomWith(['Ann', 'Ben'], { asks: true });
+  const [ann, ben] = room.players.map((p) => p.id);
+  expect(viewFor(room, ann, T0).start).toEqual({ mode: 'ask', everyone: false });
+  room = apply(room, { type: 'ready', playerId: ann, photos: ['a1'] }, T0, rng);
+  room = apply(room, { type: 'ready', playerId: ben, photos: [] }, T0, rng);
+  expect(viewFor(room, ben, T0).start).toEqual({ mode: 'ask', everyone: true });
+  room = apply(room, { type: 'start', playerId: ben, go: false }, T0, rng);
+  expect(viewFor(room, ann, T0).start).toEqual({ mode: 'button', everyone: true });
+  room = apply(room, { type: 'start', playerId: ann, go: true }, T0, rng);
+  expect(viewFor(room, ann, T0)).toMatchObject({ phase: 'countdown', start: null });
+});

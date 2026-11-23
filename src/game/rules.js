@@ -48,6 +48,11 @@
  *   is the one the player last said "Yes" to (`ready`), so a "Change" or a newer "Yes" that
  *   overtook it on the way wins. A phone's hello says which of its uploads is still on its
  *   way (`join`), so a "Yes" whose app was closed meanwhile is not waited for.
+ * - A group's first game asks before it starts: once everyone said "Yes", every phone asks
+ *   "Is everyone here?" (`startMode` 'ask'); anyone's Yes starts it, anyone's No lets the
+ *   group wait for whoever is missing, and then "Start now" (anyone's, only while everyone
+ *   said "Yes") starts it (`start`). Later games start by themselves; a room everyone left
+ *   asks the next group again.
  * - The start (`countdown`), once everyone said "Yes" (`everyoneSaidYes`), in three steps
  *   the whole group goes through together, so the 3-2-1 is the same on every phone and the
  *   first photo is there the moment it ends: (1) photos still on their way come in (no
@@ -70,7 +75,7 @@ import { buildPlan } from './plan.js';
 import { pointsFor } from './score.js';
 import {
   answerTimeMs, cleanName, connectedPlayers, currentEntry, everyoneSaidYes, freeAvatar, inGame, isUploadId,
-  newGame, newPlayer, phonesReady, photosIn, playerById, playerByKey, timerMs,
+  newGame, newPlayer, phonesReady, photosIn, playerById, playerByKey, startMode, timerMs,
 } from './state.js';
 
 const inLobby = (room) => room.phase === 'lobby' || room.phase === 'countdown';
@@ -134,8 +139,12 @@ function toLobby(room) {
   }
 }
 
-/** The 3-2-1 is over: the dealt photos now belong to the game, and readiness is spent for it. */
+/**
+ * The 3-2-1 is over: the dealt photos now belong to the game, and readiness is spent for it.
+ * The group is together now: its next games start by themselves.
+ */
 function startGame(room, now, rng) {
+  room.start = 'auto';
   for (const p of room.players) {
     p.ready = false;
     p.photos = [];
@@ -340,9 +349,10 @@ const HANDLERS = {
    * updated meanwhile says so on its next connection. `uploading` is the upload this phone
    * still has on its way, if any: a "Yes" whose upload is gone (the app was closed
    * meanwhile) is not waited for any more, and one the room missed (said while the
-   * connection was down) counts from now on.
+   * connection was down) counts from now on. `asks` says the app can ask "Is everyone
+   * here?" and show "Start now" (`startMode`).
    */
-  join(room, { key, name, avatar, ahead, uploading }, now, rng) {
+  join(room, { key, name, avatar, ahead, uploading, asks }, now, rng) {
     const clean = cleanName(name);
     if (!clean || typeof key !== 'string' || !key || room.banned.includes(key)) return;
     const existing = playerByKey(room, key);
@@ -350,6 +360,7 @@ const HANDLERS = {
       existing.connected = true;
       existing.goneAt = null;
       existing.ahead = ahead === true;
+      existing.asks = asks === true;
       // Name and avatar only change in the lobby, so nobody is renamed mid-game.
       if (inLobby(room)) {
         existing.name = clean;
@@ -360,7 +371,7 @@ const HANDLERS = {
     }
     if (room.players.length >= LIMITS.maxPlayers) return;
     const id = makeId(rng);
-    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now, ahead: ahead === true }));
+    room.players.push(newPlayer({ id, key, name: clean, avatar: freeAvatar(room, avatar, rng), now, ahead: ahead === true, asks: asks === true }));
     if (!room.hostId) room.hostId = id;
   },
 
@@ -400,6 +411,18 @@ const HANDLERS = {
     p.sending = null;
     p.ready = true;
     p.photos = photos.filter((id) => typeof id === 'string').slice(0, room.settings.photos);
+  },
+
+  /**
+   * The answer to "Is everyone here?", anyone's: No (`go` false) lets the group wait, and
+   * "Start now" will start it; Yes, or "Start now" (`go`), starts the game, but only while
+   * everyone still said "Yes" (a tap that crossed someone's "Change" does nothing).
+   */
+  start(room, { playerId, go }) {
+    if (!playerById(room, playerId) || room.phase !== 'lobby') return;
+    if (!go) {
+      if (startMode(room) === 'ask') room.start = 'button';
+    } else if (startMode(room) !== 'auto' && everyoneSaidYes(room)) room.start = 'auto';
   },
 
   /** "Change": the player chooses again; their photos go, and an upload still on its way will not count. */
@@ -534,7 +557,7 @@ function transition(room, now, rng) {
   const connected = connectedPlayers(room);
   switch (room.phase) {
     case 'lobby':
-      if (everyoneSaidYes(room)) {
+      if (everyoneSaidYes(room) && startMode(room) === 'auto') {
         begin(room);
         return true;
       }
@@ -612,11 +635,13 @@ function settle(room, now, rng) {
     return;
   }
   upgradeGame(room, now);
-  // The last player is gone: an empty lobby keeps the code for whoever comes back with it.
-  if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final)) {
+  // The last player is gone: an empty lobby keeps the code for whoever comes back with it,
+  // and asks that group again before its first game.
+  if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final || room.start !== 'ask')) {
     toLobby(room);
     room.hostId = null;
     room.final = null;
+    room.start = 'ask';
   }
   // The final standings go once nobody looks at them any more.
   if (room.final && room.phase !== 'end' && !room.players.some((p) => p.onResults)) room.final = null;
