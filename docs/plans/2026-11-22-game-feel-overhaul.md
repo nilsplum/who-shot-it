@@ -47,6 +47,10 @@ knowing. Kept up to date with every commit.
   "Waiting for Review"), with the new recording: made with 10005 on the iPad, uncut, from
   opening the app to "Play again", removing a player and reporting a photo included (review
   note 1 says exactly that). It goes live by itself once approved.
+- The public TestFlight link (group "Friends") still gave 1.0.0: only that build had been
+  added there, by hand, and nothing sent later builds on. `app-store.mjs testflight` now
+  does (and `submit` ends with it): 1.0.5 is in "Friends" and was sent to Apple's beta
+  check on 23 November; the link gives 1.0.5 once Apple approves it.
 
 **To do by hand, in this order**
 1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone

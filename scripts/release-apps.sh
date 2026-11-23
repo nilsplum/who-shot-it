@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the store apps from the game in web/ and the native projects, and uploads them:
-#   ./scripts/release-apps.sh ios         to App Store Connect (then TestFlight; you press
-#                                          "Submit for Review" there). Mac with Xcode.
+#   ./scripts/release-apps.sh ios         to App Store Connect (then TestFlight for the team;
+#                                          --submit sends it on). Mac with Xcode.
 #   ./scripts/release-apps.sh android     to Google Play, released on the production track
 #                                          (Google reviews it, then it goes live).
 #   ./scripts/release-apps.sh             both
@@ -11,8 +11,9 @@
 #   --store-images            also redraw the store screenshots in store/images/ (when the
 #                             app's look or a caption changed)
 #   --submit                  after the iPhone upload, fill in the App Store page from the
-#                             listings in store/ and send the version to App Review
-#                             (scripts/helpers/app-store.mjs, with the API key in secrets/)
+#                             listings in store/ and send the version to App Review and to
+#                             the public TestFlight link (scripts/helpers/app-store.mjs,
+#                             with the API key in secrets/)
 #
 # Every run first runs all tests, draws the icons from web/icons/icon.svg, builds the
 # stylesheet web/css/app.css (scripts/helpers/styles.sh) and copies web/ into the native
@@ -140,10 +141,10 @@ PLIST
   xcodebuild -quiet -exportArchive -archivePath dist/ios/App.xcarchive -exportPath dist/ios \
     -exportOptionsPlist dist/ios/export.plist -allowProvisioningUpdates ${auth[@]+"${auth[@]}"}
   if [ "$submit" = true ]; then
-    echo "→ iPhone: filling in the App Store page and sending it to App Review"
+    echo "→ iPhone: filling in the App Store page and sending it to App Review and the public TestFlight link"
     node scripts/helpers/app-store.mjs submit --wait
   elif [ "$upload" = true ]; then
-    echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight. To publish: node scripts/helpers/app-store.mjs submit"
+    echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight for the team. For the public TestFlight link: node scripts/helpers/app-store.mjs testflight; to publish: node scripts/helpers/app-store.mjs submit (does both)"
   else
     echo "✓ dist/ios/App.ipa: upload it with Apple's Transporter app."
   fi

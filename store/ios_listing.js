@@ -24,7 +24,10 @@ import { SERVER, TIMING } from '../web/shared/config.js';
 
 const promotionalText = 'Your next party game is already on your phones: random photos from everyone’s camera roll, and one question. Whose is it?';
 
-/** One or two plain sentences about what players notice (Apple takes it only for updates). */
+/**
+ * What players notice in this version, in plain sentences: the App Store's "What's New"
+ * (Apple takes it only for updates) and TestFlight's "What to Test" for this version's build.
+ */
 const whatsNew = 'Up to 16 players and over 130 avatars. Yes is instant: your photos are sent in the background, and the 3, 2, 1 starts once every phone has the first photo. The first game asks “Is everyone here?”, and a player whose phone goes offline stays in the game, shown in red, until anyone removes them. A swapped photo turns over like a card, the leaderboard shows who overtakes whom, the scores stay hidden in the final round, and the podium reveals the winners one by one. A flagged photo is hidden for everyone at once, and the new setting “Own photo” sets the points for guessing your own photo.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */

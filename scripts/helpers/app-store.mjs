@@ -1,8 +1,8 @@
 /**
  * Talks to App Store Connect through its API, so a release needs no clicking:
- *   node scripts/helpers/app-store.mjs status   builds, TestFlight beta check, public link, versions
- *   node scripts/helpers/app-store.mjs submit   fills the App Store page and sends it to App Review
- *   node scripts/helpers/app-store.mjs testflight   fills TestFlight's test information (also part of submit)
+ *   node scripts/helpers/app-store.mjs status       builds, TestFlight beta check, public link, versions
+ *   node scripts/helpers/app-store.mjs submit       fills the App Store page and sends it to App Review
+ *   node scripts/helpers/app-store.mjs testflight   puts this version's build on the public TestFlight link (also part of submit)
  *   node scripts/helpers/app-store.mjs withdraw     takes the version in App Review back, to send a newer build
  * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
  *
@@ -20,6 +20,11 @@
  * approved yet back, so a newer build can take its place). Two settings have no API and
  * are made by hand once (store/ios_listing.js): App Privacy and the EU trader status; until
  * then Apple refuses the submission and this script prints Apple's reason.
+ *
+ * TestFlight: every upload reaches the team's internal group at once, but the people with
+ * the public link (the external groups) get a build only after Apple's beta check. Nothing
+ * sends it there by itself, so `testflight` does (friends can play a version before it is
+ * in the App Store), and `submit` ends with it: the public link never keeps an old version.
  *
  * Signs in with the team API key in `secrets/` (`app-store-connect.p8` and
  * `app-store-connect.json` with keyId and issuerId; git-ignored). The key and the token
@@ -119,6 +124,23 @@ const AGE_RATING = {
   ageRatingOverrideV2: { 13: 'THIRTEEN_PLUS', 16: 'SIXTEEN_PLUS', 18: 'EIGHTEEN_PLUS' }[LEGAL.minAge],
 };
 
+/**
+ * The uploaded build of this version (BUILD, from package.json) once Apple has processed it,
+ * which takes about 15 minutes. Right after an upload (`--wait`) it waits for it (at most
+ * 40 minutes, asking once a minute); otherwise it stops with the reason.
+ */
+async function findBuild(app) {
+  let builds = [];
+  for (let minute = 0; minute <= (WAIT ? 40 : 0); minute++) {
+    builds = (await get(`/v1/builds?filter[app]=${app.id}&filter[version]=${BUILD}&filter[processingState]=VALID`)).data;
+    if (builds.length || !WAIT) break;
+    if (minute === 0) console.log(`… waiting for Apple to process build ${BUILD}`);
+    await new Promise((resolve) => setTimeout(resolve, 60_000));
+  }
+  if (!builds.length) throw new Error(`Build ${VERSION} (${BUILD}) is not uploaded or not processed yet: ./scripts/release-apps.sh ios, then wait about 15 minutes.`);
+  return builds[0];
+}
+
 async function appInfo(app) {
   const infos = (await get(`/v1/apps/${app.id}/appInfos`)).data;
   return infos.find((i) => i.attributes.state !== 'READY_FOR_DISTRIBUTION') || infos[0];
@@ -152,17 +174,8 @@ async function setVersion(app) {
   }
   // "What's New" exists only for updates: Apple refuses it on an app's first version.
   const update = versions.some((v) => v.id !== version.id && v.attributes.appStoreState === 'READY_FOR_SALE');
-  // Apple processes an upload for about 15 minutes; right after an upload, wait for it (at
-  // most 40 minutes, asking once a minute), otherwise stop with the reason.
-  let builds = [];
-  for (let minute = 0; minute <= (WAIT ? 40 : 0); minute++) {
-    builds = (await get(`/v1/builds?filter[app]=${app.id}&filter[version]=${BUILD}&filter[processingState]=VALID`)).data;
-    if (builds.length || !WAIT) break;
-    if (minute === 0) console.log(`… waiting for Apple to process build ${BUILD}`);
-    await new Promise((resolve) => setTimeout(resolve, 60_000));
-  }
-  if (!builds.length) throw new Error(`Build ${VERSION} (${BUILD}) is not uploaded or not processed yet: ./scripts/release-apps.sh ios, then wait about 15 minutes.`);
-  await patch('appStoreVersions', version.id, { versionString: VERSION, copyright: listing.copyright, releaseType: 'AFTER_APPROVAL' }, { build: ref('builds', builds[0].id) });
+  const build = await findBuild(app);
+  await patch('appStoreVersions', version.id, { versionString: VERSION, copyright: listing.copyright, releaseType: 'AFTER_APPROVAL' }, { build: ref('builds', build.id) });
   const loc = (await get(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`)).data.find((l) => l.attributes.locale === listing.locale);
   await patch('appStoreVersionLocalizations', loc.id, {
     description: listing.description, keywords: listing.keywords, promotionalText: listing.promotionalText,
@@ -255,11 +268,17 @@ async function setPriceAndCountries(app) {
 }
 
 /**
- * TestFlight's test information, which Apple's beta check reads: what the app is, where
- * feedback goes, the privacy policy, the same contact as the App Review, and its test steps
- * as notes (a reviewer needs to know that a game takes two phones).
+ * This version's build for the public TestFlight link. First the test information Apple's
+ * beta check reads: what the app is, where feedback goes, the privacy policy, the same
+ * contact as the App Review, and its test steps as notes (a reviewer needs to know that a
+ * game takes two phones). Then the build's "What to Test", which testers see too
+ * (`whatsNew`), the build in every external group, and the build sent to the beta check;
+ * the testers get it once Apple approves it (usually within a day). Running it again only
+ * updates the texts: a build already in a group or sent to the check stays as it is.
  */
-async function setTestFlightInfo(app) {
+async function sendToTestFlight(app) {
+  const groups = (await get(`/v1/apps/${app.id}/betaGroups`)).data.filter((g) => !g.attributes.isInternalGroup);
+  if (!groups.length) throw new Error('No external TestFlight group: create one with a public link in App Store Connect (the app, TestFlight, External Testing, +).');
   const detail = (await get(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
   await patch('betaAppReviewDetails', detail.id, {
     contactFirstName: contact.firstName, contactLastName: contact.lastName, contactPhone: contact.phone, contactEmail: contact.email,
@@ -271,6 +290,16 @@ async function setTestFlightInfo(app) {
   if (loc) await patch('betaAppLocalizations', loc.id, attributes);
   else await api('POST', '/v1/betaAppLocalizations', { data: { type: 'betaAppLocalizations', attributes: { locale: listing.locale, ...attributes }, relationships: { app: ref('apps', app.id) } } });
   console.log('✓ TestFlight test information (description, feedback email, privacy policy, review contact and notes)');
+
+  const build = await findBuild(app);
+  const toTest = (await get(`/v1/builds/${build.id}/betaBuildLocalizations`)).data.find((l) => l.attributes.locale === listing.locale);
+  if (toTest) await patch('betaBuildLocalizations', toTest.id, { whatsNew: listing.whatsNew });
+  else await api('POST', '/v1/betaBuildLocalizations', { data: { type: 'betaBuildLocalizations', attributes: { locale: listing.locale, whatsNew: listing.whatsNew }, relationships: { build: ref('builds', build.id) } } });
+  for (const group of groups) await api('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+  const check = (await get(`/v1/betaAppReviewSubmissions?filter[build]=${build.id}`)).data[0];
+  if (!check) await api('POST', '/v1/betaAppReviewSubmissions', { data: { type: 'betaAppReviewSubmissions', relationships: { build: ref('builds', build.id) } } });
+  const names = groups.map((g) => g.attributes.name).join(', ');
+  console.log(`✓ TestFlight: build ${VERSION} (${BUILD}) with “What to Test” in ${names}, ${check ? `beta check ${check.attributes.betaReviewState}` : 'sent to Apple’s beta check; the public link has it once approved (usually within a day)'}`);
 }
 
 async function sendToReview(app, version) {
@@ -309,20 +338,20 @@ async function submit() {
   if (found.length) throw new Error(`The listing is not ready (./scripts/dev.sh store shows it):\n  ${found.join('\n  ')}`);
   if (!AGE_RATING.ageRatingOverrideV2) throw new Error(`Apple has no ${LEGAL.minAge}+ rating (13, 16 or 18): LEGAL.minAge in web/shared/config.js`);
   const app = await findApp();
-  await setTestFlightInfo(app);
   await setAppDetails(app, await appInfo(app));
   const { version, loc } = await setVersion(app);
   await setReviewDetails(version);
   await setScreenshots(loc);
   await setPriceAndCountries(app);
   await sendToReview(app, version);
+  await sendToTestFlight(app);
 }
 
 const command = process.argv[2];
 try {
   if (command === 'status') await status();
   else if (command === 'submit') await submit();
-  else if (command === 'testflight') await setTestFlightInfo(await findApp());
+  else if (command === 'testflight') await sendToTestFlight(await findApp());
   else if (command === 'withdraw') await withdraw();
   else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit|testflight|withdraw');
 } catch (error) {
