@@ -27,12 +27,22 @@ knowing. Kept up to date with every commit.
 - The iPhone app 1.0.5 (build 10005) is in TestFlight, not sent to App Review. Builds 1.0.3
   (10003) and 1.0.4 (10004) are not to be released: 1.0.5 replaces them. Apple's upload
   warned that from April 2027 iPhone apps must be built with the iOS 27 SDK (a newer Xcode).
-- Not in 1.0.5 and not live: the other session's work on the store release (the listings,
-  the screenshots, "Gameplay Content" in the privacy manifest, the App Store button on the
-  invite page) was not committed when 1.0.5 was built and deployed, and stays uncommitted in
-  the main folder as it was. The privacy manifest is part of the iPhone app and must match
-  the App Privacy answers, so the build sent to App Review with those answers must be built
-  after it is committed (a new version, 1.0.6: the build number follows the version).
+- The store release work is on `main` (commits 847b99b, c3e1cc8, 9d222a5) and live:
+  the listings with the words players search for (the reasoning is in the header of
+  `store/android_ios_listing.js`), the screenshots redrawn from 1.0.5, "Gameplay Content"
+  (answers, points, reactions) in the privacy label, and the App Store button on the invite
+  page instead of a Google Play button to a page that does not exist yet (`STORES`, deployed
+  as Cloudflare version `9226b0f0`, which changed only the website's config).
+- The operator ticked "Gameplay Content" in App Store Connect (App Privacy). The privacy
+  manifest in the repo says the same; build 10005 was made just before, so its manifest
+  still lists only photos and the user ID. That manifest is Apple's report for the
+  developer, not what players or App Review see (the App Privacy answers are), so 1.0.5 is
+  released as it is (the operator's choice: 1.0.5 is the release version) and the next
+  update carries the manifest.
+- Version 1.0.0 (build 10000), sent to App Review on 22 November and still "In Review"
+  with automatic release, was taken back (`node scripts/helpers/app-store.mjs withdraw`), so
+  the old app can never go live by itself. It waits as "Developer Rejected" (Apple's word for
+  "taken back"); `submit` attaches build 10005 to it, renames it 1.0.5 and sends it.
 
 **To do by hand, in this order**
 1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone
@@ -66,19 +76,19 @@ knowing. Kept up to date with every commit.
    needed any more (the app is already live), change the first review note in
    `store/ios_listing.js` instead.
 3. Release the iPhone app: `node scripts/helpers/app-store.mjs submit` fills in the App
-   Store page and sends the TestFlight build of `package.json`'s version (now 10005) to App
-   Review (no new upload; it goes live by itself once approved). With the privacy manifest's
-   change (above), commit it, raise the version to 1.0.6 and run
-   `./scripts/release-apps.sh ios --submit` instead (builds, uploads and submits).
+   Store page and sends the TestFlight build of `package.json`'s version (10005) to App
+   Review (no new upload; it goes live by itself once approved, and the invite page's App
+   Store button works from then on).
 4. Release the Android app. This Mac has neither the Android upload key
    (`secrets/android-upload.jks` and `.properties`) nor the Google Play key
    (`secrets/google-play.json`): restore them from the backup into `secrets/` first, then
    `./scripts/release-apps.sh android`. Without the upload key the script would create a
    new one, which Google refuses for an app that was uploaded with another key before.
-   Then in the Play Console by hand (`docs/guides/android.md`): the description (its party
-   and privacy bullets changed) and the four redrawn screenshots
-   `store/images/android_screenshot-{1,2,3,5}-*.png`; `./scripts/dev.sh store` shows both
-   pages to copy from.
+   Then in the Play Console by hand (`docs/guides/android.md`): the short and the full
+   description, Data safety (now with "App activity: Other actions") and all five
+   screenshots `store/images/android_screenshot-*.png`; `./scripts/dev.sh store` shows both
+   pages to copy from. Once its page is public, set `STORES.android` and deploy, so invites
+   show the Google Play button too.
 
 **Decisions worth knowing** (details in the decision log, section 12)
 - Your own AGENTS.md edit got into my commit 2 by mistake (`git add -A`); I took it out
