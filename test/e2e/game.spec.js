@@ -12,7 +12,8 @@
  * that waits for a phone still loading the next photos. A full table of 16 (three phones of
  * the smallest sizes and light bots, `bots.js`) on every screen of a game (the question
  * before it too): nothing scrolls
- * the page, the lobby's photos are as wide as No and Yes, and the reaction row shows whole
+ * the page, the lobby's photos are as wide as No and Yes, its players take two rows that
+ * their arrow pages through (turning at each end), and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
  * swaps (the count, the turn, a refused tap) and the hold in the photo choice, the terms
  * after an update, and the website (the same page in a plain browser): invite page and
@@ -82,8 +83,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
     await join(page, code);
     guests.push(page);
   }
-  const chips = host.locator('[data-part="chips"] > *');
+  // The pills, in their two rows; five fit, so the rows stand still and show no arrow.
+  const chips = host.locator('[data-part="chips"] > * > *');
   await expect(chips).toHaveCount(5);
+  await expect(host.getByRole('button', { name: 'More players' })).toBeHidden();
 
   // Eve's phone goes away. Nobody is removed for that by the room: her pill turns red on
   // every phone, and anyone (here Ben, not the host) may take her off; she could join again.
@@ -262,7 +265,7 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
 /**
  * The screen on `page` fits it: the page scrolls neither down nor sideways, and a reaction
  * row shows its first five reactions whole. With `paging`, its arrow then goes to the last
- * five (whole again), and from there back to the first.
+ * five (whole again) and turns round, and from there back to the first and turns again.
  */
 async function fits(page, { paging = false } = {}) {
   const { width, height } = page.viewportSize();
@@ -287,8 +290,37 @@ async function fits(page, { paging = false } = {}) {
   const arrow = page.getByRole('button', { name: 'More reactions' });
   await arrow.click();
   await expect.poll(shown, `${where}: the arrow goes to the end`).toEqual({ whole: last, cut: 0 });
+  await expect(arrow, `${where}: and turns round there`).toHaveAttribute('data-back');
   await arrow.click();
   await expect.poll(shown, `${where}: and back`).toEqual({ whole: first, cut: 0 });
+  await expect(arrow, `${where}: where it turns again`).not.toHaveAttribute('data-back');
+}
+
+/**
+ * Pages a sideways row (`ui.sidewaysRow`) by its arrow named `label`, as a player would: a
+ * page (the row's visible width) per tap to the right end, where the arrow turns round
+ * (`data-back`) and not a tap earlier, then a page per tap back to the left end, where it
+ * turns again. Each tap waits for the row to glide to its page.
+ */
+async function pageThrough(page, label) {
+  const arrow = page.getByRole('button', { name: label });
+  const row = () => arrow.evaluate((el) => {
+    const s = el.previousElementSibling;
+    return { left: s.scrollLeft, width: s.clientWidth, max: s.scrollWidth - s.clientWidth };
+  });
+  const pointsBack = (back) => (back ? expect(arrow).toHaveAttribute('data-back') : expect(arrow).not.toHaveAttribute('data-back'));
+  const { width, max } = await row();
+  const pages = Math.ceil(max / width);
+  expect(pages, `${label}: the row is longer than the screen`).toBeGreaterThan(0);
+  for (const back of [false, true]) {
+    for (let k = 1; k <= pages; k++) {
+      await pointsBack(back);
+      await arrow.click();
+      const target = back ? Math.max(max - k * width, 0) : Math.min(k * width, max);
+      await expect.poll(async () => Math.abs((await row()).left - target) <= 1, `${label}: tap ${k} ${back ? 'back' : 'on'}`).toBe(true);
+    }
+  }
+  await pointsBack(false);
 }
 
 /** How far the photo grid's outer edges are from No's left and Yes's right edge, in px. */
@@ -335,12 +367,15 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
   for (const page of guests) await join(page, code);
   const bots = await addBots(baseURL, code, LIMITS.maxPlayers - phones.length);
   try {
-    await expect(host.locator('[data-part="chips"] > *')).toHaveCount(LIMITS.maxPlayers);
-    // The lobby: 16 pills above the photos, which are exactly as wide as No and Yes.
+    await expect(host.locator('[data-part="chips"] > * > *')).toHaveCount(LIMITS.maxPlayers);
+    // The lobby: 16 pills in two rows above the photos, which are exactly as wide as No and
+    // Yes. The rows scroll sideways together, and their arrow pages through them.
     for (const page of phones) {
       await dealPhotos(page, 4);
       await fits(page);
       await expect.poll(() => gridEdges(page), 'the grid lines up with No and Yes').toEqual([0, 0]);
+      await expect(page.locator('[data-part="chips"] > *')).toHaveCount(2);
+      await pageThrough(page, 'More players');
     }
     for (const page of phones) {
       await page.getByRole('button', { name: 'Yes', exact: true }).click();

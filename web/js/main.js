@@ -41,7 +41,9 @@
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change. The timer bar
  *   is animated every frame from the round's timer on the server's clock (`clock.js`,
- *   learned from every view) and the timer's length the view carries (`total`).
+ *   learned from every view) and the timer's length the view carries (`total`). The arrow
+ *   of a row that scrolls sideways (`ui.sidewaysRow`: the lobby's players, the reactions)
+ *   follows its row after every paint and every scroll (`ui.syncRow`).
  * - The flag: ⚑ flags the photo in the room (the others stop seeing it, the round waits)
  *   and opens the report sheet on this phone; Delete, Cancel, the backdrop and the back
  *   button end it (`endFlag`). The sheet is this phone's own intent: the room's views only
@@ -75,7 +77,7 @@ import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
 import { device, keyFor, saveDevice, session } from './store.js';
 import { photoState, photoUrl, readyFor, shareFor, syncUpcoming } from './upcoming.js';
-import { canRemove, floatEmoji, quietScrollbars, toast } from './ui.js';
+import { canRemove, floatEmoji, quietScrollbars, stepRow, syncRow, toast } from './ui.js';
 import { endScreen } from './views/end.js';
 import { gameScreen } from './views/game.js';
 import { homeScreen } from './views/home.js';
@@ -308,6 +310,8 @@ function lookLayers() {
 
 function render() {
   const changed = paintApp(screen());
+  // In the same task as the paint, so no frame shows an arrow that does not fit what it scrolls.
+  for (const row of $('app').querySelectorAll('[data-sideways]')) syncRow(row);
   // Another screen: the podium's light (sparks, fireworks) belongs to the one before.
   if (changed.includes('layout')) clearSparks();
   if (changed.includes('stage')) startStage();
@@ -799,15 +803,8 @@ const ACTIONS = {
     send({ type: 'react', emoji });
     floatEmoji(emoji);
   },
-  /**
-   * The arrow of the reaction row (right after the row, `ui.reactionsRow`): all the way to
-   * the end (the last five reactions), and from there back to the start.
-   */
-  reactmore: (value, el) => {
-    const row = el.previousElementSibling;
-    const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
-    row.scrollTo({ left: atEnd ? 0 : row.scrollWidth });
-  },
+  /** The arrow of a row that scrolls sideways (`ui.sidewaysRow`): a page the way it points. */
+  sideways: (value, el) => stepRow(el),
   /** ⚑: the room hides the photo from the others and holds the round while this phone decides in the report sheet. */
   report: () => {
     const v = session.view;
@@ -972,6 +969,12 @@ document.addEventListener('keydown', (e) => {
 
 // A list scrolling inside a screen shows its thin scrollbar only meanwhile.
 quietScrollbars();
+// A sideways row's arrow turns as its row reaches an end, swiped or paged (scroll events do
+// not bubble, so one listener for the whole page catches them on their way down).
+document.addEventListener('scroll', (e) => {
+  const row = e.target instanceof Element ? e.target.parentElement : null;
+  if (row && row.hasAttribute('data-sideways')) syncRow(row);
+}, { capture: true, passive: true });
 
 // ---------- Boot ----------
 

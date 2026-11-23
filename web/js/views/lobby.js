@@ -13,10 +13,11 @@
  * player opens "Remove?" (the host may remove anyone, everyone a player who is offline;
  * nobody is removed for being offline).
  *
- * The players: a pill each, its border always 2 px (so nothing shifts): green when ready,
- * dashed grey while the game waits for them to be ready, red and glowing slowly with
- * "Offline, tap to remove" while they are offline, never faded. From PILLS_COMPACT_FROM
- * players on the pills are compact, so 16 fit above the photos on a small phone.
+ * The players: a small pill each, its border always 2 px (so nothing shifts): green when
+ * ready, dashed grey while the game waits for them to be ready, red and glowing slowly with
+ * "Offline, tap to remove" while they are offline, never faded. They take exactly two rows
+ * that scroll sideways together, with an arrow at their right while they do not all fit
+ * (`players`, `ui.sidewaysRow`), so the photo grid keeps the same room for 2 players or 16.
  *
  * The photos: a grid of 2 x 2 to 5 x 5 places (by "Photos per player") filling the room
  * between the players and the buttons, exactly as wide as No and Yes; on a short screen
@@ -36,7 +37,7 @@
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
 import { photos } from '../photos.js';
-import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, topBar } from '../ui.js';
+import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, sidewaysRow, topBar } from '../ui.js';
 
 const label = (key, value) => {
   const setting = SETTINGS.find((s) => s.key === key);
@@ -56,8 +57,8 @@ const SIDES = { 2: 'grid-cols-2 grid-rows-2', 3: 'grid-cols-3 grid-rows-3', 4: '
  * free space (a size container), the grid its full width (as wide as No and Yes) and as much
  * of its height as keeps a tile at most 3:4 portrait (`100cqw * 4/3`, the gaps aside); in a
  * taller box it sits in the middle. Its rows and columns stretch, so the tiles take the free
- * space's shape. Only below 9rem of free height (7rem on a short screen, where 16 players
- * leave no more) does the page scroll instead. Without container units (iOS 15) the tiles are square and the grid
+ * space's shape. Only below 9rem of free height (7rem on a short screen, which has the least
+ * to give) does the page scroll instead. Without container units (iOS 15) the tiles are square and the grid
  * takes the full width. `busy` dims it under a spinner while "No" waits for new photos.
  */
 function grid(tiles, size, busy = false) {
@@ -192,33 +193,48 @@ function startNow({ view }) {
   return `<button class="btn mt-3 animate-breathe bg-coral text-white disabled:animate-none motion-reduce:animate-none" data-act="go" ${view.start.everyone ? '' : 'disabled'}>Start now</button>`;
 }
 
-/** From this many players on, the pills are compact: smaller avatar, text and padding. */
-const PILLS_COMPACT_FROM = 7;
-const PILLS = {
-  roomy: { cls: 'gap-1.75 py-0.5 pr-3 pl-0.5 text-sm', avatar: 'md' },
-  compact: { cls: 'gap-1 pr-2 text-xs', avatar: 'sm' },
-};
-
 /**
  * A player's pill, its look by how the game stands with them: ready (green), not ready
  * (dashed grey), offline (the red warning light, `ui.OFFLINE_LOOK`, with "Offline, tap to
  * remove" under the name). A player this phone may remove (`ui.canRemove`: the host anyone
- * else, everyone an offline player) is a button that opens the "Remove?" sheet.
+ * else, everyone an offline player) is a button that opens the "Remove?" sheet. It is as
+ * tall as its row (`players`), the offline note's two lines included, and a long name is cut
+ * short, so one name never takes a row's width.
  */
 function chip(view, p) {
-  const size = view.players.length >= PILLS_COMPACT_FROM ? PILLS.compact : PILLS.roomy;
   const offline = !p.connected;
   const look = offline ? OFFLINE_LOOK : p.ready ? 'border-green bg-card' : 'border-dashed border-line-strong bg-card';
   const name = offline
-    ? `<span class="flex min-w-0 flex-col leading-tight"><span class="truncate">${esc(p.name)}</span><small class="truncate text-2xs text-red">Offline, tap to remove</small></span>`
-    : `<span class="truncate">${esc(p.name)}</span>`;
-  const inner = `${avatar(p, size.avatar)}${name}${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready && !offline ? '<span class="text-green">✓</span>' : ''}`;
-  const cls = `flex max-w-[46%] items-center rounded-full border-2 ${size.cls} ${look}`;
+    ? `<span class="flex flex-col text-left"><span class="max-w-28 truncate leading-tight">${esc(p.name)}</span><small class="text-2xs leading-none whitespace-nowrap text-red">Offline, tap to remove</small></span>`
+    : `<span class="max-w-28 truncate">${esc(p.name)}</span>`;
+  const inner = `${avatar(p, 'sm')}${name}${p.id === view.hostId ? '<span aria-label="Host">👑</span>' : ''}${p.ready && !offline ? '<span class="text-green">✓</span>' : ''}`;
+  const cls = `flex items-center gap-1 rounded-full border-2 pr-2 pl-0.5 text-xs ${look}`;
   const label = offline ? `${esc(p.name)} is offline: remove from game` : `${esc(p.name)}: remove from game`;
   return canRemove(view, p)
     ? `<button class="${cls}" data-act="remove" data-v="${esc(p.id)}" aria-label="${label}">${inner}</button>`
     : `<div class="${cls}">${inner}</div>`;
 }
+
+/**
+ * The players in two rows that scroll sideways together (the `chips` slot of the lobby's
+ * sideways row): the first, third, fifth… player on top, the others below, so whoever joins
+ * is added at the end of a row and nobody else moves. Both rows are always there and every
+ * pill is exactly as tall as its row, so the two rows take the same height for one player or
+ * sixteen, offline or not.
+ */
+function players(view) {
+  const pills = view.players.map((p) => chip(view, p));
+  const row = (second) => `<div class="flex h-8 gap-1.5">${pills.filter((_, i) => i % 2 === second).join('')}</div>`;
+  return row(0) + row(1);
+}
+
+/**
+ * The slot the players are painted into: as wide as they are and in the middle while they
+ * fit, else starting at the left edge (an auto margin, so nothing is ever cut off at the
+ * start). Its 4 px around them, which the scroller's negative margin takes back in height,
+ * keep an offline player's glow (`animate-beacon`, 4 px) from being clipped by the scroller.
+ */
+const PLAYERS_SLOT = '<div class="mx-auto flex w-max flex-col gap-1.5 p-1" data-part="chips"></div>';
 
 export function lobbyScreen(c) {
   const { view } = c;
@@ -229,7 +245,7 @@ export function lobbyScreen(c) {
       ${topBar(LEAVE_BUTTON, '', HELP_BUTTON)}
       <button class="mx-auto mt-1.5 mb-2 flex justify-center gap-2 active:scale-97" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span class="grid h-16 w-13.5 place-items-center rounded-2xl bg-yellow font-display text-6xl font-extrabold text-navy short:h-12 short:w-10.5 short:text-4xl">${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>
-      <div class="mt-4.5 mb-1.5 flex flex-wrap justify-center gap-1.5 short:mt-2.5" data-part="chips"></div>
+      ${sidewaysRow(PLAYERS_SLOT, 'More players', { row: 'mt-4.5 mb-1.5 short:mt-2.5', scroller: '-my-1' })}
       <div class="mt-4.5 flex flex-1 flex-col short:mt-2.5">
         <div data-part="title"></div>
         <div class="flex flex-1 flex-col" data-part="pick"></div>
@@ -242,7 +258,7 @@ export function lobbyScreen(c) {
     </div>`,
     parts: {
       cfg: `<button class="mx-auto block rounded-full border border-line bg-card px-3.5 py-1.75 text-xs ${host ? 'text-ink' : 'text-muted'}" data-act="settings">${esc(settingsSummary(view.settings))}${host ? ' ⚙︎' : ''}</button>`,
-      chips: view.players.map((p) => chip(view, p)).join(''),
+      chips: players(view),
       ...mine(c),
       status: status(c),
       go: startNow(c),

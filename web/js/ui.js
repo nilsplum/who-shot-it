@@ -3,7 +3,8 @@
  * who may remove them), the top bar and its buttons, the logo
  * with the big title, the two ways to show a wait (the spinner and the progress bar), the
  * timer bar, the list of rules or steps, the confetti of a win, the quiet scrollbars, the
- * one toast, and the reaction row with its floating emojis.
+ * one toast, the row that scrolls sideways with its arrow (the lobby's players, the
+ * reactions), and the reaction row with its floating emojis.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -31,8 +32,8 @@ export const colourOf = (emoji) => `var(--color-p${Math.max(0, EMOJIS.indexOf(em
 
 /** Avatar sizes; the emoji grows with the circle. */
 const AVATAR_SIZES = {
-  sm: 'size-6 text-xs', // who has answered (16 fit in two rows on the smallest phone), the compact cards
-  md: 'size-8 text-lg', // chips, the ranking under the podium, the cards for 5 to 9 players
+  sm: 'size-6 text-xs', // who has answered (16 fit in two rows on the smallest phone), the lobby's pills, the compact cards
+  md: 'size-8 text-lg', // the ranking under the podium, the cards for 5 to 9 players
   lg: 'size-10 text-3xl', // the cards for up to 4 players, the leaderboard
   xl: 'size-13 text-4xl', // the podium
 };
@@ -179,17 +180,54 @@ export function toast(text) {
 }
 
 /**
- * The reaction row, the same on every screen that has one: emoji buttons in a row that
- * scrolls sideways (most used first), and right after it a small arrow (`main.js`, action
- * `reactmore`, scrolls the element before the arrow) that goes to the end and from there
- * back to the start. Each button is exactly a fifth of the row (the round emoji in its
- * middle) and the row snaps to whole buttons, so it always shows five whole ones: never a
- * button cut off at the edge, and the ten reactions are two pages. Its markup never
- * changes, so a repaint keeps the scroll.
+ * A row that scrolls sideways with an arrow right after it, the same wherever a row may be
+ * longer than the screen is wide: the lobby's players (two rows that scroll together) and
+ * the reaction row. `content` is what scrolls (or the empty `data-part` slot a view fills),
+ * `label` names the arrow, `row` and `scroller` add classes. A finger swipes it as usual.
+ * The arrow (action `sideways`, `stepRow`) moves it a page at a time to the right; once
+ * the right end is reached it turns round (`data-back`) and moves it back a page at a time
+ * until the left end, where it turns again. While everything fits, the arrow is hidden
+ * (`data-off`) and the row gets its room. `main.js` keeps the arrow right after every
+ * paint and every scroll (`syncRow`). The scroller and the arrow belong to the screen's
+ * layout and only `content` may be repainted, so a repaint keeps the scroll and the
+ * arrow's way.
+ */
+export const sidewaysRow = (content, label, { row = '', scroller = '' } = {}) =>
+  `<div class="flex gap-1.5 ${row}" data-sideways><div class="flex min-w-0 flex-1 scroll-smooth overflow-x-auto overscroll-x-contain scrollbar-none motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden ${scroller}">${content}</div><button class="w-8 shrink-0 text-4xl text-muted transition-transform data-back:rotate-180 data-off:hidden motion-reduce:transition-none" data-act="sideways" aria-label="${label}">›</button></div>`;
+
+/**
+ * Brings the arrow of a sideways row (`row`, the element with `data-sideways`) up to date
+ * with its scroll. Hidden while everything fits, measured against the whole row with the
+ * arrow's room, so hiding the arrow never makes the row overflow and showing it never makes
+ * it fit (no state in between flips back and forth). Otherwise it points back from the
+ * moment the right end is reached until the left end is. It reads three numbers of one
+ * element and changes an attribute only when its state changes, so `main.js` calls it after
+ * every paint (a player joined, the screen turned, a font arrived) and on every scroll.
+ */
+export function syncRow(row) {
+  const [scroller, arrow] = row.children;
+  const fits = scroller.scrollWidth <= row.clientWidth + 1;
+  arrow.toggleAttribute('data-off', fits);
+  if (fits || scroller.scrollLeft <= 1) arrow.toggleAttribute('data-back', false);
+  else if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1) arrow.toggleAttribute('data-back', true);
+}
+
+/** A tap on a sideways row's arrow: a page (the row's visible width) the way it points; the row glides there (`scroll-smooth`). */
+export function stepRow(arrow) {
+  const scroller = arrow.previousElementSibling;
+  scroller.scrollBy({ left: (arrow.hasAttribute('data-back') ? -1 : 1) * scroller.clientWidth });
+}
+
+/**
+ * The reaction row, the same on every screen that has one: emoji buttons in a sideways row
+ * (`sidewaysRow`), most used first. Each button is exactly a fifth of the row (the round
+ * emoji in its middle) and the row snaps to whole buttons, so it always shows five whole
+ * ones: never a button cut off at the edge, and the ten reactions are two pages, one tap
+ * of the arrow apart. Its markup never changes, so a repaint keeps the scroll.
  */
 export function reactionsRow(reactions) {
   const buttons = reactions.map((e) => `<button class="group grid w-1/5 shrink-0 snap-start place-items-center py-1" data-act="react" data-v="${e}" aria-label="React ${e}"><span class="grid aspect-square w-[calc(100%-4px)] max-w-13 place-items-center rounded-full bg-card text-4xl group-active:scale-85">${e}</span></button>`).join('');
-  return `<div class="flex items-center gap-1.5"><div class="flex flex-1 snap-x snap-mandatory scroll-smooth overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">${buttons}</div><button class="h-13 w-8 shrink-0 text-4xl text-muted" data-act="reactmore" aria-label="More reactions">›</button></div>`;
+  return sidewaysRow(buttons, 'More reactions', { scroller: 'snap-x snap-mandatory' });
 }
 
 /**

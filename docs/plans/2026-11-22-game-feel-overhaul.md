@@ -52,6 +52,17 @@ knowing. Kept up to date with every commit.
   does (and `submit` ends with it): 1.0.5 is in "Friends" and was sent to Apple's beta
   check on 23 November; the link gives 1.0.5 once Apple approves it.
 
+**On `main` since 1.0.5, in no app yet**
+- The lobby's players take exactly two rows that scroll sideways together, with an arrow at
+  their right while they do not all fit; it pages through them and turns round at each end,
+  as the reaction row's arrow now does too (one `ui.sidewaysRow` for both). Every pill has
+  one size, so the photo grid keeps the same room from 2 players to 16: on a 360 x 640
+  phone with 16 players 211 px of height instead of 112. It ships with the next build:
+  raise the version to 1.0.6 first, also for an Android release from `main`, which would
+  otherwise be a different 1.0.5 than the iPhone's.
+- The test players fill a game up to its 16 players (`scripts/helpers/demo-players.mjs`;
+  only this Mac runs them, nothing to release).
+
 **To do by hand, in this order**
 1. Try 1.0.5 on a real iPhone (TestFlight, against the live server) and a real Android phone
    (`./scripts/dev.sh android`, the game from this Mac), right after starting the app, with
