@@ -1,0 +1,50 @@
+/*
+ * The reveal animations' stylesheet, built by Tailwind like the app's: it imports the
+ * app's (styles/app.css) and adds what the story needs, written the way app.css writes
+ * it, so a chosen one moves over as it is: entrances in the theme (`--animate-…`, used as
+ * classes), and utilities for the pieces and the states the story sets.
+ *
+ * Mechanisms: views.js and reveal.js use these as whole class names; `data-playing` on the
+ * screen holds the result back until the story sets `data-go` on it.
+ *
+ * Invariant: only theme colours (`var(--color-…)`), and every entrance animates transform,
+ * scale, rotate or opacity, so nothing lays out again.
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+@theme {
+  --animate-rv-stamp: rv-stamp 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; /* the ✓ or ✗ of the reveal, stamped on */
+  --animate-rv-rise: rv-rise 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; /* the points of a right guess, rising off the card */
+
+  @keyframes rv-stamp { from { scale: 2.2; rotate: -25deg; opacity: 0; } 60% { scale: 0.9; rotate: 4deg; opacity: 1; } }
+  @keyframes rv-rise { from { translate: -50% 0; scale: 0.5; opacity: 0; } 18% { translate: -50% -55%; scale: 1.15; opacity: 1; } 70% { opacity: 1; } to { translate: -50% -170%; scale: 1; opacity: 0; } }
+}
+
+/* Hidden while the story plays, until it or the element it sits in is let go (`data-go`). */
+@utility rv-waits {
+  [data-playing] &:not([data-go], [data-go] *) { visibility: hidden; }
+}
+
+/* A reveal card whose result is not out yet: it looks like the round's other cards (plain), or still like my pick (chosen). */
+@utility rv-hold-plain {
+  [data-playing] &:not([data-go]) { border-color: transparent; background-color: var(--color-card); }
+}
+@utility rv-hold-chosen {
+  [data-playing] &:not([data-go]) { border-color: var(--color-yellow); background-color: var(--color-picked); }
+}
+
+/* The reveal's light, a frame of white light the size of a card; `data-off` while it holds on the near miss. */
+@utility rv-seek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  pointer-events: none;
+  border: 3px solid var(--color-white);
+  background-color: color-mix(in srgb, var(--color-white) 10%, transparent);
+  box-shadow: 0 0 22px 3px color-mix(in srgb, var(--color-white) 45%, transparent), inset 0 0 14px color-mix(in srgb, var(--color-white) 22%, transparent);
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  &[data-off] { border-color: var(--color-line-strong); background-color: transparent; box-shadow: none; }
+}

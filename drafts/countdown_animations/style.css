@@ -1,0 +1,49 @@
+/*
+ * The countdown animations' stylesheet, built by Tailwind like the app's: it imports the
+ * app's (styles/app.css) and adds the few pieces the countdowns draw, written the way
+ * app.css writes them (`cd-` utilities, and the film leader's weave in the theme), so a
+ * chosen one moves over as it is.
+ *
+ * Mechanisms: the countdowns (lens.js, timer.js, leader.js, pulse.js) use these as whole
+ * class names; everything else they draw is the app's own classes.
+ *
+ * Invariant: only theme colours (`var(--color-…)`), and nothing that moves lays out again
+ * (the weave moves with `translate` and `opacity`).
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+@theme {
+  --animate-cd-weave: cd-weave 0.33s steps(1) infinite; /* film leader: the picture weaving a little, like film in a projector */
+
+  /* A few positions a fraction of a pixel apart, jumped between (steps), with a faint flicker. */
+  @keyframes cd-weave { 0% { translate: 0 0; opacity: 1; } 25% { translate: 0.6px -0.4px; } 50% { translate: -0.4px 0.5px; opacity: 0.95; } 75% { translate: 0.3px 0.3px; opacity: 1; } }
+}
+
+/*
+ * Lens: a blade of the iris in the lens's round window. Its bottom edge runs through the
+ * window's middle; six of them, turned 60° apart and pushed out along their own axis, leave
+ * a hexagon open, pushed in they close it. Lighter at the edge, like metal.
+ */
+@utility cd-blade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 240px;
+  height: 120px;
+  margin: -120px 0 0 -120px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(to top, var(--color-raised), var(--color-stage) 16px);
+  border-bottom: 1.5px solid var(--color-line-strong);
+}
+
+/* Lens: the light that blooms when the shutter opens. */
+@utility cd-bloom {
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-white) 85%, transparent) 0, transparent 70%);
+}
+
+/* Pulse: the warm light behind the number. */
+@utility cd-glow {
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-yellow) 32%, transparent) 0, transparent 65%);
+}
