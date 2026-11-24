@@ -7,9 +7,10 @@
  * loaded ahead into memory (`upcoming.js`): the stage paints the round's photo from there
  * (`state.src`), and while the room waits for the phones to be ready for the round (`load`)
  * it shows how far the whole table is (`ui.progress`). `main.js` starts the effect when
- * the `stage` part changes, animates the timer bar (`#tbar`) every frame and vibrates when
- * the photo appears (`main.js` `moments`). The bar is a part of its own: on the reveal it
- * changes from the answer time's look to the look time's (`ui.timerBar`). Tapping a player
+ * the `stage` part changes, gives the timer bar (`#tbar`) its animation (`syncBar`) and
+ * vibrates when the photo appears (`main.js` `moments`). The bar is a part of its own: on
+ * the reveal it changes from the answer time's look to the look time's (`ui.timerBar`), and
+ * so gets an animation of its own (the look time's). Tapping a player
  * in the "who has answered" row opens "Remove?" (`views/sheets.js`) for the host, and for
  * everyone while that player is offline. The scores live on the leaderboard between the
  * rounds; the reveal shows only my own points of the round, rising off my card for a

@@ -1,7 +1,8 @@
 /**
  * The server's clock on a phone (web/js/clock.js): learned from the fastest view, a timer
  * that ends at one moment on the server's clock, so a late view never moves a countdown,
- * while a restarted timer and a held round still show right away.
+ * while a restarted timer and a held round still show right away; and that moment on the
+ * phone's own clock, where the timer bar's animation is pinned.
  */
 import { expect, test } from 'vitest';
 import { createClock } from '../../web/js/clock.js';
@@ -78,6 +79,27 @@ test('a restarted or extended timer shows at once; a held round stands still and
   expect(clock.left(timer)).toBe(2500);
   pass(9999);
   expect(clock.left(timer)).toBe(0);
+});
+
+test('the end on the phone\'s own clock stays put, moves only when the clock learns better, and matches what is left', () => {
+  const { time, clock, pass } = phone();
+  // Learned from a view 300 ms late: the phone puts the end of a 10 s timer 300 ms late.
+  clock.heard(time.server - 300);
+  const timer = clock.timer(10000, time.server);
+  const end = clock.endsAt(timer);
+  expect(end).toBe(time.local + 10300);
+  // Time passing never moves it (the bar's animation stays pinned), and it is always
+  // exactly what `left` counts down to.
+  pass(4000);
+  expect(clock.endsAt(timer)).toBe(end);
+  expect(clock.endsAt(timer) - time.local).toBe(clock.left(timer));
+  // A faster view: the end moves to within 20 ms of the true one, a little earlier.
+  clock.heard(time.server - 20);
+  expect(clock.endsAt(timer)).toBe(end - 280);
+  expect(clock.endsAt(timer) - time.local).toBe(clock.left(timer));
+  // A held round and no timer have no end.
+  expect(clock.endsAt(clock.timer(4000, time.server, true))).toBeNull();
+  expect(clock.endsAt(null)).toBeNull();
 });
 
 test('no timer, and a view without the server time (a server before it) anchors on arrival', () => {

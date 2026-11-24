@@ -12,6 +12,9 @@
  * keeps it: the usual way a game client follows its server's clock. A timer (`timer`) then
  * ends at `now + left` on the server's clock: the same moment in every view of the same
  * timer, however late a view arrives, while a restarted or extended timer ends at another.
+ * `left` counts down to that moment; `endsAt` names it on the phone's own clock, which is
+ * the clock the browser runs its animations on, so the timer bar (main.js `syncBar`) is one
+ * animation that empties right then.
  *
  * Invariants:
  * - A late view never moves a countdown: it neither changes a timer's end (exact on the
@@ -50,6 +53,15 @@ export function createClock(local = () => performance.now()) {
       if (!timer) return null;
       if (timer.frozen !== undefined) return timer.frozen;
       return Math.max(0, timer.ends - serverNow());
+    },
+    /**
+     * The moment `timer` ends on this phone's own clock (`local`), or null while it stands
+     * still or without one. It moves only when the clock learns better (a little earlier)
+     * or the timer changes, never by itself.
+     */
+    endsAt(timer) {
+      if (!timer || timer.frozen !== undefined) return null;
+      return timer.ends - (offset ?? 0);
     },
   };
 }

@@ -42,11 +42,12 @@
  *   "Change" cancels an upload still on its way. Every hello names the upload in flight,
  *   so the room never waits for one this phone no longer sends.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
- *   repaints only what changed, four times a second and after every change, and right on
- *   each second of the 3-2-1 (`paintStart`, which keeps its film leader on the room's clock
- *   with `countdown.js`). The timer bar is animated every frame from the round's timer on
- *   the server's clock (`clock.js`, learned from every view) and the timer's length the
- *   view carries (`total`). The arrow
+ *   repaints only what changed, four times a second and after every change, right on each
+ *   second of the 3-2-1 (`paintStart`, which keeps its film leader on the room's clock with
+ *   `countdown.js`), and the moment the room's timer ends. The timer bar is one animation
+ *   per timer that the browser runs by itself (`syncBar`), pinned to that moment on the
+ *   server's clock (`clock.js`, learned from every view), over the timer's length the view
+ *   carries (`total`). The arrow
  *   of a row that scrolls sideways (`ui.sidewaysRow`: the lobby's players, the reactions)
  *   follows its row after every paint and every scroll (`ui.syncRow`).
  * - The flag: ⚑ flags the photo in the room (the others stop seeing it, the round waits)
@@ -364,7 +365,8 @@ function paintStart() {
 
 function render() {
   const changed = paintApp(screen());
-  // In the same task as the paint, so no frame shows an arrow that does not fit what it scrolls.
+  // In the same task as the paint, so no frame shows a bar or an arrow that does not fit.
+  syncBar();
   for (const row of $('app').querySelectorAll('[data-sideways]')) syncRow(row);
   // Another screen: the podium's light (sparks, fireworks) belongs to the one before.
   if (changed.includes('layout')) clearSparks();
@@ -378,17 +380,57 @@ function render() {
   setHtml($('banner'), bannerHtml(session, performance.now()));
 }
 
-/** Shrinks the timer bar every frame: what is left of the timer's full length (`view.total`), hidden while there is none. */
-function frame() {
+/** The timer bar's one animation (`syncBar`), and the end it is pinned to; null without one. */
+let shrink = null;
+let pinnedEnd = null;
+/** The paint due when the timer ends (`syncBar`). */
+let timeUp = 0;
+
+/**
+ * The timer bar shows what is left of the room's timer, out of its whole length (`view.total`):
+ * full that long before the timer ends, empty when it ends. It is one animation per timer,
+ * which the browser runs by itself, so the phone does no work for it on any frame. It is
+ * pinned to the moment the timer ends on this phone's clock (`clock.endsAt`), so every phone
+ * empties its bar together; a view that arrives late or after a reconnect names the same
+ * moment and changes nothing, a closer reading of the server's clock or a restarted timer
+ * only moves the pin (the bar steps there at once, without starting over), and an app coming
+ * back from the background shows the bar where the time stands. While the room holds the
+ * round (`paused`) the bar stands where the clock stopped; without a timer it is hidden
+ * (`data-off`, the empty track stays). `render` calls this after every paint, so a new bar
+ * (the reveal's) gets its animation in the same task as it is painted, and no frame shows it
+ * full. The moment the bar is empty the screen is painted again (one timer, renewed with
+ * every paint), so "time is up" (the cards grey out, `isLate`) lands with it, not up to a
+ * quarter second later.
+ */
+function syncBar() {
   const bar = $('tbar');
   const v = session.view;
-  if (bar && v) {
-    const left = leftNow();
-    const total = v.total || null;
-    bar.toggleAttribute('data-off', total === null || left === null);
-    if (total && left !== null) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / total))})`;
+  const total = (v && v.total) || null;
+  const left = leftNow();
+  const end = clock.endsAt(roundTimer);
+  const running = Boolean(bar && total && end !== null);
+  clearTimeout(timeUp);
+  if (running && left > 0) timeUp = setTimeout(render, left + 1);
+  // A bar that was replaced, held or ended lets go of its animation.
+  if (shrink && (!running || shrink.effect.target !== bar || shrink.effect.getTiming().duration !== total)) {
+    shrink.cancel();
+    shrink = null;
   }
-  requestAnimationFrame(frame);
+  if (!bar) return;
+  bar.toggleAttribute('data-off', total === null || left === null);
+  if (total === null || left === null) return;
+  if (!running) {
+    bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / total))})`;
+    return;
+  }
+  if (!shrink) {
+    shrink = bar.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: total, fill: 'both' });
+    pinnedEnd = null;
+  }
+  if (pinnedEnd !== end) {
+    shrink.startTime = end - total;
+    pinnedEnd = end;
+  }
 }
 
 // ---------- Room ----------
@@ -1051,5 +1093,4 @@ if (!inApp()) {
   });
   render();
   setInterval(render, 250);
-  requestAnimationFrame(frame);
 }

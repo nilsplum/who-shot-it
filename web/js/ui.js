@@ -133,7 +133,8 @@ const TIMER_LOOKS = {
 /**
  * The timer bar under the top bar (game and leaderboard), in one of its looks, centred in a
  * slot as tall as `progress`; `data-kind` names it for the tests. `main.js` shrinks `#tbar`
- * every frame and sets `data-off` on it while no timer runs (the empty track stays).
+ * with one animation per timer, which the browser runs by itself (`syncBar`), and sets
+ * `data-off` on it while no timer runs (the empty track stays).
  */
 export const timerBar = (kind) =>
   `<div class="flex h-7 flex-col justify-center"><div class="h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb ${TIMER_LOOKS[kind]} data-off:opacity-0" data-kind="${kind}"></i></div></div>`;
