@@ -15,8 +15,9 @@
  * with every jump and the light taps come quicker. Full, it draws in for a moment, then
  * bursts: a ring of light, a spray of sparks, the player pops out (`data-go`), the block
  * glows, the screen jolts, a thud. The winner's orb also grows and cracks while the edges of
- * the screen darken, and its burst adds a white flash and the fireworks; then the facts,
- * the ranking and "Play again" fade in (`data-ended`).
+ * the screen darken, and its burst adds a white flash and the fireworks, each of whose bangs
+ * is felt as a light tap as it bursts, to the last one; then the facts, the ranking and "Play
+ * again" fade in (`data-ended`).
  *
  * Invariants:
  * - Every position is measured once, before anything moves (an orb's middle is where its
@@ -27,7 +28,7 @@
  *   it); main.js clears the sparks when the screen changes.
  * - With Reduce Motion main.js does not call it: the final state simply stays.
  */
-import { wait } from './motion.js';
+import { atMostEvery, wait } from './motion.js';
 import { colour, fireworks, flash, inflow, middle, ring, shade, spray } from './sparks.js';
 
 /**
@@ -39,6 +40,8 @@ import { colour, fireworks, flash, inflow, middle, ring, shade, spray } from './
 const PODIUM = {
   arrive: 340,
   stagger: 155,
+  /** Fireworks' bangs closer together than this share one light tap (a volley bursts within a few hundred ms). */
+  bangGap: 90,
   settle: 510,
   darken: 255,
   ended: 1360,
@@ -155,9 +158,10 @@ export async function playPodium(screen, buzz) {
   }
   shade(0, 900);
   const winner = places.find((p) => p.n === 1);
-  let bangs = 0;
-  // The first few bangs of the fireworks are felt as light taps; the winner's thud came with the burst.
-  fireworks(winner.at, { alive, bang: () => (bangs += 1) <= 6 && buzz('tap') });
+  // Every bang of the fireworks is felt as a light tap as it bursts, from the first rocket to
+  // the last willow (the winner's thud came with the burst); none once the screen is gone.
+  const bang = atMostEvery(PODIUM.bangGap, () => alive() && buzz('tap'));
+  fireworks(winner.at, { alive, bang });
   await wait(PODIUM.ended);
   if (!alive()) return;
   screen.removeAttribute('data-playing');

@@ -10,7 +10,8 @@
  * Delete), five rounds with their reveals (played step by step, the verdict felt) and
  * leaderboards (one ending in the new order with the medal on the leader, "Show again" held on
  * one phone and seen on another, FINAL ROUND before the last photo), the podium's
- * reveal (third, second, first, then "Play again"; a group's first game asks for no rating),
+ * reveal (third, second, first, then "Play again", the winner's fireworks felt bang by bang to
+ * their end; a group's first game asks for no rating),
  * "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. A slow phone:
  * the start waits in its film leader for its photos still on their way (the ring shows how
@@ -273,6 +274,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
   // 3rd game, web/js/review.js): nothing a moment after the story, still on the results.
   await host.waitForTimeout(RATING.afterMs + 500);
   expect(await host.evaluate(() => window.rated)).toBe(0);
+  // The winner's fireworks are felt bang by bang to their end, not only their first few: well
+  // over six light taps after the winner's thud, while the host still looks at the results.
+  const fireworkTaps = () => host.evaluate(() => window.felt.slice(window.felt.lastIndexOf('HEAVY') + 1).filter((f) => f === 'LIGHT').length);
+  await expect.poll(fireworkTaps, { timeout: 10_000 }).toBeGreaterThanOrEqual(12);
   // Play again is everyone's: a guest opens the next game, the others keep their results
   // until they join it, and the lobby quietly says who it is waiting on.
   await guests[0].getByRole('button', { name: 'Play again' }).click();

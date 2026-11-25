@@ -6,11 +6,12 @@
  * which bumps and rolls up like a slot machine (each digit a reel, the last one spinning
  * fastest, the reels stopping from left to right). The first coin to land is a light tap.
  * Then the rows slide to their new places, the ones moving up lifted over the others, and
- * the changed ranks pop. Last the medals: each hops off the old leader, flies in an arc to
- * the new one, spinning and trailing sparks, and lands with a bounce, a ring of light and a
- * firm pulse. A leader who stays sends theirs on a little loop of its own; when nobody led
- * before (the first points of the game) it drops in from above; when nobody leads now (no
- * points yet) there is none. The board after the second-to-last photo is FINAL ROUND
+ * the changed ranks pop. Last the medals (`medalMoves`): a new leader's hops off the old
+ * leader, flies in an arc to the new one, spinning and trailing sparks, and lands with a
+ * bounce, a ring of light and a firm pulse; when nobody led before (the first points of the
+ * game) it drops in from above. A leader who stays keeps theirs where it is, untouched: nothing
+ * changed at the top, so nothing moves there. When nobody leads now (no points yet) there is
+ * none. The board after the second-to-last photo is FINAL ROUND
  * instead: no ranking, the words fall onto the screen, which shakes and thuds as they land.
  *
  * Mechanisms: main.js `startBoard` calls `playBoard` once per board (`session.shown`), in
@@ -118,7 +119,20 @@ function throwCoin(screen, r) {
   });
 }
 
-/** A medal like the one the view paints, for the old leader (the story takes it off again). */
+/**
+ * Where the medals go once the rows stand in their new order (`old`: the medal a row wore
+ * before this round, `medal`: the one it wears now). A new leader gets the medal a lost leader
+ * gives up, flying over (`from`), else a new one that drops in (`from` null); a leader who
+ * stays is in neither list, so theirs stays exactly where it is; a medal nobody takes over is
+ * `gone` (it fades out).
+ */
+export function medalMoves(rows) {
+  const lost = rows.filter((r) => r.old && !r.medal);
+  const flights = rows.filter((r) => r.medal && !r.old).map((to) => ({ to, from: lost.shift() || null }));
+  return { flights, gone: lost };
+}
+
+/** A medal like the one the view paints, for the old leader (the story takes it off again, or hands over to the view's own if they stay). */
 function oldMedal() {
   const el = document.createElement('span');
   el.className = 'lb-medal';
@@ -128,10 +142,10 @@ function oldMedal() {
 }
 
 /**
- * The medal of row `to` (waiting hidden on its avatar) arrives: it flies from `from`'s old
- * one (hopping off it first; `from` is `to` itself for a leader who stays) or, without one,
- * drops in from above. It spins and trails sparks, and lands with a ring of light. Returns
- * false when the rows were replaced meanwhile.
+ * The medal of a new leader `to` (waiting hidden on its avatar) arrives: it flies from the old
+ * leader `from`'s medal (hopping off it first) or, without one, drops in from above. It spins
+ * and trails sparks, and lands with a ring of light. Returns false when the rows were replaced
+ * meanwhile.
  */
 async function fly(screen, from, to, alive) {
   if (from) await from.old.animate([{ scale: 1, translate: '0 0' }, { scale: 1.35, translate: '0 -8px' }], { duration: MEDAL.hop, easing: EASE.out, fill: 'forwards' }).finished;
@@ -235,19 +249,21 @@ export async function playBoard(screen, buzz) {
       r.rank.textContent = r.row.dataset.rank;
       r.rank.toggleAttribute('data-go', true);
     }
-    // Every leader now gets a medal: the one it already wore, else one a lost leader gives up, else a new one drops in.
-    const lost = rows.filter((r) => r.old && !r.medal);
+    // Only a change at the top moves a medal (`medalMoves`); the first one to land is felt.
+    const { flights, gone } = medalMoves(rows);
     let landed = false;
-    const flights = rows.filter((r) => r.medal).map((r) => fly(screen, r.old ? r : lost.shift(), r, alive).then((ok) => {
+    const arrivals = flights.map(({ to, from }) => fly(screen, from, to, alive).then((ok) => {
       if (ok && !landed) buzz('yes');
       landed = landed || ok;
     }));
-    // A medal nobody takes over goes out.
-    for (const r of lost) r.old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: MEDAL.hop }).finished.then(() => r.old.remove());
-    await Promise.all(flights);
+    for (const r of gone) r.old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: MEDAL.hop }).finished.then(() => r.old.remove());
+    await Promise.all(arrivals);
     if (!(await pause(MEDAL.land))) return;
     await wait(TIMING.boardStoryMs - (performance.now() - started));
   } finally {
+    // A leader who stayed has worn the story's medal all along; it hands over to the view's
+    // own, in the same place, in the same task as the screen is let go: nothing moves.
+    for (const r of rows) if (r.old && r.medal) r.old.remove();
     screen.removeAttribute('data-playing');
   }
 }

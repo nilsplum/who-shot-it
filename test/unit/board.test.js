@@ -1,12 +1,12 @@
 /**
- * The leaderboard: who wears the gold medal (web/js/views/board.js) and that its story fits
- * the time the room gives it (web/js/board.js, TIMING.boardStoryMs). The motion itself only a
- * browser shows (the end-to-end tests play every board to its end and check where the rows
- * and the medal stand).
+ * The leaderboard: who wears the gold medal (web/js/views/board.js), which medals move in its
+ * story (web/js/board.js `medalMoves`: only a change at the top), and that the story fits the
+ * time the room gives it (TIMING.boardStoryMs). The motion itself only a browser shows (the
+ * end-to-end tests play every board to its end and check where the rows and the medal stand).
  */
 import { expect, test } from 'vitest';
 import { REACTIONS, TIMING } from '../../web/shared/config.js';
-import { STORY_MS } from '../../web/js/board.js';
+import { STORY_MS, medalMoves } from '../../web/js/board.js';
 import { boardScreen } from '../../web/js/views/board.js';
 
 /** The board after round 3 of 10 for `players`: [name, total after the round, points it won], me first. */
@@ -34,6 +34,25 @@ test('nobody wears it before the first points are won, and nobody without points
   expect(medals(boardOf([['Ana', 0, 0], ['Ben', 0, 0], ['Lena', 0, 0]]))).toEqual([]);
   // The first points: only those who won them lead, not the ones tied for first before.
   expect(medals(boardOf([['Ana', 0, 0], ['Ben', 500, 500], ['Lena', 0, 0]]))).toEqual(['Ben']);
+});
+
+test('only a change at the top moves a medal: a leader who stays keeps theirs where it is', () => {
+  // Rows of the story: `old` the medal worn before this round, `medal` the one worn now.
+  const row = (name, old, medal) => ({ name, old, medal });
+  const moves = (rows) => {
+    const { flights, gone } = medalMoves(rows);
+    return { flights: flights.map(({ to, from }) => [to.name, from && from.name]), gone: gone.map((r) => r.name) };
+  };
+  // The leader stays: nothing moves.
+  expect(moves([row('Ana', true, true), row('Ben', false, false)])).toEqual({ flights: [], gone: [] });
+  // A new leader: the medal flies over from the old one.
+  expect(moves([row('Ana', true, false), row('Ben', false, true)])).toEqual({ flights: [['Ben', 'Ana']], gone: [] });
+  // Someone draws level with a leader who stays: theirs stays, the newcomer's drops in.
+  expect(moves([row('Ana', true, true), row('Ben', false, true)])).toEqual({ flights: [['Ben', null]], gone: [] });
+  // The first points of the game: a medal drops in.
+  expect(moves([row('Ana', false, true), row('Ben', false, false)])).toEqual({ flights: [['Ana', null]], gone: [] });
+  // Two leaders before, one after: one medal flies over, the other goes out.
+  expect(moves([row('Ana', true, false), row('Ben', true, false), row('Lena', false, true)])).toEqual({ flights: [['Lena', 'Ana']], gone: ['Ben'] });
 });
 
 test('a medal stays hidden while the story plays, until it lands', () => {

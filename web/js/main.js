@@ -23,7 +23,7 @@
  *   streak's blocks and bonus (`streak.js`, which `reveal.js` hands `buzz`), a
  *   swap or its refusal (action `swap`), the leaderboard's first coin, its medal landing
  *   and FINAL ROUND landing (`board.js`, which `startBoard` hands `buzz`), and the podium's
- *   charges, bursts and first fireworks (`podium.js`, which `startPodium` hands `buzz`).
+ *   charges, bursts and fireworks (`podium.js`, which `startPodium` hands `buzz`).
  * - Entrances: a screen that tells a story when it appears (the reveal: the answer, my
  *   card, its pop, my streak's tower; the leaderboard: who overtakes whom; FINAL ROUND; the
  *   podium's charges) is painted in its final state, and `startReveal`, `startBoard` or `startPodium` has
