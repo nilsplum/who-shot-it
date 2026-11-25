@@ -5,7 +5,7 @@
  * the bulge of its letters, and its lines' manners.
  */
 import { describe, expect, test } from 'vitest';
-import { NUDGE, NUDGE_CALLS, NUDGE_LINES, bulgeRows, lastToSayYes, nudgeAt, nudgeTrack, shortName, startsWith } from '../../web/js/nudge.js';
+import { CALLS, NUDGE, NUDGE_CALLS, NUDGE_LINES, bulgeRows, lastToSayYes, nudgeAt, nudgeTrack, shortName, startsWith } from '../../web/js/nudge.js';
 
 /** A lobby view as the room sends it, seen from `me`: `players` as [name, ready, connected?, photos?]. */
 function lobby(players, { me = 'Ann', games = 0, phase = 'lobby', onResults = false } = {}) {
@@ -85,12 +85,57 @@ describe('the bubble', () => {
     expect([-1, 1]).toContain(first.from);
   });
 
-  test('a small bubble per other player, three at most, each calling the name by its first part when it is long', () => {
-    expect(at(lobby([['Ann', true], ['Cleo', false]]), 0).calls).toEqual([{ text: 'Cleo?', avatar: '🦊' }]);
-    expect(at(waiting, 0).calls.map((c) => c.text)).toEqual(['Cleo?', 'Cleo!!']);
+  test('two to four small bubbles, each another call of the name, in the colours of the others at the table', () => {
+    const appearances = (view) => Array.from({ length: 40 }, (_, n) => at(view, n * NUDGE.everyMs).calls);
+    const two = lobby([['Ann', true], ['Cleo', false]]);
+    const counts = new Set();
+    for (const calls of [...appearances(two), ...appearances(waiting)]) {
+      counts.add(calls.length);
+      expect(calls.length).toBeGreaterThanOrEqual(CALLS.min);
+      expect(calls.length).toBeLessThanOrEqual(CALLS.max);
+      // Each a different call of Cleo, at a place of its own.
+      expect(new Set(calls.map((c) => c.text)).size).toBe(calls.length);
+      for (const c of calls) expect(NUDGE_CALLS.map((t) => t.replace('{name}', 'Cleo'))).toContain(c.text);
+      expect(new Set(calls.map((c) => c.spot)).size).toBe(calls.length);
+      for (const c of calls) {
+        expect(c.spot >= 0 && c.spot < CALLS.spots && c.size >= 0 && c.size < CALLS.sizes).toBe(true);
+        expect(Math.abs(c.tilt)).toBeLessThanOrEqual(CALLS.tilt);
+      }
+    }
+    // Over a few appearances every count comes up.
+    expect([...counts].sort()).toEqual([2, 3, 4]);
+    // With two at the table, the only other player (this phone's) calls every time; with three, both take turns.
+    for (const calls of appearances(two)) expect(new Set(calls.map((c) => c.avatar))).toEqual(new Set(['🦊']));
+    const callers = new Set(appearances(waiting).flat().map((c) => c.avatar));
+    expect(callers).toEqual(new Set(['🦊', '🐼']));
+  });
+
+  test('the small bubbles pop in one after another once the big one is there, and away within half a second before it leaves', () => {
+    const leaves = NUDGE.showMs / 1000;
+    for (let n = 0; n < 20; n++) {
+      const calls = at(waiting, n * NUDGE.everyMs).calls;
+      calls.forEach((c, i) => expect(c.in).toBeCloseTo(CALLS.first + i * CALLS.every, 5));
+      const outs = calls.map((c) => c.out);
+      expect(Math.max(...outs) - Math.min(...outs)).toBeLessThanOrEqual(CALLS.awayIn);
+      for (const out of outs) {
+        expect(out).toBeGreaterThanOrEqual(leaves - CALLS.awayBy - CALLS.awayIn);
+        expect(out).toBeLessThanOrEqual(leaves - CALLS.awayBy);
+      }
+    }
+    // Leaving, the same small bubbles (the view paints none: they have popped away).
+    expect(at(waiting, NUDGE.showMs).calls).toEqual(at(waiting, 0).calls);
+  });
+
+  test('a long name is called by its first part, at the smallest size, so two still fit side by side', () => {
     const big = lobby([['Ann', true], ['Ben', true], ['Dan', true], ['Eve', true], ['Maximilian-Alexa', false]]);
-    expect(at(big, 0).calls.map((c) => c.text)).toEqual(NUDGE_CALLS.map((c) => c.replace('{name}', 'Maximilian')));
-    expect(at(big, 0).line).toContain('Maximilian-Alexa');
+    for (let n = 0; n < 10; n++) {
+      const shown = at(big, n * NUDGE.everyMs);
+      expect(shown.line).toContain('Maximilian-Alexa');
+      for (const c of shown.calls) {
+        expect(c.text.startsWith('Maximilian') && !c.text.includes('Alexa')).toBe(true);
+        expect(c.size).toBe(0);
+      }
+    }
   });
 
   test('a wait that stops and comes back for the same player goes on with its order', () => {

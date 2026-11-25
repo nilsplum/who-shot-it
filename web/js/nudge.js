@@ -15,7 +15,8 @@
  *   (`NUDGE`): the first appearance the moment the wait begins, on screen for 5 s, leaving
  *   for a moment, then away until the next one, 15 s after the last began. `nudgeTrack` keeps
  *   on this phone since when the wait goes on; `nudgeAt` says what the bubble shows at a moment
- *   (its line, the side it comes from, the small bubbles, whether it is leaving), or null.
+ *   (its line, the side it comes from, the small bubbles with their places, sizes, tilts and
+ *   moments, whether it is leaving), or null.
  *   `main.js` asks at each of its four paints a second, so the bubble needs no timer of its
  *   own, and the markup it gets changes only when an appearance starts or begins to leave.
  * - The order of the lines, the sides and the small bubbles is a shuffle every phone makes
@@ -68,8 +69,18 @@ export const NUDGE_LINES = [
   '{name} takes this game very seriously',
 ];
 
-/** What the small bubbles call, by their place: above the big one's right end, below its left end, below its right end. */
-export const NUDGE_CALLS = ['{name}?', '{name}!!', '{name}…'];
+/** What the small bubbles call, each a different one in an appearance; `{name}` is the waited-for player (by `shortName`). */
+export const NUDGE_CALLS = ['{name}?', '{name}!!', '{name}…', '{name}!?'];
+
+/**
+ * The small bubbles of an appearance: how many (from `min` to `max`, picked anew each time),
+ * the places around the photos they can take (`spots`, drawn by views/lobby.js `CALL_SPOTS`),
+ * their sizes (`sizes`; a long call gets the smallest, so two side by side still fit), how far
+ * they tilt at most (deg), when the first pops in after the big bubble began to slide in and
+ * how far apart the next ones follow (s), and the half second (`awayIn`) in which they all pop
+ * away again, each at its own moment, done `awayBy` before the big bubble leaves.
+ */
+export const CALLS = { min: 2, max: 4, spots: 6, sizes: 3, long: 9, tilt: 9, first: 0.5, every: 0.3, awayIn: 0.5, awayBy: 0.25 };
 
 /** The longest row of the big bubble's line, and of a small bubble's call, in characters. */
 const ROW = { line: 13, call: 13 };
@@ -140,10 +151,12 @@ export function shortName(name) {
 
 /**
  * What the bubble shows on this phone at `now`, or null: `{ line, name, avatar, from,
- * leaving, calls: [{ text, avatar }] }`, the line with the name put in, the waited-for
- * player's name and avatar (their colour), the side it slides in from (-1 left, 1 right),
- * whether it is leaving, and the small bubbles (one per other player, three at most, each in
- * that player's colour).
+ * leaving, calls }`, the line with the name put in, the waited-for player's name and avatar
+ * (their colour), the side it slides in from (-1 left, 1 right; its tail leans that way),
+ * whether it is leaving, and the small bubbles (`CALLS`), each `{ text, avatar, spot, size,
+ * tilt, in, out }`: a different call of the name, the colour of one of the others at the table
+ * (they take turns when there are fewer of them than bubbles), its place and size, its tilt
+ * (deg) and when it pops in and away (s after the appearance began).
  */
 export function nudgeAt(view, track, now) {
   const player = view ? teased(view) : null;
@@ -157,15 +170,31 @@ export function nudgeAt(view, track, now) {
   const order = shuffle(NUDGE_LINES, seeded(`${track.key}|${Math.floor(n / NUDGE_LINES.length)}`));
   const pick = seeded(`${track.key}|${n}`);
   const from = pick() < 0.5 ? -1 : 1;
-  const callers = shuffle(view.players.filter((p) => p.id !== player.id), pick).slice(0, NUDGE_CALLS.length);
-  const call = shortName(player.name);
+  const others = shuffle(view.players.filter((p) => p.id !== player.id), pick);
+  const count = CALLS.min + Math.floor(pick() * (CALLS.max - CALLS.min + 1));
+  const texts = shuffle(NUDGE_CALLS, pick);
+  const spots = shuffle(Array.from({ length: CALLS.spots }, (_, i) => i), pick);
+  const name = shortName(player.name);
+  const away = NUDGE.showMs / 1000 - CALLS.awayBy - CALLS.awayIn;
   return {
     line: order[n % NUDGE_LINES.length].replace('{name}', player.name),
     name: player.name,
     avatar: player.avatar,
     from,
     leaving: into >= NUDGE.showMs,
-    calls: callers.map((p, i) => ({ text: NUDGE_CALLS[i].replace('{name}', call), avatar: p.avatar })),
+    calls: Array.from({ length: count }, (_, i) => {
+      const text = texts[i % texts.length].replace('{name}', name);
+      const size = Math.floor(pick() * CALLS.sizes);
+      return {
+        text,
+        avatar: others[i % others.length].avatar,
+        spot: spots[i],
+        size: graphemes(text).length > CALLS.long ? 0 : size,
+        tilt: Math.round((pick() * 2 - 1) * CALLS.tilt),
+        in: Number((CALLS.first + i * CALLS.every).toFixed(2)),
+        out: Number((away + pick() * CALLS.awayIn).toFixed(2)),
+      };
+    }),
   };
 }
 

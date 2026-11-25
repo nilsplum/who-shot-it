@@ -1258,6 +1258,25 @@ below is kept as planned; the Operator handoff (to do 2) has the version that ma
 - **The legal page's date moves to 25 November 2026** (`LEGAL.version`); 1.0.9 shows the terms
   once more anyway, as every new version does.
 
+**25 November 2026, after TestFlight 1.0.10** (the operator, trying it; asked and answered
+before building)
+- **"No →" is lilac** (#C996FF, `--color-lilac`, which replaces `--color-ice`), with the dark
+  text: white on that lilac would be hard to read.
+- **The big bubble's tail is on its bottom edge**, leaning to the side it slid in from (from
+  the left: its left part, pointing down-left), instead of pointing up to the players.
+- **Two to four small bubbles per appearance** (picked with the shared seed, so every phone
+  shows the same), whatever the number of players: name calls only ("{name}?", "{name}!!",
+  "{name}…", "{name}!?", each once), in their own sizes and tilts, in the colours of the others
+  at the table taking turns (with two players, the only other one calls every time). They are
+  spread around the photos from all sides, in six places on three rows held to the edges (two
+  long calls always fit side by side: a long call is drawn at the smallest size), pop in one
+  after another from 0.5 s, 0.3 s apart, and each pops away at its own random moment within the
+  half second before the big bubble leaves, which then leaves alone. They lie under the big
+  bubble, so on a short screen they peek out around it and never cover its line.
+- **Checked in the app** on a usual phone and on the 360 x 640 one with the longest calls; the
+  full-table e2e test holds every bubble inside the smallest screen with two to four small
+  ones.
+
 **25 November 2026, commit 8 (the release) and the merge into `main`**
 
 - **What's New names everything since 1.0.5**, the version in App Review, as 1.0.7's did:

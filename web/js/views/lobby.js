@@ -45,7 +45,8 @@
  * The bubble: while the group waits for one last player, the others' phones show a comic
  * bubble over the photos teasing them (`web/js/nudge.js` decides when and what, `context.nudge`
  * is the moment's appearance): a speech bubble in that player's colour slides in from a side,
- * the other players' small bubbles call the name, and it leaves again (`nudge`). It is a part
+ * its tail below it leaning that way, two to four small bubbles call the name from around the
+ * photos and pop away again, and the big one leaves (`nudge`). It is a part
  * of its own (`nudge`), laid over the photos and taking no tap, so holding a photo, "Change"
  * and the players all work through it; its markup changes only when an appearance starts or
  * begins to leave, and main.js fits its line right after it is painted (`fitNudge`).
@@ -157,7 +158,7 @@ const mainButton = (act, text) => `<button class="btn mt-4 bg-coral text-white" 
 const START = '<span class="inline-block -rotate-8 animate-stamp rounded-md border-2 border-navy px-1.5 py-px font-display text-xs leading-none font-extrabold tracking-wider motion-reduce:animate-none" data-cell="start">START</span>';
 
 /**
- * Yes (green) and "No →" (ice blue, a new set). The last player's Yes carries START next to
+ * Yes (green) and "No →" (lilac, a new set). The last player's Yes carries START next to
  * the word, the pair centred, so "Yes" moves a little to the left; its accessible name says
  * what it does.
  */
@@ -166,7 +167,7 @@ function actions(view) {
   const yes = startsWith(view, true)
     ? `<button class="btn flex items-center justify-center gap-2 bg-green text-navy" data-act="yes" data-start aria-label="Yes, start the game" ${off}>Yes${START}</button>`
     : `<button class="btn bg-green text-navy" data-act="yes" ${off}>Yes</button>`;
-  return `<div class="mt-3.5 grid grid-cols-2 gap-2.5">${yes}<button class="btn bg-ice text-navy" data-act="no" aria-label="No, other photos" ${off}>No →</button></div>`;
+  return `<div class="mt-3.5 grid grid-cols-2 gap-2.5">${yes}<button class="btn bg-lilac text-navy" data-act="no" aria-label="No, other photos" ${off}>No →</button></div>`;
 }
 
 /** The player's photo area as its five parts: `{ title, pick, note, actions, links }` (empty ones are ''). */
@@ -301,64 +302,97 @@ const tail = (where) => `<svg class="pointer-events-none absolute nudge-tail ${w
 /** A line as the bubble's letters, each sized by its place ("ss SS ss", `nudge.bulgeRows`); an emoji keeps its colours. */
 const letters = (text, call = false) => bulgeRows(text, { call }).map((row) => `<span class="block whitespace-nowrap">${row.map((c) => `<span class="bulge" style="--k:${c.k}"${c.emoji ? ' data-emoji' : ''}>${esc(c.ch)}</span>`).join('')}</span>`).join('');
 
+/** A small bubble's tail on its top edge (up and out) or its bottom edge (down and out), to its left or right (`tail`). */
+const CALL_TAILS = {
+  'top left': 'bottom-full left-[max(1rem,18%)] h-[1.1rem] w-[1.4rem]',
+  'top right': 'bottom-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-x-100',
+  'bottom left': 'top-full left-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-y-100',
+  'bottom right': 'top-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-100',
+};
+
 /**
- * The small bubbles, by their place around the big one (`NUDGE_CALLS`): above its right end,
- * below its left end, and below its right end, lower (so the two below never meet). Each one's
- * tail points off the screen, to where its player sits, and it pops out from that corner;
- * each tilts a little its own way and pops in at its own moment after the big bubble arrived.
+ * The places the small bubbles take (`nudge.CALLS.spots`; an appearance picks two to four):
+ * spread around the photos in three rows, a left and a right one each: near the top, and two
+ * near the bottom. Each is held to its edge, so a long call never leaves the photos, and two in
+ * a row always fit side by side (a long call is drawn at the smallest size: two of the longest
+ * fit the narrowest phone). Each pops out from its outer corner, where its tail points off the
+ * screen: up and out from the two upper rows, down and out from the lowest, so no tail reaches
+ * into another bubble. They lie under the big bubble: where the photos are short, they peek out
+ * around it and never cover its line. The steps (rem) give each row its own height, tails
+ * included.
  */
-const CALLS = [
-  { box: 'right-0 bottom-full mb-6 translate-x-2', tail: 'bottom-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-x-100', from: 'top right', tilt: 6, delay: 0.45 },
-  { box: 'left-0 top-full mt-4 -translate-x-2', tail: 'top-full left-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-y-100', from: 'bottom left', tilt: -7, delay: 0.75 },
-  { box: 'right-0 top-full mt-16 translate-x-3', tail: 'top-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-100', from: 'bottom right', tilt: 4, delay: 1.05 },
+const CALL_SPOTS = [
+  { box: 'left-[3cqw] top-[1.2rem]', from: 'top left' },
+  { box: 'right-[3cqw] top-[1.6rem]', from: 'top right' },
+  { box: 'left-[5cqw] bottom-[4rem]', from: 'top left' },
+  { box: 'right-[5cqw] bottom-[4.5rem]', from: 'top right' },
+  { box: 'left-[3cqw] bottom-[1.2rem]', from: 'bottom left' },
+  { box: 'right-[3cqw] bottom-[1.4rem]', from: 'bottom right' },
 ];
+/** The small bubbles' sizes (`nudge.CALLS.sizes`; a long call always the first), whole class names so Tailwind builds them. */
+const CALL_SIZES = ['text-base', 'text-xl', 'text-2xl'];
 
 /**
  * How each piece moves, entering (`in`) and leaving (`out`): one complete set of classes
  * each, picked by the view. Leaving is a new paint, so the endless moves (the rock, the
  * turning rays) would start over and jump; they go on instead from where an appearance
- * always is when it leaves (`resume`, its time on screen).
+ * always is when it leaves (`resume`, its time on screen). The small bubbles are not painted
+ * then: each has popped away by itself (`animate-nudge-call`, its `--out`) before the big one
+ * leaves.
  */
 const MOVES = {
-  in: { bubble: 'animate-nudge-in', boing: 'animate-nudge-boing', call: 'animate-nudge-call-in', wiggle: 'animate-nudge-wiggle', resume: '' },
-  out: { bubble: 'animate-nudge-out', boing: '', call: 'animate-nudge-call-out', wiggle: '', resume: ` style="animation-delay:-${NUDGE.showMs}ms"` },
+  in: { bubble: 'animate-nudge-in', boing: 'animate-nudge-boing', resume: '' },
+  out: { bubble: 'animate-nudge-out', boing: '', resume: ` style="animation-delay:-${NUDGE.showMs}ms"` },
+};
+
+/**
+ * One small bubble of the appearance (`nudge.nudgeAt`'s `calls`): at its place, in its
+ * colour, size and tilt, popping in (`--in`) and away (`--out`) by itself, wiggling between.
+ */
+function call(c) {
+  const at = CALL_SPOTS[c.spot];
+  const still = 'motion-reduce:animate-none';
+  return `<div class="absolute ${at.box}" style="--tilt:${c.tilt}deg;--in:${c.in}s;--out:${c.out}s">
+      <div class="animate-nudge-call ${still}" style="transform-origin:${at.from}">
+        <div class="rotate-(--tilt) animate-nudge-wiggle ${still}">
+          <div class="nudge-call px-3.5 py-1.5" style="--player:${colourOf(c.avatar)}" data-cell="call"><i class="nudge-dots"></i>${tail(CALL_TAILS[at.from])}<p class="nudge-text relative w-max text-center ${CALL_SIZES[c.size]}" aria-hidden="true">${letters(c.text, true)}</p></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/** The big bubble's tail on its bottom edge, leaning to the side it came from (`from`). */
+const BIG_TAILS = {
+  '-1': 'top-full left-[max(2rem,22%)] h-[1.375rem] w-[1.75rem] -scale-y-100',
+  1: 'top-full right-[max(2rem,22%)] h-[1.375rem] w-[1.75rem] -scale-100',
 };
 
 /**
  * The bubble over the photos for the moment's appearance `n` (`nudge.nudgeAt`), or '' while
  * there is none: the big bubble in the waited-for player's colour, with its rays, its tail
- * pointing up to the players, its pop-art dots, its gleam and its line; around it the small
- * bubbles, each in its player's colour. Entering, it slides in from its side (`--from`) while
- * it grows, rocks and bounces once, and the small ones pop in one after another; leaving, the
- * same markup is painted once more with the exit's classes. The line is also there as plain
- * text for screen readers, announced once per appearance (not again as it leaves).
+ * below it leaning to the side it came from, its pop-art dots, its gleam and its line; around
+ * the photos, under it, the small bubbles (`call`). Entering, it slides in from its side
+ * (`--from`) while it grows, rocks and bounces once, and the small ones pop in one after
+ * another and away again; leaving, the big one is painted once more with the exit's classes.
+ * The line is also there as plain text for screen readers, announced once per appearance (not
+ * again as it leaves).
  */
 function nudge(n) {
   if (!n) return '';
   const m = MOVES[n.leaving ? 'out' : 'in'];
   const still = 'motion-reduce:animate-none';
-  const calls = n.calls.map((call, i) => {
-    const at = CALLS[i];
-    return `<div class="absolute ${at.box}" style="--tilt:${at.tilt}deg;--delay:${at.delay}s">
-      <div class="${m.call} ${still}" style="transform-origin:${at.from}">
-        <div class="rotate-(--tilt) ${m.wiggle} ${still}">
-          <div class="nudge-call px-3.5 py-1.5" style="--player:${colourOf(call.avatar)}" data-cell="call"><i class="nudge-dots"></i>${tail(at.tail)}<p class="nudge-text relative w-max text-center text-xl" aria-hidden="true">${letters(call.text, true)}</p></div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-  return `<div class="absolute top-[40%] left-1/2 -translate-1/2" style="--from:${n.from}">
+  const calls = n.leaving ? '' : n.calls.map(call).join('');
+  return `${calls}<div class="absolute top-[40%] left-1/2 -translate-1/2" style="--from:${n.from}">
       <div class="${m.bubble} ${still}">
         <div class="relative animate-nudge-rock ${still}"${m.resume}>
           <i class="nudge-rays pointer-events-none absolute -inset-[40%] animate-nudge-turn ${still}"${m.resume}></i>
           <div class="relative origin-bottom ${m.boing} ${still}">
             <div class="nudge-bubble grid min-w-52 place-items-center px-5 py-4" style="--player:${colourOf(n.avatar)}" data-cell="bubble">
               <i class="nudge-dots"></i><i class="nudge-gleam"></i>
-              ${tail('bottom-full left-[max(2rem,22%)] h-[1.375rem] w-[1.75rem]')}
+              ${tail(BIG_TAILS[n.from])}
               <p class="nudge-text relative w-max text-center" aria-hidden="true" data-cell="line">${letters(n.line)}</p>
             </div>
           </div>
-          ${calls}
         </div>
       </div>
     </div>${n.leaving ? '' : `<p class="sr-only" role="status">${esc(n.line)}</p>`}`;

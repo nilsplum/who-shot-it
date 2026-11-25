@@ -73,7 +73,7 @@
   --color-coral: #ff5a5f; /* the main action of a screen */
   --color-green: #3ddc97; /* yes, ready, right */
   --color-green-dark: #1f3a31; /* behind the right card */
-  --color-ice: #c2e6ff; /* "No →" in the lobby, with dark blue text, next to the green Yes */
+  --color-lilac: #c996ff; /* "No →" in the lobby, with dark blue text, next to the green Yes */
   --color-red: #ff6b6f; /* wrong, leaving and deleting, no swaps left, a player who is offline */
   --color-red-dark: #40222b; /* behind a wrong pick, behind a player who is offline */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
@@ -230,10 +230,10 @@
  * The bubble that teases the last player (views/lobby.js `nudge`, web/js/nudge.js `NUDGE`):
  * it slides in from its side while it grows (`--from`: -1 left, 1 right), rocks gently in 3D
  * so its bulging letters bend with it, bounces once halfway, and its rays turn; the small
- * bubbles pop out of their tails one after another (each its own `--delay`) and wiggle around
- * their tilt (`--tilt`); leaving, the small ones pop away and the big one shrinks and fades.
- * `inline`, so a move that reads a value of its element (a small bubble's `--delay`) gets
- * that element's value, not the page's.
+ * bubbles pop out of their tails one after another and, before the big one leaves, pop away
+ * each at its own moment (`nudge-call`: its `--in` and `--out`), wiggling around their tilt
+ * (`--tilt`) between; leaving, the big one shrinks and fades. `inline`, so a move that reads a
+ * value of its element (a small bubble's `--in`) gets that element's value, not the page's.
  */
 @theme inline {
   --animate-nudge-in: nudge-in 0.75s ease-out both;
@@ -241,8 +241,8 @@
   --animate-nudge-rock: nudge-rock 4.8s ease-in-out infinite;
   --animate-nudge-boing: nudge-boing 0.6s ease-out 2.4s both;
   --animate-nudge-turn: turn 22s linear infinite;
-  --animate-nudge-call-in: nudge-call-in 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) var(--delay) both;
-  --animate-nudge-call-out: nudge-call-out 0.2s ease-in forwards;
+  /* Two moves of one small bubble, the later one taking over when it starts: in, and away. */
+  --animate-nudge-call: nudge-call-in 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) var(--in) both, nudge-call-pop 0.22s ease-in var(--out) forwards;
   --animate-nudge-wiggle: nudge-wiggle 0.9s ease-in-out infinite;
 
   /* From beyond its side of the photos (`--from`) and a third of its size to its place: it stops with a little squash. */
@@ -262,7 +262,8 @@
   @keyframes nudge-boing { 0%, 100% { scale: 1; } 25% { scale: 1.07 0.9; } 50% { scale: 0.95 1.06; } 75% { scale: 1.02 0.985; } }
   /* Out of its tail, a little too big, then its size. */
   @keyframes nudge-call-in { 0% { scale: 0; } 55% { scale: 1.2; } 75% { scale: 0.93; } 100% { scale: 1; } }
-  @keyframes nudge-call-out { to { scale: 0; } }
+  /* Away with a pop: a little bigger, then gone. */
+  @keyframes nudge-call-pop { 40% { scale: 1.18; } to { scale: 0; opacity: 0; } }
   @keyframes nudge-wiggle { 0%, 100% { rotate: var(--tilt); } 50% { rotate: calc(var(--tilt) * -0.5); } }
 }
 
@@ -490,16 +491,17 @@
  * that player's colour (`--player`), the small bubbles around it in their players' colours.
  * Opaque and smooth: large soft corners, a thick dark outline, a hard dark shadow to the bottom
  * right (its thickness), pop-art dots on its shadow side and a gleam on its light side; its
- * tail (`nudge-tail`) is filled with the colour of the edge it leaves (`--tail`) and carries
- * its outline on. Nothing here moves (the moves are above): the graphics chip moves finished
+ * tail (`nudge-tail`) is filled with the colour of the edge it leaves (`--tail`: the big
+ * bubble's bottom edge, a small one's only colour) and carries its outline on. Nothing here moves (the moves are above): the graphics chip moves finished
  * layers and nothing is repainted while it rocks.
  */
 @utility nudge-bubble {
-  --tail: color-mix(in srgb, var(--player) 62%, var(--color-white));
+  --light: color-mix(in srgb, var(--player) 62%, var(--color-white));
+  --tail: color-mix(in srgb, var(--player) 80%, var(--color-navy));
   position: relative;
   border: 0.19rem solid var(--color-navy);
   border-radius: 1.75rem;
-  background: linear-gradient(180deg, var(--tail) 0%, var(--player) 55%, color-mix(in srgb, var(--player) 80%, var(--color-navy)) 100%);
+  background: linear-gradient(180deg, var(--light) 0%, var(--player) 55%, var(--tail) 100%);
   box-shadow: 0.25rem 0.3rem 0 var(--color-navy), 0 1rem 2rem color-mix(in srgb, var(--color-stage) 55%, transparent);
 }
 /* A small bubble: a pill in its player's colour (its tails leave edges of that colour), a thinner outline and shadow, finer dots. */

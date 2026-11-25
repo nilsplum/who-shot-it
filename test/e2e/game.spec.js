@@ -477,10 +477,11 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
     };
     await sayYes(host);
     await sayYes(guests[0]);
-    // The last one, with the longest name: once her bubble has slid in and its small bubbles
-    // have popped up, all of it is inside the smallest screen, and nothing scrolls.
+    // The last one, with the longest name: once her bubble has slid in and its two to four
+    // small bubbles have popped up, all of it is inside the smallest screen, and nothing scrolls.
     await expect.poll(() => inside(host, '[data-part="nudge"] [data-cell="bubble"], [data-part="nudge"] [data-cell="call"]')).toBe(true);
-    await expect(host.locator('[data-part="nudge"] [data-cell="call"]')).toHaveCount(3);
+    const calls = await host.locator('[data-part="nudge"] [data-cell="call"]').count();
+    expect(calls >= 2 && calls <= 4, `${calls} small bubbles`).toBe(true);
     await fits(host);
     // Ann changes her photos (two to wait for, the bubble goes) and the third phone says Yes:
     // now Ann's Yes starts the game and asks first, on the smallest phone, all of it on screen.
