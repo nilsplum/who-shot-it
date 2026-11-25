@@ -17,9 +17,9 @@
  * - Files that cannot import this module restate a few values, and
  *   `test/unit/config.test.js` pins each copy: the brand name (`index.html`, `legal.html`,
  *   `capacitor.config.json`, the native projects), the app id (`capacitor.config.json`,
- *   the native projects), the link scheme (the native projects), the server's address
- *   (`wrangler.jsonc` and the page's Content-Security-Policy in `index.html`) and the
- *   terms version and minimum age (`legal.html`).
+ *   the native projects), the link scheme (the native projects), the environments' Workers
+ *   (`wrangler.jsonc`) and addresses (the page's Content-Security-Policy in `index.html`)
+ *   and the terms version and minimum age (`legal.html`).
  */
 
 export const APP = {
@@ -35,13 +35,43 @@ export const APP = {
   version: '1.0.9',
 };
 
+/**
+ * The deployed environments, the one table every part reads: the app (`phone.serverOrigin`,
+ * by the environment its build was made for, `web/js/environment.js`), the scripts
+ * (`scripts/helpers/environments.sh`) and the store links. Each has its address (the API,
+ * the room sockets and the photos, and the website with the legal page and the invite
+ * links), its Worker (`wrangler.jsonc`: production is the top level, staging `env.staging`)
+ * and the digit its builds' numbers end in (`buildNumber`). Local development
+ * (`./scripts/dev.sh`, the tests) has no entry: a page in a browser talks to the server it
+ * came from.
+ * - production: the store apps everyone installs, the website and the store links. Every
+ *   installed app has its address built in, so it never changes: a move to a domain needs a
+ *   new app release, and the old address stays served until no installed app uses it any
+ *   more (README, Release).
+ * - staging: the test builds (TestFlight, Google Play's internal track), with their own rooms
+ *   and photos, so new code is tried there without touching anyone's game.
+ */
+export const ENVIRONMENTS = {
+  production: { origin: 'https://who-shot-it.nils-plum.workers.dev', worker: 'who-shot-it', build: 1 },
+  staging: { origin: 'https://who-shot-it-staging.nils-plum.workers.dev', worker: 'who-shot-it-staging', build: 0 },
+};
+
+/**
+ * A build's number for the stores (the iPhone's build number, Android's version code): the
+ * version as a number (1.0.9 is 10009) times ten, plus its environment's digit, so 1.0.9 is
+ * 100090 built for staging and 100091 for production. The same version can be tried on
+ * staging and then released; App Store Connect shows which build is which, so only a
+ * production build can be sent to App Review (`scripts/helpers/app-store.mjs`); and the
+ * numbers only grow (the builds before environments were the plain version number, 10007 and
+ * lower), as Google requires.
+ */
+export function buildNumber(version, environment) {
+  if (!ENVIRONMENTS[environment]) throw new Error(`No environment "${environment}" (${Object.keys(ENVIRONMENTS).join(', ')})`);
+  const [major, minor, patch] = version.split('.').map(Number);
+  return (major * 10000 + minor * 100 + patch) * 10 + ENVIRONMENTS[environment].build;
+}
+
 export const SERVER = {
-  /**
-   * Where the apps reach the server (API, room sockets, photos) and where the website
-   * with the legal page and invite links lives. Changing it needs a new app release, so
-   * an old address stays served until no installed app uses it any more (README, Deploy).
-   */
-  origin: 'https://who-shot-it.nils-plum.workers.dev',
   /**
    * The origins of the app's own page inside the store apps (Capacitor's defaults:
    * iOS serves the bundle from `capacitor://localhost`, Android from `https://localhost`).
@@ -87,7 +117,7 @@ export const BLOCKED_WORDS = [
  * button to a "not found" page would be a dead end. The iPhone link is the App Store
  * Connect record's Apple ID (it opens once a version is approved); the Android one is
  * `https://play.google.com/store/apps/details?id=${APP.id}` once Google Play publishes it.
- * The website shows a change only after `./scripts/deploy.sh`.
+ * The website shows a change only after `./scripts/deploy.sh production`.
  */
 export const STORES = {
   android: null,

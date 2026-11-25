@@ -5,7 +5,7 @@
  */
 import { expect, test } from 'vitest';
 import { IMAGE_FILES, LISTINGS, problems } from '../../scripts/helpers/listing.mjs';
-import { APP, SERVER } from '../../web/shared/config.js';
+import { APP, ENVIRONMENTS } from '../../web/shared/config.js';
 
 /** The files in store/images/, by repo path (only their names: nothing is loaded). */
 const images = Object.keys(import.meta.glob('../../store/images/**/*')).map((file) => file.replace('../../', ''));
@@ -33,12 +33,13 @@ test('the checks find what a store would refuse', () => {
   ]));
 });
 
-test('both stores get the same name, description and links, built from the config', () => {
+test('both stores get the same name, description and links, built from the config (the store apps\' server)', () => {
+  const site = ENVIRONMENTS.production.origin;
   for (const listing of Object.values(LISTINGS)) {
     expect(listing.name.startsWith(APP.name)).toBe(true);
     expect(listing.description).toBe(LISTINGS.ios.description);
-    for (const url of [listing.website, listing.privacyPolicyUrl, listing.supportUrl].filter(Boolean)) expect(url.startsWith(SERVER.origin), url).toBe(true);
+    for (const url of [listing.website, listing.privacyPolicyUrl, listing.supportUrl].filter(Boolean)) expect(url.startsWith(site), url).toBe(true);
   }
   // The imprint stays one tap from both store pages (German law), through the description.
-  expect(LISTINGS.android.description).toContain(`${SERVER.origin}/legal`);
+  expect(LISTINGS.android.description).toContain(`${site}/legal`);
 });

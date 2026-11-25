@@ -19,7 +19,9 @@ browser), and internet. The computer must stay awake while they play.
 
        node scripts/helpers/demo-players.mjs ABCD 3
 
-   Or ask Claude: "Get me the test users: ABCD".
+   Or ask Claude: "Get me the test users: ABCD". They look for the game on the staging
+   server (where a TestFlight build plays) and then on production (the App Store app), and
+   join wherever it is.
 3. After a few seconds they appear in the lobby, one after the other. Once the last one is
    in, they wait **half a minute** before they get ready, so there is time to show the
    lobby, for example to remove one (tap the name, then **Remove**).
@@ -34,11 +36,11 @@ browser), and internet. The computer must stay awake while they play.
 They also leave when you remove them or when the game is gone. Ctrl+C on the computer ends
 them all at once.
 
-**Options:** the number of players (1 to 15, default 2) and the server (default: the live
-one). Everyone already in the game counts: with 15 they fill the game up to its 16
-players, and the script says when the game is full. With the local server of
-`./scripts/dev.sh android` or `ios`, add its address:
-`node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787`.
+**Options:** the number of players (1 to 15, default 2) and the server: `staging` or
+`production` to look only there, or an address (default: staging, then production). Everyone
+already in the game counts: with 15 they fill the game up to its 16 players, and the script
+says when the game is full. With the local server of `./scripts/dev.sh android` or `ios`, add
+its address: `node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787`.
 
 ## Record the video for App Review
 

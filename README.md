@@ -46,10 +46,11 @@ run `./scripts/release-apps.sh --submit`. It uploads both apps and sends them to
 both go live by themselves after approval. Store setup and the first release by hand:
 [docs/apps.md](docs/apps.md); everything the stores get (texts, images, form answers): `store/`.
 
-**The server's address** is `SERVER.origin` in `web/shared/config.js` (and `wrangler.jsonc`;
-a test keeps them in step): for now `who-shot-it.<subdomain>.workers.dev`. The apps have it
-built in, so a move to a domain needs a new app release, and the old address stays on until
-no installed app uses it.
+**The servers' addresses** are `ENVIRONMENTS` in `web/shared/config.js` (and `wrangler.jsonc`;
+a test keeps them in step): production `who-shot-it.<subdomain>.workers.dev`, staging
+`who-shot-it-staging.<subdomain>.workers.dev`. A build talks to the one it was made for
+(`web/js/environment.js`). The store apps have production's built in, so a move to a domain
+needs a new app release, and the old address stays on until no installed app uses it.
 
 ## How it works
 
@@ -68,7 +69,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `src/room.js` | The room: turns messages, uploads and its alarm into events, then persists, deletes unreferenced photos, broadcasts views and sets the next alarm. |
 | `src/worker.js` | Creates rooms (EU only), checks who may call, forwards room requests. Everything else is the website from `web/`. |
 | `styles/app.css` | The design: Tailwind's theme (every colour, with the dark blue and the yellow as main colours; the type scale, fonts, animations) and the shared `screen`, `btn` and `link`. Built into `web/css/app.css` (git-ignored) by `wrangler dev`/`deploy` and the app release. |
-| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `clock.js` (the server's clock, which every countdown runs on), `photos.js` (the photos to choose from, with a bucket of previews kept ready), `upcoming.js` (the game's photos, loaded ahead in play order), `loader.js` (the background workers, one per kind of work, for both), `textcheck.js` (counts lines of text on a preview), `nudge.js` (the last player the group waits for, and the comic bubble that teases them on the others' phones), `countdown.js` (keeps the 3-2-1's film leader on the room's clock), `reveal.js` (each round's reveal, step by step) and `streak.js` (a streak's tower on it), `board.js` (the leaderboard's entrance: who overtakes whom), `motion.js` (the stories' pauses, easings and frame loop), `podium.js` and `sparks.js` (the end screen's reveal, its sparks and fireworks), `review.js` (when to ask the phone for the store's own rating window), `phone.js` (everything native). |
+| `web/js/` | The app: `main.js` (controller), `views/` (screens and sheets as HTML strings with Tailwind classes; shared pieces in `ui.js`), `render.js` (repaints only changed parts), `connection.js` (socket with reconnect), `clock.js` (the server's clock, which every countdown runs on), `photos.js` (the photos to choose from, with a bucket of previews kept ready), `upcoming.js` (the game's photos, loaded ahead in play order), `loader.js` (the background workers, one per kind of work, for both), `textcheck.js` (counts lines of text on a preview), `environment.js` (which server a build talks to), `nudge.js` (the last player the group waits for, and the comic bubble that teases them on the others' phones), `countdown.js` (keeps the 3-2-1's film leader on the room's clock), `reveal.js` (each round's reveal, step by step) and `streak.js` (a streak's tower on it), `board.js` (the leaderboard's entrance: who overtakes whom), `motion.js` (the stories' pauses, easings and frame loop), `podium.js` and `sparks.js` (the end screen's reveal, its sparks and fireworks), `review.js` (when to ask the phone for the store's own rating window), `phone.js` (everything native). |
 | `web/legal.html` | Imprint, privacy policy, terms, content reports, licences. |
 | `store/` | Everything the stores get, named by who gets it (`android_ios_` both, `ios_`, `android_`): the listings and `images/`. `scripts/helpers/listing.mjs` is the one reader: the iOS upload, the image scripts and the preview (`./scripts/dev.sh store`) all use it, so the preview shows what both stores get. |
 | `drafts/` | Screens and animations tried out before they go into the app, on phone-sized screens with the app's real views and theme; never shipped. How they work and how to make one: [drafts/README.md](drafts/README.md). |

@@ -15,12 +15,15 @@
  *   data dropped): small previews (LIMITS.previewSide) to choose from, which never leave
  *   the phone, and the chosen photos (LIMITS.photoMaxSide), which leave it only through
  *   `uploadPhotos` after the player taps "Yes".
- * - The app's own page runs at one of `SERVER.appOrigins` and talks to `SERVER.origin`;
- *   anywhere else (the website, local development, the tests) it talks to the origin it
- *   came from. `serverOrigin` and `codeFromLink` are pure, so they are unit-tested.
+ * - The app's own page runs at one of `SERVER.appOrigins` and talks to the server of the
+ *   environment its build was made for (`ENVIRONMENTS`, `environment.js`: production, or
+ *   staging for a test build); anywhere else (the website, local development, the tests) it
+ *   talks to the origin it came from. `serverOrigin` and `codeFromLink` are pure, so they are
+ *   unit-tested.
  */
 
-import { APP, LIMITS, SERVER, TIMING, isRoomCode } from '../shared/config.js';
+import { APP, ENVIRONMENTS, LIMITS, SERVER, TIMING, isRoomCode } from '../shared/config.js';
+import { ENVIRONMENT } from './environment.js';
 
 const plugin = (name) => (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
 
@@ -30,9 +33,9 @@ export const inApp = () => Boolean(plugin('Phone'));
 /** 'ios' or 'android' inside the store apps, 'web' in a plain browser: Capacitor's own answer. */
 export const platform = () => (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'web');
 
-/** Where the API, the room sockets and the photos are, seen from a page at `origin`. */
-export function serverOrigin(origin = location.origin) {
-  return SERVER.appOrigins.includes(origin) ? SERVER.origin : origin;
+/** Where the API, the room sockets and the photos are, seen from a page at `origin` of a build for `environment`. */
+export function serverOrigin(origin = location.origin, environment = ENVIRONMENT) {
+  return SERVER.appOrigins.includes(origin) ? ENVIRONMENTS[environment].origin : origin;
 }
 
 /**

@@ -2,9 +2,13 @@
  * Demo players: computer opponents that join a real game, so one person with one phone can
  * play, demonstrate or record the whole game (for example the screen recording App Review
  * asks for; step by step in docs/guides/demo-players.md). Usage, with the code the phone shows:
- *   node scripts/helpers/demo-players.mjs ABCD            two players on the live server
+ *   node scripts/helpers/demo-players.mjs ABCD            two players, wherever the game is
  *   node scripts/helpers/demo-players.mjs ABCD 15         as many as the game still holds
+ *   node scripts/helpers/demo-players.mjs ABCD 3 staging  three, only on staging (or production)
  *   node scripts/helpers/demo-players.mjs ABCD 3 http://localhost:8787   three, local server
+ * Without a server they look for the game on each deployed environment in turn (ENVIRONMENTS:
+ * a TestFlight build plays on staging, a store app on production), so they always join the
+ * server the phone uses; the first one that knows the code is where all of them play.
  *
  * They join one after the other until as many as asked for are in, or until the room turns
  * one away. The room alone knows who else is in the game, so it alone decides: it holds
@@ -25,16 +29,20 @@
  * host removed them. Ctrl+C ends them all.
  */
 import { chromium } from '@playwright/test';
-import { LIMITS, SERVER } from '../../web/shared/config.js';
+import { ENVIRONMENTS, LIMITS } from '../../web/shared/config.js';
 import { installFakePhone } from '../../test/e2e/fake-phone.js';
 import { drawLibrary } from './demo-photos.mjs';
 
 const MOST = LIMITS.maxPlayers - 1;
-const [code, count = '2', server = SERVER.origin] = process.argv.slice(2);
-if (!/^[A-Z0-9]{4}$/.test(code || '') || !(Number(count) >= 1)) {
-  console.error(`Use: node scripts/helpers/demo-players.mjs <CODE> [players, 1 to ${MOST}] [server]`);
+const [code, count = '2', where] = process.argv.slice(2);
+/** The servers to look for the game on, in turn: the one asked for, or staging (a TestFlight phone, the usual case) and then production. */
+const servers = where ? [ENVIRONMENTS[where]?.origin || where] : [ENVIRONMENTS.staging.origin, ENVIRONMENTS.production.origin];
+if (!/^[A-Z0-9]{4}$/.test(code || '') || !(Number(count) >= 1) || !/^https?:\/\//.test(servers[0])) {
+  console.error(`Use: node scripts/helpers/demo-players.mjs <CODE> [players, 1 to ${MOST}] [${Object.keys(ENVIRONMENTS).join('|')}|<server address>]`);
   process.exit(1);
 }
+/** What the app says when a server has no game with that code (main.js, CLOSE.gone). */
+const NO_SUCH_GAME = 'No game with this code.';
 const wanted = Math.min(Math.floor(Number(count)), MOST);
 if (wanted < Number(count)) console.log(`At most ${MOST}: a game holds ${LIMITS.maxPlayers} players, you included.`);
 
@@ -57,11 +65,11 @@ const END_STAY_MS = 120_000;
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Opens the app as a new phone and joins the game. Resolves with the page once it is in the
- * room (every room screen has the Leave button), or null once the app is back on its start
- * screen with the room's answer in the toast (full, no such game).
+ * Opens the app as a new phone at `server` and joins the game. Resolves with the page once it
+ * is in the room (every room screen has the Leave button), or with the room's answer in the
+ * toast once the app is back on its start screen (full, no such game).
  */
-async function join(browser, library, [name, avatar]) {
+async function join(browser, library, [name, avatar], server) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addInitScript(installFakePhone, { photos: library });
   await context.addInitScript(([n, a]) => localStorage.setItem('whoshotit', JSON.stringify({ name: n, avatar: a })), [name, avatar]);
@@ -78,9 +86,9 @@ async function join(browser, library, [name, avatar]) {
     console.log(`${avatar} ${name} joined ${code}`);
     return page;
   }
-  console.log(`${avatar} ${name} could not join: ${await page.locator('#toast').textContent()}`);
+  const answer = await page.locator('#toast').textContent();
   await context.close();
-  return null;
+  return answer;
 }
 
 /**
@@ -137,9 +145,25 @@ async function play(page, [name, avatar], since) {
 const browser = await chromium.launch();
 const library = await drawLibrary(browser);
 const players = [];
-for (let i = 0; i < wanted; i++) {
-  const page = await join(browser, library, nameOf(i));
-  if (!page) break;
+// The first player looks for the game on each server in turn; the rest follow it there.
+let server = null;
+for (const candidate of servers) {
+  const first = await join(browser, library, nameOf(0), candidate);
+  if (typeof first !== 'string') {
+    server = candidate;
+    players.push([first, nameOf(0)]);
+    console.log(`${code} is on ${candidate}`);
+    break;
+  }
+  console.log(`${candidate}: ${first}`);
+  if (first !== NO_SUCH_GAME) break;
+}
+for (let i = 1; server && i < wanted; i++) {
+  const page = await join(browser, library, nameOf(i), server);
+  if (typeof page === 'string') {
+    console.log(`${nameOf(i).join(' ')} could not join: ${page}`);
+    break;
+  }
   players.push([page, nameOf(i)]);
 }
 if (players.length) console.log(`${players.length} in ${code}; they say Yes to their photos in half a minute.`);

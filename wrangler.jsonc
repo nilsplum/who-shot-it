@@ -3,7 +3,11 @@
 // browser the app's page shows the invite page; /legal the legal texts). Every room is
 // its own Durable Object (src/room.js), stored in the EU (SERVER.jurisdiction).
 // Everything runs on the Workers Free plan (SQLite-backed Durable Objects only).
-// `./scripts/deploy.sh` deploys this file; `./scripts/dev.sh` and the tests run it locally.
+// The top level is production; `env.staging` (below) is the same Worker a second time, for
+// the test builds. The two are ENVIRONMENTS in web/shared/config.js (their Worker names and
+// addresses pinned to this file by test/unit/config.test.js).
+// `./scripts/deploy.sh staging|production` deploys one of them; `./scripts/dev.sh` and the
+// tests run the top level locally.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "who-shot-it",
@@ -30,16 +34,30 @@
   },
   // A Durable Object class is registered once; never edit or remove a deployed migration.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
-  // The public address, SERVER.origin in web/shared/config.js (pinned by a test): for now
-  // the account's https://who-shot-it.<subdomain>.workers.dev. To move to a domain (a zone
-  // in the same Cloudflare account), add  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }]
-  // and change SERVER.origin. The apps have the address built in, so keep workers_dev on
-  // until no installed app uses the old address any more (README, Release).
+  // The public address, ENVIRONMENTS.production.origin in web/shared/config.js (pinned by a
+  // test): for now the account's https://who-shot-it.<subdomain>.workers.dev. To move to a
+  // domain (a zone in the same Cloudflare account), add  "routes": [{ "pattern": "whoshot.it", "custom_domain": true }]
+  // and change the origin. The apps have the address built in, so keep workers_dev on
+  // until no installed app uses the old address any more (README, Release). The Worker's
+  // name ("who-shot-it") is part of that address: never rename it.
   "workers_dev": true,
   // No preview links per upload: every version would be a second public copy of the game.
   "preview_urls": false,
   // No stored request logs (privacy policy: we store no logs). `npx wrangler tail` streams live.
   "observability": { "enabled": false },
   // No Wrangler usage telemetry from the deploy machine.
-  "send_metrics": false
+  "send_metrics": false,
+  "env": {
+    // Staging, for the test builds (ENVIRONMENTS.staging): Wrangler deploys it as the Worker
+    // "who-shot-it-staging" at its own workers.dev address, with everything above, but with
+    // Durable Objects of its own, so its rooms and photos never meet production's. Wrangler
+    // does not inherit the Durable Object binding, so it is repeated here, and so is its
+    // migration, to state the same history for both.
+    "staging": {
+      "durable_objects": {
+        "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+    }
+  }
 }

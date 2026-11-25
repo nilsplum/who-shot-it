@@ -18,7 +18,7 @@
  *   commas, colons and full stops read better on a phone.
  * - A key set here is never set again in a platform's listing (`problems` in listing.mjs):
  *   each fact has one home.
- * - Links and the number of players are built from the config (SERVER.origin, LIMITS),
+ * - Links and the number of players are built from the config (ENVIRONMENTS.production.origin, LIMITS),
  *   never written out, so a move to a domain or a new player limit changes them too.
  * - Screenshots show only drawn stand-in photos (`scripts/helpers/demo-photos.mjs`), never
  *   real ones: nobody's private pictures, no image licence needed.
@@ -43,7 +43,10 @@
  * Another app's name ("Photo Roulette", "Heads Up", "Guess Who") never appears: both stores
  * forbid it, and it would be a trademark problem.
  */
-import { APP, LIMITS, SERVER } from '../web/shared/config.js';
+import { APP, ENVIRONMENTS, LIMITS } from '../web/shared/config.js';
+
+/** The store apps' server, whose website has the legal page. */
+const SITE = ENVIRONMENTS.production.origin;
 
 const description = `Your camera roll is full of stories. Time to play them.
 
@@ -73,7 +76,7 @@ YOUR PHOTOS STAY YOURS
 Grab your friends, open the app and find out who really took that photo.
 
 Questions or ideas? whoshotit.info@gmail.com
-Imprint and privacy: ${SERVER.origin}/legal`;
+Imprint and privacy: ${SITE}/legal`;
 
 export default {
   /** The listings' one language: English (United States), on both stores. */
@@ -82,8 +85,8 @@ export default {
   name: `${APP.name} Photo Party Game`,
   description,
   /** Linked from both pages: the iPhone store calls it "Marketing URL", the Android store "Website". */
-  website: SERVER.origin,
-  privacyPolicyUrl: `${SERVER.origin}/legal#privacy`,
+  website: SITE,
+  privacyPolicyUrl: `${SITE}/legal#privacy`,
   /**
    * The screenshots, in the order a new player needs to understand the game: what it is,
    * where the photos come from, the fun part, the options, and the answer to "who sees my

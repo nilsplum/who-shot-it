@@ -10,7 +10,8 @@
   (scripts/helpers/styles.sh). Scaling is off: double-tap zoom would enlarge the whole UI
   by accident (pinch zoom is off in the apps' web view anyway). The title and descriptions
   restate APP.name for link previews, the
-  Content-Security-Policy restates SERVER.origin, the only place the app talks to, and the
+  Content-Security-Policy restates the environments' addresses (ENVIRONMENTS: production,
+  and staging for the test builds), the only places the app talks to, and the
   theme colour restates the dark blue of styles/app.css (all pinned by
   test/unit/config.test.js).
 -->
@@ -18,7 +19,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://who-shot-it.nils-plum.workers.dev; connect-src 'self' https://who-shot-it.nils-plum.workers.dev wss://who-shot-it.nils-plum.workers.dev; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://who-shot-it.nils-plum.workers.dev https://who-shot-it-staging.nils-plum.workers.dev; connect-src 'self' https://who-shot-it.nils-plum.workers.dev wss://who-shot-it.nils-plum.workers.dev https://who-shot-it-staging.nils-plum.workers.dev wss://who-shot-it-staging.nils-plum.workers.dev; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Who Shot It?</title>
 <meta name="description" content="The party game with the photos on your phones: guess whose photo it is. Free, no account.">
 <meta property="og:title" content="Who Shot It?">

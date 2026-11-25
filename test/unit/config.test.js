@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import {
-  APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SERVER, SETTINGS, SETTINGS_DEFAULTS, STORES, isRoomCode, normalizeSetting, normalizeSettings, presetOf, reviewLink,
+  APP, ENVIRONMENTS, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SETTINGS, SETTINGS_DEFAULTS, STORES, buildNumber, isRoomCode, normalizeSetting, normalizeSettings, presetOf, reviewLink,
 } from '../../web/shared/config.js';
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
@@ -134,16 +134,40 @@ describe('values restated outside the config', () => {
     expect(iosInfo).toMatch(new RegExp(`<key>CFBundleURLSchemes</key>\\s*<array>\\s*<string>${APP.scheme}</string>`));
   });
 
-  test('the server address: the page may talk to it, and wrangler.jsonc serves it', () => {
-    const { host } = new URL(SERVER.origin);
-    expect(indexHtml).toContain(`connect-src 'self' ${SERVER.origin} wss://${host};`);
-    expect(indexHtml).toContain(`img-src 'self' blob: data: ${SERVER.origin};`);
-    if (host.endsWith('.workers.dev')) {
-      expect(wrangler.workers_dev).toBe(true);
-      expect(host.startsWith(`${wrangler.name}.`)).toBe(true);
-    } else {
-      expect(wrangler.routes).toContainEqual({ pattern: host, custom_domain: true });
+  test('the environments: wrangler.jsonc deploys each one\'s Worker at its address, and the page may talk to each', () => {
+    // Production is wrangler.jsonc's top level; staging is env.staging, which Wrangler names
+    // "<name>-staging" and gives the top level's settings, but not its Durable Objects.
+    const configs = { production: wrangler, staging: { ...wrangler, ...wrangler.env.staging } };
+    expect(Object.keys(ENVIRONMENTS)).toEqual(['production', 'staging']);
+    expect(Object.keys(wrangler.env)).toEqual(['staging']);
+    expect(ENVIRONMENTS.production.worker).toBe(wrangler.name);
+    expect(ENVIRONMENTS.staging.worker).toBe(`${wrangler.name}-staging`);
+    expect(wrangler.env.staging.durable_objects).toEqual(wrangler.durable_objects);
+    expect(wrangler.env.staging.migrations).toEqual(wrangler.migrations);
+    for (const [name, { origin, worker }] of Object.entries(ENVIRONMENTS)) {
+      const { host } = new URL(origin);
+      if (host.endsWith('.workers.dev')) {
+        expect(configs[name].workers_dev, name).toBe(true);
+        expect(host.startsWith(`${worker}.`), name).toBe(true);
+      } else {
+        expect(configs[name].routes, name).toContainEqual({ pattern: host, custom_domain: true });
+      }
     }
+    const origins = Object.values(ENVIRONMENTS).map((e) => e.origin);
+    expect(indexHtml).toContain(`img-src 'self' blob: data: ${origins.join(' ')};`);
+    expect(indexHtml).toContain(`connect-src 'self' ${origins.map((o) => `${o} wss://${new URL(o).host}`).join(' ')};`);
+  });
+
+  test('a build\'s number carries its environment, is never used twice, and only grows', () => {
+    expect(buildNumber('1.0.9', 'staging')).toBe(100090);
+    expect(buildNumber('1.0.9', 'production')).toBe(100091);
+    const digits = Object.values(ENVIRONMENTS).map((e) => e.build);
+    expect(new Set(digits).size).toBe(digits.length);
+    for (const d of digits) expect(d >= 0 && d <= 9).toBe(true);
+    // Above every build made before environments had a digit (the plain version number).
+    expect(buildNumber('1.0.9', 'staging')).toBeGreaterThan(10009);
+    expect(buildNumber('1.0.10', 'staging')).toBeGreaterThan(buildNumber('1.0.9', 'production'));
+    expect(() => buildNumber('1.0.9', 'local')).toThrow('No environment "local"');
   });
 
   test('the legal page: its date is the terms version, its age the minimum age', () => {

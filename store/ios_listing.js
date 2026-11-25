@@ -20,7 +20,7 @@
  *   is published through the managing director's own account (web/legal.html, Imprint).
  * - Review texts are seen only by Apple's reviewers; the preview never shows them.
  */
-import { SERVER, TIMING } from '../web/shared/config.js';
+import { ENVIRONMENTS, TIMING } from '../web/shared/config.js';
 
 const promotionalText = 'Your next party game is already on your phones: random photos from everyone’s camera roll, and one question. Whose is it?';
 
@@ -76,7 +76,7 @@ export default {
   whatsNew,
   developer: 'Nils Plum',
   /** The imprint, which also names every way to reach us. */
-  supportUrl: `${SERVER.origin}/legal#imprint`,
+  supportUrl: `${ENVIRONMENTS.production.origin}/legal#imprint`,
   copyright: '2026 HiveDone UG (haftungsbeschränkt)',
   /** Apple's category ids: Games, with Trivia and Casual, and Entertainment as the second category. */
   categories: { primary: 'GAMES', subcategories: ['GAMES_TRIVIA', 'GAMES_CASUAL'], secondary: 'ENTERTAINMENT' },
