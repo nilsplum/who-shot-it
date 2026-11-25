@@ -10,7 +10,8 @@
  *
  * Invariant: views are pure string builders; all DOM writes happen here (plus the
  * timer bar, the effects and the entrances, which main.js and effects.js animate directly
- * on the painted markup until the next repaint replaces it).
+ * on the painted markup until the next repaint replaces it, and the lobby bubble's line,
+ * which main.js sizes right after it is painted, `nudge.fitNudge`).
  */
 
 export function createPainter(root) {

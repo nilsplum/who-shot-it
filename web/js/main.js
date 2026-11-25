@@ -55,6 +55,11 @@
  *   button end it (`endFlag`). The sheet is this phone's own intent: the room's views only
  *   close it (its photo is gone, its round is over, someone else's flag came first), so a
  *   view that crosses a Cancel on the wire can never reopen it.
+ * - The bubble: while the group waits for one last player, the lobby teases them on every
+ *   other phone (`nudge.js`). Every paint first brings this phone's memory of that wait up to
+ *   date (`session.nudge`, `nudgeTrack`) and hands the moment's appearance to the lobby
+ *   (`context().nudge`, `nudgeAt`), so the bubble comes and goes with the paints that run
+ *   anyway; when its part was painted, its line is fitted in the same task (`fitNudge`).
  * - Hold to look: elements with `data-hold` start an entry of the `HOLDS` table when a
  *   finger stays on them; it ends when the finger lifts anywhere, and meanwhile the page
  *   neither scrolls nor opens the phone's long-press menu. The photo it shows is painted
@@ -81,6 +86,7 @@ import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, ope
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
 import { playReveal } from './reveal.js';
+import { fitNudge, nudgeAt, nudgeTrack } from './nudge.js';
 import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
 import { device, keyFor, saveDevice, session } from './store.js';
@@ -168,7 +174,7 @@ function sendShare(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view, flagLeft: clock.left(flagTimer) };
+  return { device, session, view: session.view, flagLeft: clock.left(flagTimer), nudge: nudgeAt(session.view, session.nudge, performance.now()) };
 }
 
 function screen() {
@@ -364,7 +370,11 @@ function paintStart() {
 }
 
 function render() {
+  // The wait for the last player as of now (it stays the same object while the same wait goes on).
+  session.nudge = nudgeTrack(session.nudge, session.view, performance.now());
   const changed = paintApp(screen());
+  // Its bubble's line is sized to the photos in the same task as the paint, so no frame shows it unfitted.
+  if (changed.includes('nudge')) fitNudge(document.querySelector('[data-part="nudge"]'));
   // In the same task as the paint, so no frame shows a bar or an arrow that does not fit.
   syncBar();
   for (const row of $('app').querySelectorAll('[data-sideways]')) syncRow(row);
@@ -466,7 +476,7 @@ function exitRoom(message, { forget = false } = {}) {
   if (socket) socket.end();
   socket = null;
   cancelSending();
-  Object.assign(session, { code: null, view: null, sheet: null, pick: null, conn: 'connecting', shownAt: {} });
+  Object.assign(session, { code: null, view: null, sheet: null, pick: null, conn: 'connecting', shownAt: {}, nudge: null });
   device.room = null;
   if (forget) device.lastRoom = null;
   saveDevice();

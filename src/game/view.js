@@ -37,6 +37,9 @@
  * - In the lobby, `start` says how the game will start (`startMode`: 'ask' shows "Is
  *   everyone here?" once `everyone` said "Yes", 'button' shows "Start now", usable once
  *   `everyone` did, 'auto' neither); else null.
+ * - `games` is how many games this group started in this room (`room.games`): the same on
+ *   every phone, so the lobby's bubble draws the same order of lines on all of them, and
+ *   another order each game (`web/js/nudge.js`).
  */
 
 import { API } from '../../web/shared/api.js';
@@ -116,6 +119,7 @@ export function viewFor(room, playerId, now) {
   return {
     code: room.code,
     phase: room.phase,
+    games: room.games || 0,
     hostId: room.hostId,
     settings: room.settings,
     me: me ? {

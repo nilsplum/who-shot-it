@@ -18,11 +18,14 @@
  * - `final` (the last game's standings) exists only while someone is on the end screen.
  *
  * Room shape:
- *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline, start,
+ *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline, start, games,
  *     players: [Player], banned: [key], game: Game | null, final: Final | null }
  *   start: how the next game starts once everyone said "Yes" (`startMode`): 'ask' (the
  *   first game of a group asks "Is everyone here?"), 'button' (someone answered No: the
  *   group starts with "Start now") or 'auto' (by itself; a room saved before this existed)
+ *   games: how many games this group started in this room, counted when a game's 3-2-1 ends
+ *   and back to 0 when the room is left empty (a room saved before this existed counts from
+ *   0); the apps' bubble draws its order of lines from it (`view.games`)
  *   phase: 'lobby' | 'countdown' | 'load' | 'show' | 'reveal' | 'board' | 'end'
  *   Player: { id, key, name, avatar, joinedAt, connected, goneAt, ready, sending, photos: [id],
  *             score, streak, onResults, ahead, asks }
@@ -67,6 +70,7 @@ export function newRoom(code, now, settings) {
     phase: 'lobby',
     deadline: null,
     start: 'ask',
+    games: 0,
     players: [],
     banned: [],
     game: null,

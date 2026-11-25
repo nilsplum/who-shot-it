@@ -120,5 +120,11 @@ export const session = {
    * 1), stop (an AbortController, for "Change") }`; else null.
    */
   sending: null,
+  /**
+   * This phone's memory of the wait for the last player (`nudge.js` `nudgeTrack`): which wait
+   * goes on, since when on this phone, and how many appearances each wait's bubble had in this
+   * lobby; null outside a room.
+   */
+  nudge: null,
   creating: false,
 };

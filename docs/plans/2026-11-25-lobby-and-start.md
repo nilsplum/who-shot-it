@@ -32,6 +32,9 @@ to date with every commit.
 
 **Done**
 - Commit 1: the plan and the bubble's draft are on the branch (nothing to deploy or release).
+- Commit 2: the bubble is in the app, and the room counts the group's games (`view.games`).
+  The server changed (the count), so it is part of the next deploy; installed apps ignore
+  the new field. To try on the phones: the bubble's look and moves (commit 8's list).
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -683,7 +686,7 @@ kept as they were shown: round 5 asked not to change them yet) with its row in
 
 ### Commit 2: lobby: the bubble for the last one; the room counts the group's games
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `src/game/rules.js`, `src/game/state.js`, `src/game/view.js`, `test/unit/rules.test.js`,
 `test/unit/view.test.js`, `test/helpers.js`, `web/js/views/lobby.js`, `web/js/main.js`,
@@ -1036,3 +1039,42 @@ Status: planned.
 ## 11. Decision log
 
 (Filled in while implementing: dated entries, what was decided, how and why.)
+
+**25 November 2026, commit 2 (the bubble; the room counts the group's games)**
+
+- **The bulge is milder than section 3.3 says**: 0.82 to 1.18 across a row of the big
+  bubble's line (0.88 to 1.12 on a small bubble's call), not 0.76 to 1.24. In the app's
+  screenshots a capital at a row's end, next to the bigger letters of the row's middle, read
+  as a small letter ("cleo is" for "Cleo is"); the milder curve still shows the ball.
+- **The slide-in takes 0.75 s** (section 3.3: about 0.6 s), with a gentler start: at 0.6 s the
+  bubble was almost in place after 150 ms and the slide from the side did not read as one.
+- **The tails**: one small SVG per tail whose units are the bubble's outline (three units are
+  the border: the big bubble's tail is 1.75rem wide for its 0.19rem outline, a small bubble's
+  1.4rem for 0.15rem), drawn as a bent wedge whose base runs through the middle of the
+  outline's band, its fill reaching one unit into the bubble so it covers the outline under
+  its base, its two sides stroked with the outline's width. It always sits on a straight part
+  of the edge (`max(2rem, 22%)` on the big bubble with its 1.75rem corners, `max(1rem, 18%)`
+  on the pills), so it meets the edge cleanly at every width. A first, smaller tail (1.375rem)
+  looked like a fin.
+- **The rhythm** is one cycle of 15 s from the start of an appearance: 5 s on screen, then
+  0.35 s leaving and the rest of the 10 s away. It comes from the four paints a second
+  (`nudgeAt` asked at each), so an appearance starts or leaves up to a quarter second late,
+  and the bubble has no timer of its own.
+- **Leaving is one more paint** with the exit's classes; the rock and the turning rays would
+  start over there, so the leaving markup resumes them 5 s into their cycle
+  (`animation-delay: -5000ms`, from `NUDGE.showMs`), and they do not jump.
+- **The small bubbles' callers** are the other players including this phone's own (the table
+  is talking), in the appearance's shared random order; with two players there is one.
+- **Sizes**: the line fits 78% of the photo area's width and 36% of its height, at most 2rem
+  (`FIT` in `nudge.js`, measured once per paint of the part); the big bubble is at least
+  13rem wide, so the two small bubbles below it never meet even for a short line ("Classic
+  Cleo."). The bubble lies over the photos only (the `pick` part), not over "✓ Ready" and
+  "Change", its middle at 40% of their height.
+- **The order**: each run through the 14 lines is a fresh shuffle (seeded with the wait and
+  the run's number), so a very long wait never repeats the same sequence.
+- **`seeded` (web/shared/random.js) repeats the generator of `seededRandom` in
+  `test/helpers.js`** (mulberry32, there seeded by a number). The test helper stays as it is,
+  so every existing test keeps its random sequence.
+- **The full-table e2e test** names its third phone "Cleopatra-Marlen" (the longest name a
+  player can have), so the bubble's longest case is checked on the smallest phone, and every
+  other screen of that test now shows a 16-letter name too.

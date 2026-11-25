@@ -33,11 +33,20 @@
  *
  * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so what
  * changes often (the swap counter) never repaints the grid and its photos.
+ *
+ * The bubble: while the group waits for one last player, the others' phones show a comic
+ * bubble over the photos teasing them (`web/js/nudge.js` decides when and what, `context.nudge`
+ * is the moment's appearance): a speech bubble in that player's colour slides in from a side,
+ * the other players' small bubbles call the name, and it leaves again (`nudge`). It is a part
+ * of its own (`nudge`), laid over the photos and taking no tap, so holding a photo, "Change"
+ * and the players all work through it; its markup changes only when an appearance starts or
+ * begins to leave, and main.js fits its line right after it is painted (`fitNudge`).
  */
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
+import { NUDGE, bulgeRows } from '../nudge.js';
 import { photos } from '../photos.js';
-import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, esc, sidewaysRow, topBar } from '../ui.js';
+import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, colourOf, esc, sidewaysRow, topBar } from '../ui.js';
 
 const label = (key, value) => {
   const setting = SETTINGS.find((s) => s.key === key);
@@ -236,6 +245,87 @@ function players(view) {
  */
 const PLAYERS_SLOT = '<div class="mx-auto flex w-max flex-col gap-1.5 p-1" data-part="chips"></div>';
 
+/**
+ * A comic tail: a short bent wedge sitting on a straight part of its bubble's edge (never a
+ * corner, so it always meets the edge cleanly), drawn pointing up and to the left from a top
+ * edge; `where` places it and may mirror it (`-scale-x-100` points right, `-scale-y-100`
+ * down from a bottom edge). Its fill (the first path, reaching a little into the bubble)
+ * covers the bubble's outline where the tail leaves it, and its two sides (the second path)
+ * carry the outline on to a rounded tip, so bubble and tail are one outline without a seam.
+ * Three of its units are its bubble's outline (one unit is 1px at the base font size): the
+ * big bubble's tail is 1.75rem wide (0.19rem outline), a small bubble's 1.4rem (0.15rem);
+ * `nudge-tail` in styles/app.css colours it. Its base runs through the middle of the
+ * outline's band (y 20.5 of 22), where the outline of its sides begins.
+ */
+const TAIL_SIDES = 'M6 20.5 Q7.5 10 2 1.5 Q13 8 24 20.5';
+const tail = (where) => `<svg class="pointer-events-none absolute nudge-tail ${where}" viewBox="0 0 28 22" aria-hidden="true"><path d="M6 23 L${TAIL_SIDES.slice(1)} L24 23 Z"/><path d="${TAIL_SIDES}"/></svg>`;
+
+/** A line as the bubble's letters, each sized by its place ("ss SS ss", `nudge.bulgeRows`); an emoji keeps its colours. */
+const letters = (text, call = false) => bulgeRows(text, { call }).map((row) => `<span class="block whitespace-nowrap">${row.map((c) => `<span class="bulge" style="--k:${c.k}"${c.emoji ? ' data-emoji' : ''}>${esc(c.ch)}</span>`).join('')}</span>`).join('');
+
+/**
+ * The small bubbles, by their place around the big one (`NUDGE_CALLS`): above its right end,
+ * below its left end, and below its right end, lower (so the two below never meet). Each one's
+ * tail points off the screen, to where its player sits, and it pops out from that corner;
+ * each tilts a little its own way and pops in at its own moment after the big bubble arrived.
+ */
+const CALLS = [
+  { box: 'right-0 bottom-full mb-6 translate-x-2', tail: 'bottom-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-x-100', from: 'top right', tilt: 6, delay: 0.45 },
+  { box: 'left-0 top-full mt-4 -translate-x-2', tail: 'top-full left-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-y-100', from: 'bottom left', tilt: -7, delay: 0.75 },
+  { box: 'right-0 top-full mt-16 translate-x-3', tail: 'top-full right-[max(1rem,18%)] h-[1.1rem] w-[1.4rem] -scale-100', from: 'bottom right', tilt: 4, delay: 1.05 },
+];
+
+/**
+ * How each piece moves, entering (`in`) and leaving (`out`): one complete set of classes
+ * each, picked by the view. Leaving is a new paint, so the endless moves (the rock, the
+ * turning rays) would start over and jump; they go on instead from where an appearance
+ * always is when it leaves (`resume`, its time on screen).
+ */
+const MOVES = {
+  in: { bubble: 'animate-nudge-in', boing: 'animate-nudge-boing', call: 'animate-nudge-call-in', wiggle: 'animate-nudge-wiggle', resume: '' },
+  out: { bubble: 'animate-nudge-out', boing: '', call: 'animate-nudge-call-out', wiggle: '', resume: ` style="animation-delay:-${NUDGE.showMs}ms"` },
+};
+
+/**
+ * The bubble over the photos for the moment's appearance `n` (`nudge.nudgeAt`), or '' while
+ * there is none: the big bubble in the waited-for player's colour, with its rays, its tail
+ * pointing up to the players, its pop-art dots, its gleam and its line; around it the small
+ * bubbles, each in its player's colour. Entering, it slides in from its side (`--from`) while
+ * it grows, rocks and bounces once, and the small ones pop in one after another; leaving, the
+ * same markup is painted once more with the exit's classes. The line is also there as plain
+ * text for screen readers, announced once per appearance (not again as it leaves).
+ */
+function nudge(n) {
+  if (!n) return '';
+  const m = MOVES[n.leaving ? 'out' : 'in'];
+  const still = 'motion-reduce:animate-none';
+  const calls = n.calls.map((call, i) => {
+    const at = CALLS[i];
+    return `<div class="absolute ${at.box}" style="--tilt:${at.tilt}deg;--delay:${at.delay}s">
+      <div class="${m.call} ${still}" style="transform-origin:${at.from}">
+        <div class="rotate-(--tilt) ${m.wiggle} ${still}">
+          <div class="nudge-call px-3.5 py-1.5" style="--player:${colourOf(call.avatar)}" data-cell="call"><i class="nudge-dots"></i>${tail(at.tail)}<p class="nudge-text relative w-max text-center text-xl" aria-hidden="true">${letters(call.text, true)}</p></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="absolute top-[40%] left-1/2 -translate-1/2" style="--from:${n.from}">
+      <div class="${m.bubble} ${still}">
+        <div class="relative animate-nudge-rock ${still}"${m.resume}>
+          <i class="nudge-rays pointer-events-none absolute -inset-[40%] animate-nudge-turn ${still}"${m.resume}></i>
+          <div class="relative origin-bottom ${m.boing} ${still}">
+            <div class="nudge-bubble grid min-w-52 place-items-center px-5 py-4" style="--player:${colourOf(n.avatar)}" data-cell="bubble">
+              <i class="nudge-dots"></i><i class="nudge-gleam"></i>
+              ${tail('bottom-full left-[max(2rem,22%)] h-[1.375rem] w-[1.75rem]')}
+              <p class="nudge-text relative w-max text-center" aria-hidden="true" data-cell="line">${letters(n.line)}</p>
+            </div>
+          </div>
+          ${calls}
+        </div>
+      </div>
+    </div>${n.leaving ? '' : `<p class="sr-only" role="status">${esc(n.line)}</p>`}`;
+}
+
 export function lobbyScreen(c) {
   const { view } = c;
   const host = view.hostId === view.me.id;
@@ -248,7 +338,10 @@ export function lobbyScreen(c) {
       ${sidewaysRow(PLAYERS_SLOT, 'More players', { row: 'mt-4.5 mb-1.5 short:mt-2.5', scroller: '-my-1' })}
       <div class="mt-4.5 flex flex-1 flex-col short:mt-2.5">
         <div data-part="title"></div>
-        <div class="flex flex-1 flex-col" data-part="pick"></div>
+        <div class="relative flex flex-1 flex-col">
+          <div class="flex flex-1 flex-col" data-part="pick"></div>
+          <div class="pointer-events-none absolute inset-0 z-10 @container-size" data-part="nudge"></div>
+        </div>
         <div data-part="note"></div>
         <div data-part="actions"></div>
         <div data-part="links"></div>
@@ -260,6 +353,7 @@ export function lobbyScreen(c) {
       cfg: `<button class="mx-auto block rounded-full border border-line bg-card px-3.5 py-1.75 text-xs ${host ? 'text-ink' : 'text-muted'}" data-act="settings">${esc(settingsSummary(view.settings))}${host ? ' ⚙︎' : ''}</button>`,
       chips: players(view),
       ...mine(c),
+      nudge: nudge(c.nudge),
       status: status(c),
       go: startNow(c),
     },

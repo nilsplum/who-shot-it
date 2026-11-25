@@ -125,6 +125,17 @@ test('the photos a phone may load: the whole game from the deal on, then from th
   expect(JSON.stringify(ann.upcoming)).not.toContain(idOf(room, 'Ann'));
 });
 
+test('the view says how many games this group started in the room, the same on every phone', () => {
+  let room = roomWith(['Ann', 'Ben']);
+  const [ann, ben] = room.players.map((p) => p.id);
+  expect(viewFor(room, ann, T0).games).toBe(0);
+  room = apply(room, { type: 'ready', playerId: ann, photos: ['a1'] }, T0, rng);
+  room = apply(room, { type: 'ready', playerId: ben, photos: [] }, T0, rng);
+  room = apply(room, { type: 'tick' }, T0 + TIMING.countdownMs, rng);
+  expect(viewFor(room, ann, T0 + TIMING.countdownMs)).toMatchObject({ phase: 'load', games: 1 });
+  expect(viewFor(room, ben, T0 + TIMING.countdownMs).games).toBe(1);
+});
+
 test('the lobby says how the game will start: the question once everyone said Yes, after a No "Start now"', () => {
   let room = roomWith(['Ann', 'Ben'], { asks: true });
   const [ann, ben] = room.players.map((p) => p.id);

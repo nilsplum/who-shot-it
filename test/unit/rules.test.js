@@ -168,6 +168,25 @@ describe('lobby and start', () => {
     expect(old.room).toMatchObject({ phase: 'lobby', start: 'ask', players: [] });
   });
 
+  test("the room counts the group's games: when a 3-2-1 ends, not when a start falls back; from 0 for the next group", () => {
+    const d = driver(roomWith(['Ann', 'Ben']));
+    expect(d.room.games).toBe(0);
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] });
+    expect(d.room.phase).toBe('countdown');
+    d.by('Ben', 'unready');
+    expect(d.room).toMatchObject({ phase: 'lobby', games: 0 });
+    d.by('Ben', 'ready', { photos: [] }).wait(TIMING.countdownMs);
+    expect(d.room).toMatchObject({ phase: 'load', games: 1 });
+    // Everyone leaves: the next group to use the code counts from 0.
+    d.by('Ann', 'leave').by('Ben', 'leave');
+    expect(d.room).toMatchObject({ phase: 'lobby', games: 0, players: [] });
+    // A room saved before the count existed starts counting with its next game.
+    const old = driver(roomWith(['Ann', 'Ben']));
+    delete old.room.games;
+    old.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).wait(TIMING.countdownMs);
+    expect(old.room.games).toBe(1);
+  });
+
   test('a ready player keeps at most "Photos per player" photos', () => {
     const d = driver(roomWith(['Ann'], { settings: { photos: 4 } })).by('Ann', 'ready', { photos: ['1', '2', '3', '4', '5', 6] });
     expect(d.room.players[0].photos).toEqual(['1', '2', '3', '4']);

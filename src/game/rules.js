@@ -52,7 +52,9 @@
  *   "Is everyone here?" (`startMode` 'ask'); anyone's Yes starts it, anyone's No lets the
  *   group wait for whoever is missing, and then "Start now" (anyone's, only while everyone
  *   said "Yes") starts it (`start`). Later games start by themselves; a room everyone left
- *   asks the next group again.
+ *   asks the next group again. The room also counts the games a group started (`games`,
+ *   when a 3-2-1 ends, so a start that falls back to the lobby does not count), back to 0
+ *   with the next group.
  * - The start (`countdown`), once everyone said "Yes" (`everyoneSaidYes`), in three steps
  *   the whole group goes through together, so the 3-2-1 is the same on every phone and the
  *   first photo is there the moment it ends: (1) photos still on their way come in (no
@@ -141,10 +143,12 @@ function toLobby(room) {
 
 /**
  * The 3-2-1 is over: the dealt photos now belong to the game, and readiness is spent for it.
- * The group is together now: its next games start by themselves.
+ * The group is together now: its next games start by themselves, and this one counts as one
+ * of its games (a room saved before the count existed starts it here).
  */
 function startGame(room, now, rng) {
   room.start = 'auto';
+  room.games = (room.games || 0) + 1;
   for (const p of room.players) {
     p.ready = false;
     p.photos = [];
@@ -636,12 +640,13 @@ function settle(room, now, rng) {
   }
   upgradeGame(room, now);
   // The last player is gone: an empty lobby keeps the code for whoever comes back with it,
-  // and asks that group again before its first game.
-  if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final || room.start !== 'ask')) {
+  // asks that group again before its first game and counts its games from 0.
+  if (!room.players.length && (room.phase !== 'lobby' || room.hostId || room.final || room.start !== 'ask' || room.games)) {
     toLobby(room);
     room.hostId = null;
     room.final = null;
     room.start = 'ask';
+    room.games = 0;
   }
   // The final standings go once nobody looks at them any more.
   if (room.final && room.phase !== 'end' && !room.players.some((p) => p.onResults)) room.final = null;

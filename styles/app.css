@@ -202,6 +202,46 @@
   @keyframes breathe { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-coral) 35%, transparent); } }
 }
 
+/*
+ * The bubble that teases the last player (views/lobby.js `nudge`, web/js/nudge.js `NUDGE`):
+ * it slides in from its side while it grows (`--from`: -1 left, 1 right), rocks gently in 3D
+ * so its bulging letters bend with it, bounces once halfway, and its rays turn; the small
+ * bubbles pop out of their tails one after another (each its own `--delay`) and wiggle around
+ * their tilt (`--tilt`); leaving, the small ones pop away and the big one shrinks and fades.
+ * `inline`, so a move that reads a value of its element (a small bubble's `--delay`) gets
+ * that element's value, not the page's.
+ */
+@theme inline {
+  --animate-nudge-in: nudge-in 0.75s ease-out both;
+  --animate-nudge-out: nudge-out 0.35s ease-in forwards;
+  --animate-nudge-rock: nudge-rock 4.8s ease-in-out infinite;
+  --animate-nudge-boing: nudge-boing 0.6s ease-out 2.4s both;
+  --animate-nudge-turn: turn 22s linear infinite;
+  --animate-nudge-call-in: nudge-call-in 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) var(--delay) both;
+  --animate-nudge-call-out: nudge-call-out 0.2s ease-in forwards;
+  --animate-nudge-wiggle: nudge-wiggle 0.9s ease-in-out infinite;
+
+  /* From beyond its side of the photos (`--from`) and a third of its size to its place: it stops with a little squash. */
+  @keyframes nudge-in {
+    from { translate: calc(var(--from) * 70cqw) 0; scale: 0.35; opacity: 0; animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1); }
+    20% { opacity: 1; }
+    70% { translate: 0 0; scale: 1.06 0.94; }
+    85% { scale: 0.98 1.03; }
+    to { translate: 0 0; scale: 1; opacity: 1; }
+  }
+  @keyframes nudge-out { to { scale: 0.6; opacity: 0; } }
+  @keyframes nudge-rock {
+    0%, 100% { transform: perspective(34rem) rotateY(-8deg) rotateX(3deg) rotate(-1.5deg); }
+    50% { transform: perspective(34rem) rotateY(8deg) rotateX(-3deg) rotate(1.5deg); }
+  }
+  /* One springy bounce, from its bottom. */
+  @keyframes nudge-boing { 0%, 100% { scale: 1; } 25% { scale: 1.07 0.9; } 50% { scale: 0.95 1.06; } 75% { scale: 1.02 0.985; } }
+  /* Out of its tail, a little too big, then its size. */
+  @keyframes nudge-call-in { 0% { scale: 0; } 55% { scale: 1.2; } 75% { scale: 0.93; } 100% { scale: 1; } }
+  @keyframes nudge-call-out { to { scale: 0; } }
+  @keyframes nudge-wiggle { 0%, 100% { rotate: var(--tilt); } 50% { rotate: calc(var(--tilt) * -0.5); } }
+}
+
 @layer base {
   /* No grey flash on a tap, and no double-tap zoom: a tap answers at once instead of
      waiting for a possible second tap. */
@@ -329,6 +369,103 @@
 @utility bg-rays {
   background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tone) 38%, transparent) 0deg 8deg, transparent 8deg 24deg);
   mask: radial-gradient(circle, black 18%, transparent 70%);
+}
+
+/*
+ * The bubble that teases the last player (views/lobby.js `nudge`): a comic speech bubble in
+ * that player's colour (`--player`), the small bubbles around it in their players' colours.
+ * Opaque and smooth: large soft corners, a thick dark outline, a hard dark shadow to the bottom
+ * right (its thickness), pop-art dots on its shadow side and a gleam on its light side; its
+ * tail (`nudge-tail`) is filled with the colour of the edge it leaves (`--tail`) and carries
+ * its outline on. Nothing here moves (the moves are above): the graphics chip moves finished
+ * layers and nothing is repainted while it rocks.
+ */
+@utility nudge-bubble {
+  --tail: color-mix(in srgb, var(--player) 62%, var(--color-white));
+  position: relative;
+  border: 0.19rem solid var(--color-navy);
+  border-radius: 1.75rem;
+  background: linear-gradient(180deg, var(--tail) 0%, var(--player) 55%, color-mix(in srgb, var(--player) 80%, var(--color-navy)) 100%);
+  box-shadow: 0.25rem 0.3rem 0 var(--color-navy), 0 1rem 2rem color-mix(in srgb, var(--color-stage) 55%, transparent);
+}
+/* A small bubble: a pill in its player's colour (its tails leave edges of that colour), a thinner outline and shadow, finer dots. */
+@utility nudge-call {
+  --tail: var(--player);
+  --dot: 0.3rem;
+  position: relative;
+  border: 0.15rem solid var(--color-navy);
+  border-radius: 9999px;
+  background: var(--player);
+  box-shadow: 0.16rem 0.2rem 0 var(--color-navy);
+}
+/* Pop-art dots: a halftone in a deeper shade of the bubble's own colour, densest at its lower right (away from the light), gone before its middle. */
+@utility nudge-dots {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--player) 50%, var(--color-navy)) 30%, transparent 34%);
+  background-size: var(--dot, 0.42rem) var(--dot, 0.42rem);
+  mask: radial-gradient(120% 140% at 100% 100%, var(--color-navy) 15%, transparent 60%);
+}
+/* The gleam at the big bubble's top left. */
+@utility nudge-gleam {
+  position: absolute;
+  left: 8%;
+  top: 12%;
+  width: 26%;
+  height: 16%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--color-white) 70%, transparent), transparent);
+  rotate: -10deg;
+}
+/* A tail (views/lobby.js `tail`): its fill, the colour of the edge it leaves; its two sides, the bubble's outline (3 of its units). */
+@utility nudge-tail {
+  overflow: visible;
+  & > :first-child { fill: var(--tail); }
+  & > :last-child { fill: none; stroke: var(--color-navy); stroke-width: 3; stroke-linejoin: round; }
+}
+/* The rays behind the big bubble, in the yellow, fading out at both ends. */
+@utility nudge-rays {
+  border-radius: 9999px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--color-yellow) 45%, transparent) 0deg 6deg, transparent 6deg 20deg);
+  mask: radial-gradient(circle closest-side, transparent 36%, var(--color-navy) 54%, transparent 98%);
+}
+/*
+ * Comic lettering: white, fattened by an outline in its own colour (`--fat`), outlined in the
+ * dark blue all round and standing out with a short dark extrusion (`--letter-shadow`). Both
+ * are set here but drawn by each letter (`bulge`), measured in that letter's own size, so a
+ * bigger letter gets a thicker outline.
+ */
+@utility nudge-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  color: var(--color-white);
+  --fat: 0.04em;
+  --letter-shadow: 0.06em 0 0 var(--color-navy), -0.06em 0 0 var(--color-navy), 0 0.06em 0 var(--color-navy), 0 -0.06em 0 var(--color-navy),
+    0.045em 0.045em 0 var(--color-navy), -0.045em 0.045em 0 var(--color-navy), 0.045em -0.045em 0 var(--color-navy), -0.045em -0.045em 0 var(--color-navy),
+    0.07em 0.09em 0 var(--color-navy), 0.1em 0.13em 0 var(--color-navy);
+}
+/*
+ * A letter of the bubble, sized by its place in its row ("ss SS ss": `--k`, web/js/nudge.js
+ * `bulgeRows`) and centred on the row's middle line, so bigger letters grow up and down
+ * evenly, as on a ball. An emoji keeps its own colours: an outline in the text's colour
+ * would turn it into a hollow shape.
+ */
+@utility bulge {
+  display: inline-block;
+  white-space: pre;
+  line-height: 1;
+  vertical-align: middle;
+  font-size: calc(var(--k, 1) * 1em);
+  -webkit-text-stroke: var(--fat, 0) currentColor;
+  text-shadow: var(--letter-shadow, none);
+  &[data-emoji] {
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
 }
 
 /*

@@ -2,7 +2,9 @@
  * Friends play a whole game on three phones (the real app UI, a fake photo library):
  * the terms, the "New game" step with a preset and the settings "?", joining by code, a
  * phone going offline (its red pill, removed by a guest), the host removing a player, the
- * photos dealt with "Play with these?" (ready at once on Yes), reload, "Is everyone here?"
+ * photos dealt with "Play with these?" (ready at once on Yes), the bubble that teases the
+ * one player the others still wait for (on their phones, not on hers, gone while two are
+ * left), reload, "Is everyone here?"
  * answered No and "Start now" (greyed while someone changes their photos), the start
  * behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
  * Delete), five rounds with their reveals (played step by step, the verdict felt) and
@@ -12,7 +14,7 @@
  * others still look at their results, and leaving with the code remembered. A leaderboard
  * that waits for a phone still loading the next photos. A full table of 16 (three phones of
  * the smallest sizes and light bots, `bots.js`) on every screen of a game (the question
- * before it too): nothing scrolls
+ * before it too, and the bubble for a last player with the longest name): nothing scrolls
  * the page, the lobby's photos are as wide as No and Yes, its players take two rows that
  * their arrow pages through (turning at each end), and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
@@ -116,7 +118,19 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await expect(chips).toHaveCount(3);
 
   const everyone = [host, ...guests];
-  for (const page of everyone) await choosePhotos(page, 4);
+  const [ben, cleo] = guests;
+  await choosePhotos(host, 4);
+  await choosePhotos(ben, 4);
+  // Cleo is the last one: a bubble teases her on the others' phones at once, never on hers;
+  // it goes when Ben changes his photos (two to wait for) and comes back with his Yes.
+  const bubble = (page) => page.locator('[data-part="nudge"] [data-cell="line"]');
+  for (const page of [host, ben]) await expect(page.locator('[data-part="nudge"] [role="status"]')).toContainText('Cleo');
+  await expect(bubble(cleo)).toHaveCount(0);
+  await ben.getByRole('button', { name: 'Change' }).click();
+  await expect(bubble(host)).toHaveCount(0);
+  await ben.getByRole('button', { name: 'Yes', exact: true }).click();
+  await expect(bubble(host)).toHaveCount(1);
+  await choosePhotos(cleo, 4);
   // The group's first game asks first, on every phone. Cleo answers No: everyone gets "Start
   // now", greyed while Ben changes his photos; once he said Yes again, the host starts.
   for (const page of everyone) await expect(page.getByRole('heading', { name: 'Is everyone here?' })).toBeVisible();
@@ -326,6 +340,12 @@ async function pageThrough(page, label) {
   await pointsBack(false);
 }
 
+/** Whether every element matching `selector` (at least one) lies inside the screen. */
+const inside = (page, selector) => page.evaluate((s) => {
+  const boxes = [...document.querySelectorAll(s)].map((el) => el.getBoundingClientRect());
+  return boxes.length > 0 && boxes.every((b) => b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight);
+}, selector);
+
 /** How far the photo grid's outer edges are from No's left and Yes's right edge, in px. */
 const gridEdges = (page) => page.evaluate(() => {
   const box = (el) => el.getBoundingClientRect();
@@ -355,7 +375,8 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
   // Three phones at common small sizes (Android, iPhone SE, iPhone 15); light bots fill the room.
   const sizes = [{ width: 360, height: 640 }, { width: 375, height: 667 }, { width: 393, height: 852 }];
   const phones = [];
-  for (const [i, viewport] of sizes.entries()) phones.push(await openApp(browser, ['Ann', 'Ben', 'Cleo'][i], library, { viewport }));
+  // The third has the longest name a player can have (LIMITS.nameMax).
+  for (const [i, viewport] of sizes.entries()) phones.push(await openApp(browser, ['Ann', 'Ben', 'Cleopatra-Marlen'][i], library, { viewport }));
   const [host, ...guests] = phones;
   await host.getByRole('button', { name: 'Create game' }).click();
   // No clock and "Host taps": each screen stays until the test moves on.
@@ -380,10 +401,18 @@ test('a full table fits the smallest phones: 16 players on every screen of a gam
       await expect(page.locator('[data-part="chips"] > *')).toHaveCount(2);
       await pageThrough(page, 'More players');
     }
-    for (const page of phones) {
+    const sayYes = async (page) => {
       await page.getByRole('button', { name: 'Yes', exact: true }).click();
       await expect(page.getByText('✓ Ready')).toBeVisible();
-    }
+    };
+    await sayYes(host);
+    await sayYes(guests[0]);
+    // The last one, with the longest name: once her bubble has slid in and its small bubbles
+    // have popped up, all of it is inside the smallest screen, and nothing scrolls.
+    await expect.poll(() => inside(host, '[data-part="nudge"] [data-cell="bubble"], [data-part="nudge"] [data-cell="call"]')).toBe(true);
+    await expect(host.locator('[data-part="nudge"] [data-cell="call"]')).toHaveCount(3);
+    await fits(host);
+    await sayYes(guests[1]);
     // The question before the first game: on the smallest phone too, all of it on screen.
     await expect(host.getByRole('heading', { name: 'Is everyone here?' })).toBeVisible();
     await fits(host);
