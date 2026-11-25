@@ -1,0 +1,437 @@
+/*
+ * The bubble draft's stylesheet, written like the app's (styles/app.css) so the chosen
+ * bubble moves over as it is: it imports the app's stylesheet and adds the bubbles' looks
+ * (`@utility`) and moves (`--animate-…` with their `@keyframes`).
+ *
+ * Mechanisms: scripts/helpers/drafts.mjs builds it with Tailwind (scanning this folder for
+ * classes). The moves are in `@theme inline`, so a move that reads a value of its element
+ * (a small bubble's own `--dur` and `--delay`) gets that element's value.
+ *
+ * Invariants:
+ * - Colours only by the theme's names, mixed with `color-mix` where a shade is needed
+ *   (test/unit/config.test.js checks the drafts too).
+ * - Only `transform`, `translate`, `rotate`, `scale` and `opacity` move; every gradient,
+ *   shadow, mask and outline is still, so the graphics chip moves finished layers and
+ *   nothing is repainted while a bubble floats.
+ * - A character's outline and shadow (`--fat`, `--letter-shadow`) are set by its bubble
+ *   but measured on the character itself (`bulge`), so a bigger letter gets a bigger outline.
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+/* ---------- The bulging text (bulge.js) ---------- */
+
+@utility bulge {
+  display: inline-block;
+  white-space: pre;
+  line-height: 1;
+  vertical-align: middle;
+  font-size: calc(var(--k, 1) * 1em);
+  -webkit-text-stroke: var(--fat, 0) currentColor;
+  text-shadow: var(--letter-shadow, none);
+  &[data-emoji] {
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
+}
+
+/* ---------- Soap bubbles (soap.js) ---------- */
+
+/* The bubble: dark and glassy inside (the white text reads over any photo), lighter towards its skin, a thin bright edge. */
+@utility soap {
+  position: relative;
+  border-radius: 9999px;
+  background: radial-gradient(circle closest-side,
+    color-mix(in srgb, var(--color-stage) 66%, transparent) 0%,
+    color-mix(in srgb, var(--color-stage) 54%, transparent) 60%,
+    color-mix(in srgb, var(--color-glow-violet) 45%, transparent) 86%,
+    color-mix(in srgb, var(--color-white) 24%, transparent) 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-white) 55%, transparent),
+    inset 0 -0.5rem 1.2rem color-mix(in srgb, var(--color-p3) 28%, transparent),
+    inset 0 0.45rem 1rem color-mix(in srgb, var(--color-p5) 20%, transparent),
+    0 0.5rem 1.4rem color-mix(in srgb, var(--color-stage) 45%, transparent);
+}
+/* Its skin's colours, strongest at the rim: two films that turn against each other, so the colours seem to flow. */
+@utility soap-film {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 10deg, var(--color-p3), var(--color-p4), var(--color-p5), var(--color-yellow), var(--color-p7), var(--color-p10), var(--color-p3));
+  mask: radial-gradient(circle closest-side, color-mix(in srgb, var(--color-navy) 12%, transparent) 0%, color-mix(in srgb, var(--color-navy) 12%, transparent) 50%, color-mix(in srgb, var(--color-navy) 55%, transparent) 80%, var(--color-navy) 95%, transparent 100%);
+  opacity: 0.95;
+}
+@utility soap-film-2 {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 190deg, var(--color-p5), transparent 18%, var(--color-p3) 34%, transparent 52%, var(--color-yellow) 68%, transparent 84%, var(--color-p5));
+  mask: radial-gradient(circle closest-side, transparent 58%, var(--color-navy) 96%, transparent 100%);
+  opacity: 0.8;
+}
+/*
+ * Its light: a soft glow and a crescent of light at the top left (a thin ring shown only
+ * there, fading at both ends), and a small glint at the bottom right.
+ */
+@utility soap-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(ellipse 30% 18% at 32% 26%, color-mix(in srgb, var(--color-white) 26%, transparent), transparent);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: radial-gradient(circle closest-side, transparent 78%, color-mix(in srgb, var(--color-white) 90%, transparent) 83%, transparent 89%);
+    mask: conic-gradient(from 240deg, transparent 0deg, var(--color-navy) 40deg, var(--color-navy) 70deg, transparent 112deg);
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    right: 20%;
+    bottom: 16%;
+    width: 7%;
+    height: 4%;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-white) 70%, transparent);
+    rotate: -40deg;
+  }
+}
+/* White and fat, with a pink and a cyan fringe at its edges (light split on the skin) and a dark glow behind. */
+@utility soap-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-white);
+  --fat: 0.07em;
+  --letter-shadow: -0.045em 0 0 color-mix(in srgb, var(--color-p5) 80%, transparent), 0.045em 0.015em 0 color-mix(in srgb, var(--color-p3) 80%, transparent), 0 0.06em 0.34em color-mix(in srgb, var(--color-stage) 92%, transparent);
+}
+/* The ring of light a small bubble leaves when it pops. */
+@utility soap-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 0.12rem solid color-mix(in srgb, var(--color-white) 80%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Comic chorus (comic.js) ---------- */
+
+/* The big speech bubble: the player's colour, light to deep, a thick dark outline and a hard shadow (its thickness). */
+@utility comic {
+  position: relative;
+  border: 0.19rem solid var(--color-navy);
+  border-radius: 44% 56% 48% 52% / 56% 50% 50% 44%;
+  background: linear-gradient(172deg, color-mix(in srgb, var(--player) 55%, var(--color-white)) 0%, var(--player) 50%, color-mix(in srgb, var(--player) 76%, var(--color-navy)) 100%);
+  box-shadow: 0.24rem 0.3rem 0 var(--color-navy), 0 1rem 2rem color-mix(in srgb, var(--color-stage) 55%, transparent);
+}
+/* A small one: the shouting friend's colour, a thinner outline and shadow. */
+@utility comic-flat {
+  position: relative;
+  border: 0.15rem solid var(--color-navy);
+  border-radius: 46% 54% 50% 50% / 58% 54% 46% 42%;
+  background: linear-gradient(175deg, color-mix(in srgb, var(--player) 62%, var(--color-white)) 0%, var(--player) 45%);
+  box-shadow: 0.16rem 0.2rem 0 var(--color-navy);
+}
+/* Halftone dots shading the lower right, as printed comics do. */
+@utility comic-dots {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: radial-gradient(color-mix(in srgb, var(--color-navy) 26%, transparent) 30%, transparent 34%);
+  background-size: 0.42rem 0.42rem;
+  mask: linear-gradient(155deg, transparent 40%, var(--color-navy) 100%);
+}
+/* A gleam at the top left. */
+@utility comic-shine {
+  position: absolute;
+  left: 9%;
+  top: 11%;
+  width: 24%;
+  height: 14%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--color-white) 75%, transparent), transparent);
+  rotate: -14deg;
+}
+/* The tails: filled like the part of the bubble they leave (its light top, or its full colour), outlined on their two sides. */
+@utility comic-tail-light {
+  fill: color-mix(in srgb, var(--player) 55%, var(--color-white));
+}
+@utility comic-tail-solid {
+  fill: var(--player);
+}
+@utility comic-tail-line {
+  fill: none;
+  stroke: var(--color-navy);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* The rays behind the big bubble, fading out at both ends. */
+@utility comic-rays {
+  border-radius: 9999px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--color-yellow) 45%, transparent) 0deg 6deg, transparent 6deg 20deg);
+  mask: radial-gradient(circle closest-side, transparent 36%, var(--color-navy) 54%, transparent 98%);
+}
+/* Comic lettering: white, fat, outlined in the dark blue all round, with a short dark extrusion. */
+@utility comic-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  color: var(--color-white);
+  --fat: 0.04em;
+  --letter-shadow: 0.06em 0 0 var(--color-navy), -0.06em 0 0 var(--color-navy), 0 0.06em 0 var(--color-navy), 0 -0.06em 0 var(--color-navy), 0.045em 0.045em 0 var(--color-navy), -0.045em 0.045em 0 var(--color-navy), 0.045em -0.045em 0 var(--color-navy), -0.045em -0.045em 0 var(--color-navy), 0.07em 0.09em 0 var(--color-navy), 0.1em 0.13em 0 var(--color-navy);
+}
+
+/* ---------- Gummy orbit (gummy.js) ---------- */
+
+/* The sweet: the player's colour deepened with violet, lit from the top left, a dark underside, a bright rim, its own glow. */
+@utility gummy {
+  --gum: color-mix(in srgb, var(--player) 50%, var(--color-violet));
+  position: relative;
+  overflow: hidden;
+  border-radius: 34% / 46%;
+  background: radial-gradient(130% 110% at 28% 8%, color-mix(in srgb, var(--gum) 55%, var(--color-white)) 0%, color-mix(in srgb, var(--gum) 88%, var(--color-navy)) 36%, color-mix(in srgb, var(--gum) 48%, var(--color-navy)) 100%);
+  box-shadow:
+    inset 0 -0.6rem 1rem color-mix(in srgb, var(--gum) 40%, var(--color-navy)),
+    inset 0 0.16rem 0.25rem color-mix(in srgb, var(--color-white) 60%, transparent),
+    inset 0 -0.14rem 0 color-mix(in srgb, var(--color-white) 28%, transparent),
+    0 0.3rem 0 color-mix(in srgb, var(--gum) 48%, var(--color-navy)),
+    0 1rem 2.2rem color-mix(in srgb, var(--gum) 45%, transparent);
+}
+/* The wide gloss over its upper half. */
+@utility gummy-gloss {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  top: 4%;
+  height: 34%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-white) 40%, transparent), color-mix(in srgb, var(--color-white) 4%, transparent) 80%, transparent);
+}
+/* The glint that sweeps over it now and then. */
+@utility gummy-glint {
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  left: 0;
+  width: 18%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-white) 50%, transparent), transparent);
+  rotate: 20deg;
+  translate: -260% 0;
+}
+/* White with a hint of the sweet's colour, fat, pressed in with a short dark edge below. */
+@utility gummy-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--color-white) 96%, var(--gum));
+  --fat: 0.075em;
+  --letter-shadow: 0 0.07em 0 color-mix(in srgb, var(--gum) 30%, var(--color-navy)), 0 0 0.3em color-mix(in srgb, var(--gum) 45%, var(--color-navy)), 0 0.14em 0.3em color-mix(in srgb, var(--color-navy) 55%, transparent);
+}
+/* A marble: a glass sphere in a friend's colour, lit from the top left, a highlight on top. */
+@utility marble {
+  position: relative;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--m) 35%, var(--color-white)) 0%, var(--m) 42%, color-mix(in srgb, var(--m) 50%, var(--color-navy)) 100%);
+  box-shadow: inset 0 -0.3rem 0.5rem color-mix(in srgb, var(--m) 40%, var(--color-navy)), 0 0.35rem 0.8rem color-mix(in srgb, var(--color-stage) 50%, transparent);
+  &::after {
+    content: '';
+    position: absolute;
+    left: 20%;
+    top: 10%;
+    width: 32%;
+    height: 18%;
+    border-radius: 9999px;
+    background: linear-gradient(color-mix(in srgb, var(--color-white) 75%, transparent), transparent);
+    rotate: -24deg;
+  }
+}
+@utility marble-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-white);
+  --fat: 0.07em;
+  --letter-shadow: 0 0.06em 0 color-mix(in srgb, var(--m) 40%, var(--color-navy));
+}
+
+/* ---------- The moves ---------- */
+
+@theme inline {
+  /* Soap: blown from a speck; drifting, wobbling, its films turning, the text swaying inside; a new line condenses, the bubble shivers. */
+  --animate-soap-blow: soap-blow 1.15s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  --animate-soap-drift: soap-drift 7.6s ease-in-out infinite;
+  --animate-soap-wobble: soap-wobble 3.4s ease-in-out infinite;
+  --animate-soap-swirl: soap-swirl 13s linear infinite;
+  --animate-soap-swirl-back: soap-swirl 19s linear infinite reverse;
+  --animate-soap-sway-text: soap-sway-text 5.2s ease-in-out infinite;
+  --animate-soap-condense: soap-condense 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  --animate-soap-shiver: soap-shiver 0.6s ease-out;
+  /* The small soap bubbles, each on its own clock (`--dur`, `--delay`, `--sway-dur`): rising, swaying, living and popping, the ring of the pop. */
+  --animate-soap-born: soap-born 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  --animate-soap-rise: soap-rise var(--dur) linear var(--delay) infinite;
+  --animate-soap-sway: soap-sway var(--sway-dur) ease-in-out var(--delay) infinite;
+  --animate-soap-life: soap-life var(--dur) linear var(--delay) infinite;
+  --animate-soap-ring: soap-ring var(--dur) linear var(--delay) infinite;
+
+  /* Comic: the slam, the gentle 3D rock, the springy bounce now and then, the turning rays; the chorus shouting in turn (`--delay`), wiggling while it does. */
+  --animate-comic-slam: comic-slam 0.56s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  --animate-comic-rock: comic-rock 4.8s ease-in-out infinite;
+  --animate-comic-boing: comic-boing 2.7s ease-out infinite;
+  --animate-comic-rays: comic-rays 22s linear infinite;
+  --animate-comic-shout: comic-shout 3.9s ease-out var(--delay) infinite both;
+  --animate-comic-wiggle: comic-wiggle 0.9s ease-in-out infinite;
+
+  /* Gummy: the drop and its jelly landing, the soft wobble, the 3D tilt, the glint; the ring turning and each marble turning back; a bounce for a new line; a marble popping out. */
+  --animate-gummy-drop: gummy-drop 0.95s linear both;
+  --animate-gummy-jelly: gummy-jelly 2.3s ease-in-out infinite;
+  --animate-gummy-tilt: gummy-tilt 6.4s ease-in-out infinite;
+  --animate-gummy-glint: gummy-glint 4.6s ease-in-out infinite;
+  --animate-gummy-orbit: gummy-orbit 9s linear infinite;
+  --animate-gummy-face: gummy-face 9s linear infinite;
+  --animate-gummy-boing: gummy-boing 0.65s ease-out;
+  --animate-gummy-moon-in: gummy-moon-in 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+/* From a speck rising off the wand to its size, with the wobble of a fresh bubble. */
+@keyframes soap-blow {
+  0% { transform: translateY(38%) scale(0.08); opacity: 0; animation-timing-function: cubic-bezier(0.3, 0.1, 0.3, 1); }
+  16% { opacity: 1; }
+  50% { transform: translateY(-3%) scale(1.07, 0.94); }
+  66% { transform: translateY(1%) scale(0.96, 1.05); }
+  80% { transform: scale(1.025, 0.98); }
+  91% { transform: scale(0.995, 1.008); }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes soap-drift {
+  0%, 100% { translate: 0 0; rotate: -1.5deg; }
+  33% { translate: 0.25rem -0.35rem; rotate: 0.5deg; }
+  66% { translate: -0.2rem -0.15rem; rotate: 1.5deg; }
+}
+@keyframes soap-wobble {
+  0%, 100% { scale: 1 1; }
+  25% { scale: 1.03 0.97; }
+  50% { scale: 0.985 1.022; }
+  75% { scale: 1.018 0.984; }
+}
+@keyframes soap-swirl { to { rotate: 360deg; } }
+@keyframes soap-sway-text {
+  0%, 100% { transform: perspective(26rem) rotateY(-12deg) rotateX(5deg); }
+  50% { transform: perspective(26rem) rotateY(12deg) rotateX(-5deg); }
+}
+@keyframes soap-condense {
+  from { scale: 0.55; opacity: 0; }
+  55% { scale: 1.07; opacity: 1; }
+  to { scale: 1; opacity: 1; }
+}
+@keyframes soap-shiver {
+  0% { scale: 1 1; }
+  20% { scale: 1.06 0.95; }
+  45% { scale: 0.97 1.04; }
+  70% { scale: 1.015 0.99; }
+  100% { scale: 1 1; }
+}
+@keyframes soap-born { from { scale: 0; opacity: 0; } 60% { scale: 1.1; opacity: 1; } to { scale: 1; opacity: 1; } }
+@keyframes soap-rise { from { translate: 0 var(--from); } to { translate: 0 var(--to); } }
+@keyframes soap-sway {
+  0%, 100% { translate: calc(-1 * var(--sway)) 0; }
+  50% { translate: var(--sway) 0; }
+}
+/* Grows in at the bottom, lives, and pops near the top (it swells and is gone). */
+@keyframes soap-life {
+  0% { scale: 0.25; opacity: 0; }
+  9% { scale: 1; opacity: 1; }
+  85% { scale: 1; opacity: 1; }
+  89% { scale: 1.25; opacity: 0; }
+  100% { scale: 1.25; opacity: 0; }
+}
+@keyframes soap-ring {
+  0%, 85% { scale: 1; opacity: 0; }
+  86% { scale: 1.05; opacity: 0.95; }
+  95%, 100% { scale: 1.9; opacity: 0; }
+}
+
+/* Lands from big and turned, overshoots a little, sets. */
+@keyframes comic-slam {
+  0% { scale: 2.3; rotate: -14deg; opacity: 0; }
+  40% { scale: 0.9; rotate: 3deg; opacity: 1; }
+  64% { scale: 1.05; rotate: -1deg; }
+  100% { scale: 1; rotate: 0deg; opacity: 1; }
+}
+@keyframes comic-rock {
+  0%, 100% { transform: perspective(34rem) rotateY(-9deg) rotateX(3deg) rotate(-1.5deg); }
+  50% { transform: perspective(34rem) rotateY(9deg) rotateX(-3deg) rotate(1.5deg); }
+}
+/* Still most of the time, then one springy bounce. */
+@keyframes comic-boing {
+  0%, 64%, 100% { scale: 1 1; }
+  70% { scale: 1.08 0.9; }
+  77% { scale: 0.95 1.07; }
+  84% { scale: 1.02 0.985; }
+  91% { scale: 1 1; }
+}
+@keyframes comic-rays { to { rotate: 360deg; } }
+/* Pops out of its tail a little too big, settles, shouts, and is gone again. */
+@keyframes comic-shout {
+  0% { scale: 0; }
+  5% { scale: 1.22; }
+  10% { scale: 0.92; }
+  15% { scale: 1.04; }
+  19%, 58% { scale: 1; }
+  62% { scale: 1.12; }
+  68%, 100% { scale: 0; }
+}
+@keyframes comic-wiggle {
+  0%, 100% { rotate: var(--tilt); }
+  50% { rotate: calc(var(--tilt) * -0.5); }
+}
+
+/* Falls in stretched, lands squashed, springs up and wobbles out. */
+@keyframes gummy-drop {
+  0% { translate: 0 -150%; scale: 0.82 1.18; opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 1, 1); }
+  10% { opacity: 1; }
+  42% { translate: 0 0; scale: 0.86 1.14; animation-timing-function: ease-out; }
+  55% { translate: 0 0; scale: 1.24 0.76; animation-timing-function: ease-in-out; }
+  69% { scale: 0.9 1.1; }
+  81% { scale: 1.06 0.95; }
+  91% { scale: 0.98 1.02; }
+  100% { translate: 0 0; scale: 1 1; opacity: 1; }
+}
+@keyframes gummy-jelly {
+  0%, 100% { scale: 1 1; }
+  30% { scale: 1.035 0.965; }
+  62% { scale: 0.975 1.028; }
+}
+@keyframes gummy-tilt {
+  0%, 100% { transform: rotateY(-10deg) rotateX(6deg); }
+  50% { transform: rotateY(10deg) rotateX(-4deg); }
+}
+@keyframes gummy-glint {
+  0%, 58% { translate: -260% 0; }
+  82%, 100% { translate: 620% 0; }
+}
+@keyframes gummy-orbit {
+  from { transform: translateY(var(--oy)) rotateX(72deg) rotateZ(0deg); }
+  to { transform: translateY(var(--oy)) rotateX(72deg) rotateZ(360deg); }
+}
+@keyframes gummy-face {
+  from { transform: rotateZ(0deg) rotateX(-72deg); }
+  to { transform: rotateZ(-360deg) rotateX(-72deg); }
+}
+@keyframes gummy-boing {
+  0% { scale: 1 1; }
+  22% { scale: 1.14 0.86; }
+  48% { scale: 0.92 1.09; }
+  72% { scale: 1.03 0.98; }
+  100% { scale: 1 1; }
+}
+@keyframes gummy-moon-in { from { scale: 0; } 60% { scale: 1.18; } to { scale: 1; } }
