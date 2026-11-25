@@ -38,8 +38,9 @@
  *   while a game runs (`syncPhotoNeeds`).
  * - "Yes" never waits (`readyWith`): the player is ready at once and tells the room so
  *   (`sending`, with the id the upload carries), then the photos go in the background, no
- *   more than the game can show of this player (`sendCount`). Only if the group then waits
- *   for them does the start show how far they are (`views/overlays.js` `startScreen`).
+ *   more than the game can show of this player (`sendCount`). If the group then waits for
+ *   them, the start's film leader fills its ring as they come in (`startShare`,
+ *   `views/overlays.js` `startScreen`).
  *   "Change" cancels an upload still on its way. Every hello names the upload in flight,
  *   so the room never waits for one this phone no longer sends. The Yes that would start the
  *   game (`nudge.startsWith`, its button stamped START) asks "Is everyone here?" on this
@@ -167,12 +168,15 @@ function loadShare(v) {
 }
 
 /**
- * While the start waits for photos still on their way (`view.uploads`), how far the group
- * is, 0 to 1: the others by whether theirs are in, this phone by how much of its upload is
- * sent (`session.sending`); else null.
+ * How far the start's loading is, 0 to 1, for the film leader's ring: while photos are still
+ * on their way (`view.uploads`), the others by whether theirs are in and this phone by how
+ * much of its upload is sent (`session.sending`); once every photo is in (the game is dealt
+ * and the first photo goes to every phone), full. Within one start it only grows: `of` stays
+ * the same (anyone leaving or unreadying ends the start), and this phone's upload counts as
+ * sent until the room counts it in.
  */
-function sendShare(v) {
-  if (!v || !v.uploads || !v.uploads.of) return null;
+function startShare(v) {
+  if (!v || !v.uploads || !v.uploads.of) return 1;
   const mine = v.me.sending && session.sending ? session.sending.share : 0;
   return (v.uploads.done + mine) / v.uploads.of;
 }
@@ -289,7 +293,8 @@ function lookLayers() {
 }
 
 /**
- * Paints the start over the lobby (`views/overlays.js` `startScreen`). Each new number of the
+ * Paints the start over the lobby (`views/overlays.js` `startScreen`): the film leader, which
+ * loads first (its ring as full as `startShare`; felt nowhere). Each new number of the
  * 3-2-1 is felt, a little longer than a tap, and kept on the room's clock (`countdown.js`):
  * a number painted late starts as far into its second as the clock is, and the next one is
  * painted right on its second (one timer for the next number, renewed with every paint, so
@@ -298,7 +303,7 @@ function lookLayers() {
  */
 function paintStart() {
   const left = leftNow();
-  const start = startScreen(session.view, left, sendShare(session.view));
+  const start = startScreen(session.view, left, startShare(session.view));
   const now = Boolean(start && start.parts.count);
   if (paintCover(start).includes('count') && now) {
     buzz('count');
@@ -630,9 +635,9 @@ async function checkAccess() {
  * it first (`sending`, with a new upload id, and `start` when it is the confirmed last Yes,
  * `sayYes`), then the photos' big versions are gathered
  * (`blobsOf`; usually there already) and uploaded in the background with that id. The lobby
- * shows "✓ Ready" meanwhile, and the start shows how far the upload is only if the group
- * waits for it. If it fails, the player is not ready any more (the room hears "unready")
- * and is told; after "Change" (`cancelSending`) it ends without a word. It holds nothing
+ * shows "✓ Ready" meanwhile; if the group waits for the upload, the start's film leader fills
+ * its ring as it goes (`startShare`). If it fails, the player is not ready any more (the room
+ * hears "unready") and is told; after "Change" (`cancelSending`) it ends without a word. It holds nothing
  * of the room across its waits: what it finds afterwards it reads from `session` again.
  */
 async function readyWith(count, blobsOf, start = false) {

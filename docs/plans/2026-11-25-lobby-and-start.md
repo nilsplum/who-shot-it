@@ -29,6 +29,10 @@ to date with every commit.
 - The main folder still holds an untracked copy of `drafts/bubble_animations` (so the drafts
   page that was open there kept working). It is identical to the one committed on this branch
   and is deleted there right before the merge, or git refuses to merge over it.
+- The leaderboard and streak work reached `main` first (2a6c4f4). `main` was merged into this
+  branch on 25 November 2026, before commit 6 (three conflicts, both sides kept, the full
+  suite green), so commits 6 to 8 are built and tested on the code they ship with, and the
+  final merge into `main` has nothing left to resolve unless `main` moves again.
 
 **Done**
 - Commit 1: the plan and the bubble's draft are on the branch (nothing to deploy or release).
@@ -46,8 +50,12 @@ to date with every commit.
   pops the new photo, a refused tap shakes it with a red ✕, "No →" slides the set; "How to
   play" explains the swap and the hold in one line. App only, nothing to deploy. To try on the
   phones: the turn, the pop, the slide, with Reduce Motion too (commit 8's list).
-- Next: commits 6 (the 3-2-1's loading), 7 (the rating) and 8 (the release), then the merge
-  into `main` (The branch and the merge, above).
+- Commit 6: "Get ready" is gone; the start's film leader is on screen from the first moment,
+  loads (its hand turning, its outer ring filling in white as the group's photos come in, no
+  words), then counts 3-2-1 on the same frame. App only, nothing to deploy. To try on the
+  phones: a start on a slow network (commit 8's list).
+- Next: commits 7 (the rating) and 8 (the release), then the merge into `main` (The branch
+  and the merge, above).
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -896,7 +904,7 @@ Read: `web/js/photos.js`, `views/lobby.js`, `main.js` (actions `no`, `swap`, `HO
 
 ### Commit 6: the 3-2-1 loads in its film leader; "Get ready" goes
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `views/overlays.js`, `main.js` (`paintStart`, `sendShare`, `render`),
 `web/js/countdown.js`, `styles/app.css`, `drafts/countdown_animations/app.js` and its
@@ -1151,3 +1159,39 @@ Status: planned.
   (`tile-count`, a container size), so it reads on a 5 x 5 grid as on a 2 x 2; a swap's
   entrance ends after 0.85 s, a slide's after 0.5 s (`ENTRANCE_MS`), when the tile or the grid
   is painted plain.
+
+**25 November 2026, `main` merged into the branch (before commit 6)**
+
+- The leaderboard and streak work reached `main` while this branch was under way. It was
+  merged into the branch before commit 6 rather than at the very end: commit 7 changes
+  `podium.js` and `main.js` `startPodium`, which that work had changed too, and commit 8
+  releases both pieces together. Three conflicts (the README's and the drafts' lists, the
+  vibrations in `main.js`'s header), each keeping both sides; the full suite passed before the
+  merge was committed.
+
+**25 November 2026, commit 6 (the 3-2-1 loads in its film leader)**
+
+- **The leader's frame is the cover's layout**, its parts the loading's ring and hand and the
+  number (`views/overlays.js`): the frame and its weave stay untouched from the start's first
+  moment to the first photo; the ring's whole-percent steps repaint only the ring. The two
+  outline circles moved from the number's drawing into the frame; they are drawn above the
+  number's shadow (later in the page, all positioned), exactly as before.
+- **The ring is the outer circle drawn again in white**, one unit of the 80-unit drawing wide
+  (3 px on a phone), so it covers the 2 px outline under it and reads as filling; its dash
+  is computed from the circle's own length, like the number's shadow, rather than relying on
+  `pathLength`.
+- **`startShare`** (main.js) replaces `sendShare`: the share of the group's photos in while
+  uploads run, and 1 (full) once every photo is in. It only grows within one start without
+  any memory: the count of players stays the same (anyone leaving or unreadying ends the
+  start), and this phone's upload counts as sent until the room counts it in.
+- **The slow-phone e2e test** now also holds back Ben's upload: the start waits in its leader
+  with the ring at half (Ann's photos in), no words, no number; once the upload goes through
+  the 3 cuts in and the ring is gone. The main test's vibrations stay the three numbers and
+  the first photo's tap (the loading is felt nowhere).
+- **The speed test measures "Yes, start" until the leader** (limit 1 s: one message's round
+  trip at a phone network's delay, then a paint). A first run on a heavily loaded computer
+  (other sessions' servers and tests, a load average above 20) measured 1048 ms, with every
+  other wait slow too ("No" failed its own limit there); the limit stays well above a healthy
+  run, like the others.
+- **The countdown draft's "Film leader, in the app"** shows the loading during its lead (the
+  ring filling over 0.3 s) instead of an empty cover, so it plays what the app plays.

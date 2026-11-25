@@ -1,6 +1,7 @@
 /**
  * The 3-2-1 on the room's clock. The start's film leader (views/overlays.js `startScreen`)
- * paints each number as a new element whose hand goes round once and leaves its shadow
+ * first loads (its hand going round endlessly, until the room's 3-2-1 begins), then paints
+ * each number as a new element whose hand goes round once and leaves its shadow
  * behind it: CSS animations of one second, which start when the number is painted. That is
  * not always on its second: the first number comes with a view over the network, a phone
  * may come back in the middle of one, and the paint loop runs only four times a second. So
@@ -15,8 +16,9 @@
  * app"), beside the draft it was chosen from.
  *
  * Invariants: it only moves animations to the room's time and never changes markup (the
- * view paints every number as it is); with Reduce Motion the leader has no animations to
- * move and there is no white frame.
+ * view paints every number as it is); it moves only the number's own animations, which play
+ * once, never an endless one (the frame's weave, the loading's hand); with Reduce Motion the
+ * leader has no animations to move and there is no white frame.
  */
 import { flash } from './sparks.js';
 
@@ -28,7 +30,7 @@ const CUT = { strength: 0.75, ms: 260 };
 /** The number the 3-2-1 shows with `left` ms to go (the 1 stays until the round begins). */
 const numberAt = (left) => Math.max(1, Math.ceil(left / SECOND));
 
-/** Starts the number just painted in `cover` as far into its round as `left` (ms left on the 3-2-1) says; its endless weave stays as it is. */
+/** Starts the number just painted in `cover` as far into its round as `left` (ms left on the 3-2-1) says; the endless animations (the weave) stay as they are. */
 export function onTheClock(cover, left) {
   const into = Math.min(SECOND, numberAt(left) * SECOND - left);
   for (const animation of cover.getAnimations({ subtree: true })) {

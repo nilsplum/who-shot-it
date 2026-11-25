@@ -10,7 +10,7 @@
  * first, holding a photo, the last "Yes" asking "Is everyone here?" on this phone, "Yes,
  * start") and a short game, and prints what each
  * step took: the
- * lobby's waits, the 3-2-1 as it was painted,
+ * lobby's waits, the start's film leader arriving, the 3-2-1 as it was painted,
  * how long the room waited for phones, when each photo appeared, how many messages went
  * each way and how long the page was blocked.
  *
@@ -49,7 +49,9 @@ const LIMITS = {
   asked: 300,
   /** "Yes, start" makes the player ready at once: no bar, the photos go in the background. */
   ready: 300,
-  /** "Yes, start" until the 3-2-1 (photos still on their way, the first photo on every phone). */
+  /** "Yes, start" until the start's film leader is on screen: the Yes to the room and its view back (the network's delay twice), then a paint; a healthy run takes a few hundred ms. */
+  leader: 1000,
+  /** "Yes, start" until the 3-2-1 (the leader loading: photos still on their way, the first photo on every phone). */
   yes: 3000,
   /** How long the room may stand in `load` (or a leaderboard wait) for phones that all kept up. */
   roomWait: 1000,
@@ -196,6 +198,8 @@ test('a game at phone speed: what the players wait for stays within its limits',
     const answered = Date.now();
     await msUntil(host, () => document.getElementById('app').textContent.includes('✓ Ready'));
     report.ready = Date.now() - answered;
+    await msUntil(host, () => Boolean(document.querySelector('#cover [data-part="ring"]')));
+    report.leader = Date.now() - answered;
     await msUntil(host, () => Boolean(document.querySelector('#cover [data-count]')), null, 60_000);
     report.yes = Date.now() - answered;
     // The game: everyone answers each photo at once, so the rounds run on the room's own timers.
@@ -241,7 +245,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
     `  "No" ${SKIPS} times, a glance apart     ${report.no.join(', ')} ms`,
     `  holding a photo: preview, sharp     ${report.preview} ms, ${report.sharp} ms`,
     `  "Yes" until the question, "✓ Ready" ${report.asked} ms, ${report.ready} ms`,
-    `  "Yes, start" until the 3-2-1        ${report.yes} ms`,
+    `  "Yes, start" until the leader, 3-2-1 ${report.leader} ms, ${report.yes} ms`,
     `  the 3-2-1 as painted                ${report.countdown}`,
     `  the room waiting for phones         ${report.roomWaits.map((w) => `${w.label} ${w.ms} ms`).join(', ') || 'never'}`,
     `  leaderboards                        ${report.boards.join(', ')} ms`,
@@ -259,6 +263,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
   expect(report.sharp, 'a held photo turning sharp').toBeLessThanOrEqual(LIMITS.heldSharp);
   expect(report.asked, 'the last "Yes" until "Is everyone here?" on its phone').toBeLessThanOrEqual(LIMITS.asked);
   expect(report.ready, '"Yes, start" until "✓ Ready"').toBeLessThanOrEqual(LIMITS.ready);
+  expect(report.leader, '"Yes, start" until the film leader').toBeLessThanOrEqual(LIMITS.leader);
   expect(report.yes, '"Yes, start" until the 3-2-1').toBeLessThanOrEqual(LIMITS.yes);
   expect(report.countdown, 'the 3-2-1, each number once').toBe('3 2 1');
   for (const w of report.roomWaits) expect(w.ms, `the room waiting (${w.label})`).toBeLessThanOrEqual(LIMITS.roomWait);

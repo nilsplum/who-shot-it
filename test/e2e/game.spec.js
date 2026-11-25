@@ -11,8 +11,9 @@
  * leaderboards (one ending in the new order with the medal on the leader, "Show again" held on
  * one phone and seen on another, FINAL ROUND before the last photo), the podium's
  * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
- * others still look at their results, and leaving with the code remembered. A leaderboard
- * that waits for a phone still loading the next photos. The room-wide "Is everyone here?" as
+ * others still look at their results, and leaving with the code remembered. A slow phone:
+ * the start waits in its film leader for its photos still on their way (the ring shows how
+ * far, no words), and a leaderboard waits for it to load the next photos. The room-wide "Is everyone here?" as
  * the fallback (the last one removed): No, "Start now", and a START Yes after the answer.
  * A full table of 16 (three phones of
  * the smallest sizes and light bots, `bots.js`) on every screen of a game (the question
@@ -283,7 +284,7 @@ test('friends play a full game and start another one', async ({ browser }) => {
   await expect(waiting).toHaveText('Waiting on Ann');
 });
 
-test('a leaderboard waits for a phone still loading the next photos, and shows how far the table is', async ({ browser }) => {
+test('a slow phone: the start waits for its photos in the film leader, a leaderboard for its next photos; both show how far the table is', async ({ browser }) => {
   const host = await openApp(browser, 'Ann');
   await host.getByRole('button', { name: 'Create game' }).click();
   await host.getByRole('button', { name: 'Custom' }).click();
@@ -304,10 +305,29 @@ test('a leaderboard waits for a phone still loading the next photos, and shows h
     if (served > 1) await gate;
     await route.continue();
   });
+  // Ben's own photos reach the room only when the test lets them through.
+  let sendPhotos;
+  const sent = new Promise((resolve) => {
+    sendPhotos = resolve;
+  });
+  await guest.route('**/api/rooms/*/photos', async (route) => {
+    if (route.request().method() === 'PUT') await sent;
+    await route.continue();
+  });
   await join(guest, code);
   await choosePhotos(host, 4);
   await dealPhotos(guest, 4);
   await startFirstGame(guest);
+  // The start waits for Ben's photos in its film leader: no words and no number yet, the ring
+  // half full (Ann's photos are in, Ben's still on their way).
+  const ring = host.getByRole('progressbar', { name: 'Getting the photos ready' });
+  await expect(ring).toHaveAttribute('aria-valuenow', '50');
+  await expect(host.locator('#cover [data-count]')).toHaveCount(0);
+  expect(await host.locator('#cover').innerText()).toBe('');
+  // Once they are in, the 3-2-1 cuts in on the same leader, and the ring goes.
+  sendPhotos();
+  await expect(host.locator('#cover [data-count]')).toBeVisible();
+  await expect(ring).toHaveCount(0);
   // Round 1 needs only its own photo, which both phones hold before the 3-2-1.
   await expect(guest.getByText('1 / 5', { exact: true })).toBeVisible();
   for (const page of [host, guest]) await page.locator('[data-act="answer"]').first().click();

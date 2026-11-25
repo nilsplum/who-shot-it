@@ -172,9 +172,11 @@
   --animate-arrive: fade 0.5s ease-out; /* what follows the podium: the facts, the ranking, Play again */
   --animate-rise: rise 2.4s ease-out forwards; /* a reaction floating up */
   --animate-slide-up: slide-up 0.25s ease-out; /* a sheet coming in */
-  /* The 3-2-1, a film leader (views/overlays.js): per number (each is a new element) the hand
-     goes round once and leaves its shadow behind it; its frame weaves a little, like film in
-     a projector. web/js/countdown.js keeps each round on the room's second. */
+  /* The start, a film leader (views/overlays.js): while it loads, its hand goes round and
+     round (one turn a second); then per number (each is a new element) the hand goes round
+     once and leaves its shadow behind it; its frame weaves a little, like film in a
+     projector. web/js/countdown.js keeps each number's round on the room's second. */
+  --animate-hand-loop: turn 1s linear infinite;
   --animate-sweep: sweep 1s linear both;
   --animate-hand: turn 1s linear both;
   --animate-weave: weave 0.33s steps(1) infinite;
@@ -288,7 +290,8 @@
 
 /*
  * The page's background: the dark blue with its two soft lights, defined once. The body
- * carries it, and so does whatever covers the whole page as a screen of its own (the 3-2-1).
+ * carries it, and so does whatever covers the whole page as a screen of its own (the start's
+ * film leader, from its loading to the 1).
  */
 @utility bg-page {
   background: radial-gradient(800px 500px at 0% -10%, var(--color-glow-violet), transparent 60%),

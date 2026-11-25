@@ -11,11 +11,11 @@
  * here?" on their phone first (the 'start' sheet, `main.js` `sayYes`). Only when everyone
  * said Yes without that (the last one left or was removed, two at once, an older app) does
  * every phone ask (`views/overlays.js`), and after a No "Start now" appears at the bottom
- * while it can start the game (`startNow`). The start ("Get
- * ready", the 3-2-1) is an overlay (`views/overlays.js`). Tapping the code opens the invite sheet, tapping the settings
- * summary opens the settings sheet (read-only for everyone but the host), and tapping a
- * player opens "Remove?" (the host may remove anyone, everyone a player who is offline;
- * nobody is removed for being offline).
+ * while it can start the game (`startNow`). The start (its film leader: the loading, the
+ * 3-2-1) is an overlay (`views/overlays.js`). Tapping the code opens the invite sheet,
+ * tapping the settings summary opens the settings sheet (read-only for everyone but the
+ * host), and tapping a player opens "Remove?" (the host may remove anyone, everyone a player
+ * who is offline; nobody is removed for being offline).
  *
  * The players: a small pill each, its border always 2 px (so nothing shifts): green when
  * ready, dashed grey while the game waits for them to be ready, red and glowing slowly with
@@ -31,11 +31,12 @@
  * refused tap shakes the photo with a red ✕ over it. No line under the grid explains it: the
  * tile itself does ("How to play" says it in one line). Holding a photo shows it big
  * (`main.js`, hold to look). "No →" slides the set out to the right while the new one comes in
- * from the left and snaps in place (`photos.leaving`); the first set of a game fades in. "Yes" makes the player ready at once: the set stays with
- * "✓ Ready" while its photos go in the background (`session.sending`; only if the group
- * waits for them does the start show how far they are, `views/overlays.js`). Every wait
- * shows itself: "Picking photos…" under a spinner before the first set, and the set dimmed
- * under a spinner while No waits for new photos.
+ * from the left and snaps in place (`photos.leaving`); the first set of a game fades in.
+ * "Yes" makes the player ready at once: the set stays with "✓ Ready" while its photos go in
+ * the background (`session.sending`; if the group waits for them, the start's film leader
+ * fills its ring as they come in, `views/overlays.js`). Every wait shows itself: "Picking
+ * photos…" under a spinner before the first set, and the set dimmed under a spinner while
+ * "No →" waits for new photos.
  *
  * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so a change to
  * the buttons or the lines under the grid never repaints the grid and its photos (a swap

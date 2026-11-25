@@ -83,9 +83,10 @@ back as the same player. The server alone runs phases, timers, scores and the ho
 lobby → start once everyone (at least two) said "Yes" (while one is left, a comic bubble
 teases them on the others' phones; their Yes says START, and in a group's first game it asks
 "Is everyone here?" on their phone first; only if everyone said Yes without that, every phone
-asks, and after a No anyone's "Start now" starts it): *Get ready*
+asks, and after a No anyone's "Start now" starts it): the film leader, which first loads
 (the photos still on their way come in, the game is dealt, which photos in which random
-order, and every phone gets the first photo), then the 3-2-1, the same on every phone →
+order, and every phone gets the first photo; its ring fills meanwhile), then counts 3-2-1,
+the same on every phone →
 per round *load* (every phone holds the photo, at once for round 1) → *show* → *reveal* →
 *board* (the leaderboard; holding "Show again" shows the photo to everyone and
 stops the clock; when its time is up it waits until every phone holds the next round's
@@ -105,10 +106,10 @@ sharpens it in place. The host's "Which photos" decides what may come up: all, l
 (default: photos with 6 or more lines of text, like chats and emails, stay out) or no
 screenshots either; the check runs on the phone. Yes makes the player ready at once; the
 photos shown (as many as the game can show of this player, shrunk to at most 1080 px JPEG
-without location data) upload in the background ("Change" cancels it; the start shows how
-far it is only if the group waits for it). A photo is deleted right after its round (its
-reveal and leaderboard), and also when reported, on "Change", "Leave", removal, a new photo
-count and at the game's end.
+without location data) upload in the background ("Change" cancels it; if the group waits
+for it, the 3-2-1's film leader fills its ring as the photos come in). A photo is deleted
+right after its round (its reveal and leaderboard), and also when reported, on "Change",
+"Leave", removal, a new photo count and at the game's end.
 A room keeps its code for 24 hours after its last activity, even when everyone left, so the
 same group can play again the next day; then it is deleted. From the game's deal on (right
 before the 3-2-1), every phone loads the game's photos in play order and keeps them in
