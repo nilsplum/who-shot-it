@@ -34,8 +34,8 @@
  *   (ready: their chosen photos are in; sending: they said "Yes" and their photos are on
  *   their way, the id their upload carries, else null; onResults: still on the last game's
  *   end screen; ahead: the app loads the game's photos ahead and says which round it is
- *   ready for, see `holdsRound`; asks: the app can ask "Is everyone here?" and show "Start
- *   now", see `startMode`)
+ *   ready for, see `holdsRound`; asks: the app can ask "Is everyone here?" on every phone and
+ *   show "Start now", the fallback, see `startMode`)
  *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: { [id]: round }, waiting, shownAt,

@@ -86,8 +86,10 @@ export const session = {
   /** 'connecting' | 'open' | 'down' | 'replaced' */
   conn: 'connecting',
   downSince: 0,
-  /** The open sheet: 'settings' | 'help' | 'avatar' | 'invite' | 'leave' | 'report' | 'remove' | null. */
+  /** The open sheet: 'settings' | 'help' | 'avatar' | 'invite' | 'leave' | 'report' | 'remove' | 'start' | null. */
   sheet: null,
+  /** While "Is everyone here?" is open on this phone: which Yes it asks for ('yes' with the photos, 'guess' without), said on "Yes, start" (`main.js` `sayYes`); else null. */
+  confirm: null,
   /** The avatars in the order the open avatar sheet shows them (shuffled when it opens, `main.js`). */
   avatarOrder: [],
   /** The setting whose "?" explanation is open in the settings sheet, or null. */

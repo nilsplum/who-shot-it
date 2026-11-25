@@ -10,7 +10,7 @@ came from*. Was the blurry 2 a.m. kebab Ana's? Is the 400th cat picture Ben's? R
 fast scores the most, and every reveal is a story.
 
 - **Free, no account.** Install, pick an emoji, play. 2 to 16 players.
-- **Your photos, your call.** Don't like what you were dealt? Tap **No** for new ones.
+- **Your photos, your call.** Don't like what you were dealt? Tap **No →** for new ones.
   Nothing leaves a phone before its owner taps **Yes**, and each photo is deleted right after
   its round.
 - **Two ways to start, every option to tune:** Classic or Tricky (blurry, zoomed, pixelated),
@@ -81,8 +81,9 @@ game": a 4-letter code (no look-alike letters). Friends join with the code, a sh
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:
 lobby → start once everyone (at least two) said "Yes" (while one is left, a comic bubble
-teases them on the others' phones; a group's first game asks every
-phone "Is everyone here?" first; after a No, anyone's "Start now" starts it): *Get ready*
+teases them on the others' phones; their Yes says START, and in a group's first game it asks
+"Is everyone here?" on their phone first; only if everyone said Yes without that, every phone
+asks, and after a No anyone's "Start now" starts it): *Get ready*
 (the photos still on their way come in, the game is dealt, which photos in which random
 order, and every phone gets the first photo), then the 3-2-1, the same on every phone →
 per round *load* (every phone holds the photo, at once for round 1) → *show* → *reveal* →

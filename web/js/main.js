@@ -40,7 +40,11 @@
  *   more than the game can show of this player (`sendCount`). Only if the group then waits
  *   for them does the start show how far they are (`views/overlays.js` `startScreen`).
  *   "Change" cancels an upload still on its way. Every hello names the upload in flight,
- *   so the room never waits for one this phone no longer sends.
+ *   so the room never waits for one this phone no longer sends. The Yes that would start the
+ *   game (`nudge.startsWith`, its button stamped START) asks "Is everyone here?" on this
+ *   phone first in a group's first game (`sayYes`, the 'start' sheet) and then goes
+ *   confirmed (`sending` with `start`), so the room starts at once without asking every
+ *   phone.
  * - Rendering: `screen()` picks the view for the current state and `createPainter`
  *   repaints only what changed, four times a second and after every change, right on each
  *   second of the 3-2-1 (`paintStart`, which keeps its film leader on the room's clock with
@@ -86,7 +90,7 @@ import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, ope
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
 import { playReveal } from './reveal.js';
-import { fitNudge, nudgeAt, nudgeTrack } from './nudge.js';
+import { fitNudge, nudgeAt, nudgeTrack, startsWith } from './nudge.js';
 import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
 import { device, keyFor, saveDevice, session } from './store.js';
@@ -448,7 +452,8 @@ function syncBar() {
 /**
  * The first message of every connection; `ahead`: this app loads the game's photos ahead
  * (`upcoming.js`); `uploading`: its upload still on its way, so the room waits for that one
- * and no other (`readyWith`); `asks`: it can ask "Is everyone here?" and show "Start now"
+ * and no other (`readyWith`); `asks`: it can show the room-wide "Is everyone here?" and
+ * "Start now", the fallback for when the last Yes did not come confirmed
  * (`views/overlays.js`, `views/lobby.js`).
  */
 function hello() {
@@ -576,6 +581,13 @@ function onMessage(msg) {
       session.sheet = null;
     }
   }
+  // "Is everyone here?" belongs to this phone's last Yes: it closes once that Yes would no
+  // longer start the game (someone joined or tapped Change), the group is past that question,
+  // or the lobby is over.
+  if (session.sheet === 'start' && !(v.start && v.start.mode === 'ask' && startsWith(v, session.confirm === 'yes'))) {
+    session.sheet = null;
+    session.confirm = null;
+  }
   // "Remove?" closes once its player is gone, or may no longer be removed from this phone
   // (they came back online and this phone does not host).
   if (session.sheet === 'remove' && !v.players.some((p) => p.id === session.target && canRemove(v, p))) session.sheet = null;
@@ -677,19 +689,20 @@ async function checkAccess() {
 
 /**
  * "Yes" (or playing without photos, `count` 0): the player is ready at once. The room hears
- * it first (`sending`, with a new upload id), then the photos' big versions are gathered
+ * it first (`sending`, with a new upload id, and `start` when it is the confirmed last Yes,
+ * `sayYes`), then the photos' big versions are gathered
  * (`blobsOf`; usually there already) and uploaded in the background with that id. The lobby
  * shows "✓ Ready" meanwhile, and the start shows how far the upload is only if the group
  * waits for it. If it fails, the player is not ready any more (the room hears "unready")
  * and is told; after "Change" (`cancelSending`) it ends without a word. It holds nothing
  * of the room across its waits: what it finds afterwards it reads from `session` again.
  */
-async function readyWith(count, blobsOf) {
+async function readyWith(count, blobsOf, start = false) {
   if (session.sending || !session.code) return;
   const code = session.code;
   const job = { upload: makeId(Math.random, 16), count, share: 0, stop: new AbortController() };
   session.sending = job;
-  send({ type: 'sending', upload: job.upload });
+  send({ type: 'sending', upload: job.upload, start });
   render();
   let problem = 'Upload failed. Try again.';
   try {
@@ -714,6 +727,35 @@ async function readyWith(count, blobsOf) {
     if (session.sending === job) session.sending = null;
     render();
   }
+}
+
+/**
+ * "Yes" or "Play without photos" (`kind` 'yes' or 'guess'). When this phone's Yes would start
+ * the game (`startsWith`) in a group's first game (`view.start.mode` 'ask'), it asks "Is
+ * everyone here?" first: the 'start' sheet opens and remembers which Yes it was
+ * (`session.confirm`). Otherwise it says Yes at once, confirmed (`start`) when it is the Yes
+ * that starts the game, so the room never asks every phone.
+ */
+function sayYes(kind) {
+  const v = session.view;
+  if (!v || !v.me) return;
+  const starts = startsWith(v, kind === 'yes');
+  if (starts && v.start && v.start.mode === 'ask') {
+    session.confirm = kind;
+    openSheet('start');
+    return;
+  }
+  readyAs(kind, starts);
+}
+
+/** Says Yes with the set on screen (no more of it than the game can show of this player, `sendCount`), or without photos; `start` confirms the last Yes. */
+function readyAs(kind, start) {
+  if (kind === 'guess') {
+    readyWith(0, async () => [], start);
+    return;
+  }
+  const count = Math.min(sendCount(session.view), photos.chosen.length);
+  readyWith(count, () => chosenBlobs(count), start);
 }
 
 /** "Change" (or leaving the room): an upload still on its way is cancelled and will not count. */
@@ -861,18 +903,20 @@ const ACTIONS = {
     render();
   },
   opensettings: openSettings,
-  guess: () => readyWith(0, async () => []),
+  guess: () => sayYes('guess'),
   no: () => {
     const v = session.view;
     if (!v || !v.me) return;
     const { size, filter } = photoSettings(v);
     roll(size, filter, render);
   },
-  yes: () => {
-    const v = session.view;
-    if (!v || !v.me) return;
-    const count = Math.min(sendCount(v), photos.chosen.length);
-    readyWith(count, () => chosenBlobs(count));
+  yes: () => sayYes('yes'),
+  /** "Is everyone here?" Yes, on this phone: its Yes goes, confirmed, and the game starts (the count from the latest view). */
+  yesstart: () => {
+    const kind = session.confirm;
+    session.confirm = null;
+    openSheet(null);
+    if (kind) readyAs(kind, true);
   },
   /** A tap on a photo of the choice: it flips to another one (a light tap), or the refusal is felt twice. */
   swap: (index) => {
@@ -884,9 +928,9 @@ const ACTIONS = {
     send({ type: 'unready' });
     render();
   },
-  /** "Is everyone here?" Yes, or "Start now": the room starts the game if everyone still said "Yes". */
+  /** The room-wide "Is everyone here?" Yes, or "Start now" (the fallback): the room starts the game if everyone still said "Yes". */
   go: () => send({ type: 'start', go: true }),
-  /** "Is everyone here?" No: the group waits, and "Start now" appears on every phone. */
+  /** The room-wide "Is everyone here?" No: the group waits, and "Start now" appears on every phone once everyone said "Yes". */
   wait: () => send({ type: 'start', go: false }),
   answer: (id) => {
     const v = session.view;

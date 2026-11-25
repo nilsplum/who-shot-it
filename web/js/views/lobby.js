@@ -1,13 +1,17 @@
 /**
  * The lobby: the room code, the settings summary, who is here and ready, and the
- * player's own photos: n random ones from the phone, "Play with these?" No/Yes.
+ * player's own photos: n random ones from the phone, "Play with these?" Yes / "No →".
  *
  * Mechanisms: shown in the `lobby` and `countdown` phases. `main.js` deals the photos by
  * itself as soon as the app may read them (`photos.roll`); the first time, the player is
  * asked once ("Continue" shows the phone's own question), and if access is off, "Open
  * settings" leads to the switch. The game starts by itself when everyone said "Yes"
- * (server rule `everyoneSaidYes`); a group's first game asks "Is everyone here?" first,
- * and after a No it starts with "Start now" at the bottom (`startNow`). The start ("Get
+ * (server rule `everyoneSaidYes`). The player whose Yes would start it sees a stamped START
+ * on their Yes (`nudge.startsWith`); in a group's first game that Yes asks "Is everyone
+ * here?" on their phone first (the 'start' sheet, `main.js` `sayYes`). Only when everyone
+ * said Yes without that (the last one left or was removed, two at once, an older app) does
+ * every phone ask (`views/overlays.js`), and after a No "Start now" appears at the bottom
+ * while it can start the game (`startNow`). The start ("Get
  * ready", the 3-2-1) is an overlay (`views/overlays.js`). Tapping the code opens the invite sheet, tapping the settings
  * summary opens the settings sheet (read-only for everyone but the host), and tapping a
  * player opens "Remove?" (the host may remove anyone, everyone a player who is offline;
@@ -44,7 +48,7 @@
  */
 
 import { SETTINGS, normalizeSettings } from '../../shared/config.js';
-import { NUDGE, bulgeRows } from '../nudge.js';
+import { NUDGE, bulgeRows, startsWith } from '../nudge.js';
 import { photos } from '../photos.js';
 import { HELP_BUTTON, LEAVE_BUTTON, OFFLINE_LOOK, SPINNER, avatar, canRemove, colourOf, esc, sidewaysRow, topBar } from '../ui.js';
 
@@ -127,10 +131,26 @@ function card(icon, title, text, button) {
 
 const mainButton = (act, text) => `<button class="btn mt-4 bg-coral text-white" data-act="${act}">${text}</button>`;
 
-/** No and Yes. */
-function actions() {
+/**
+ * START, stamped onto the Yes of the player whose Yes would start the game: dark, extra bold,
+ * in a thin frame, a little crooked, landing with the stamp the reveal's ✓ and ✗ use. Never
+ * taller than the button's text line (one pixel of padding, no line gap), so the button keeps
+ * its height whether it is there or not; a new element each time it appears, so it stamps
+ * again then and never on a repaint.
+ */
+const START = '<span class="inline-block -rotate-8 animate-stamp rounded-md border-2 border-navy px-1.5 py-px font-display text-xs leading-none font-extrabold tracking-wider motion-reduce:animate-none" data-cell="start">START</span>';
+
+/**
+ * Yes (green) and "No →" (ice blue, a new set). The last player's Yes carries START next to
+ * the word, the pair centred, so "Yes" moves a little to the left; its accessible name says
+ * what it does.
+ */
+function actions(view) {
   const off = photos.rolling ? 'disabled' : '';
-  return `<div class="mt-3.5 grid grid-cols-2 gap-2.5"><button class="btn" data-act="no" ${off}>No</button><button class="btn bg-green text-navy" data-act="yes" ${off}>Yes</button></div>`;
+  const yes = startsWith(view, true)
+    ? `<button class="btn flex items-center justify-center gap-2 bg-green text-navy" data-act="yes" data-start aria-label="Yes, start the game" ${off}>Yes${START}</button>`
+    : `<button class="btn bg-green text-navy" data-act="yes" ${off}>Yes</button>`;
+  return `<div class="mt-3.5 grid grid-cols-2 gap-2.5">${yes}<button class="btn bg-ice text-navy" data-act="no" aria-label="No, other photos" ${off}>No →</button></div>`;
 }
 
 /** The player's photo area as its five parts: `{ title, pick, note, actions, links }` (empty ones are ''). */
@@ -157,7 +177,7 @@ function mine({ view, session }) {
       title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold short:mb-2 short:text-xl">Play with these?</h2>',
       pick: grid(chosenTiles(false), view.settings.photos, photos.rolling),
       note: swapsLine(),
-      actions: actions(),
+      actions: actions(view),
       links: `${limited}${withoutPhotos}`,
     };
   }
@@ -193,13 +213,15 @@ function status({ view }) {
 }
 
 /**
- * "Start now", on every phone once someone answered "Is everyone here?" with No
- * (`view.start.mode` 'button', `views/overlays.js`): big and pulsing at the bottom, greyed
- * (and still) until everyone said "Yes". Anyone may tap it.
+ * "Start now", the fallback's second half: on every phone once someone answered the
+ * room-wide "Is everyone here?" with No (`view.start.mode` 'button', `views/overlays.js`),
+ * big and pulsing at the bottom, but only while it can start the game (everyone said "Yes").
+ * Before that the last player's own Yes starts it (its START), and a greyed button next to
+ * that would only compete. Anyone may tap it.
  */
 function startNow({ view }) {
-  if (!view.start || view.start.mode !== 'button') return '';
-  return `<button class="btn mt-3 animate-breathe bg-coral text-white disabled:animate-none motion-reduce:animate-none" data-act="go" ${view.start.everyone ? '' : 'disabled'}>Start now</button>`;
+  if (!view.start || view.start.mode !== 'button' || !view.start.everyone) return '';
+  return '<button class="btn mt-3 animate-breathe bg-coral text-white motion-reduce:animate-none" data-act="go">Start now</button>';
 }
 
 /**

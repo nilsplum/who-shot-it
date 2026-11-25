@@ -23,8 +23,10 @@ browser), and internet. The computer must stay awake while they play.
 3. After a few seconds they appear in the lobby, one after the other. Once the last one is
    in, they wait **half a minute** before they get ready, so there is time to show the
    lobby, for example to remove one (tap the name, then **Remove**).
-4. Choose your photos (**Continue**, then **Yes**). Once everyone is ready, the app asks
-   **Is everyone here?**: tap **Yes, start**.
+4. Choose your photos (**Continue**), and say **Yes** after the test players are ready:
+   the test players never take the Yes that would start the game, so yours then says
+   **START**, and in the first game it asks **Is everyone here?**: tap **Yes, start**. (If you
+   said Yes before them, tap **Change**, then **Yes** again once they are ready.)
 5. In each round they tap a random player a few seconds after the photo appears.
 6. After the podium they stay **two minutes**; when you tap **Play again** they join the next
    game. Otherwise they leave by themselves.
@@ -52,9 +54,10 @@ including reporting a photo and removing a player. What worked:
 3. Accept the terms, enter a name, **Create game**, keep **Classic**, **Start game**.
 4. Start the test players with the code (above). Keep recording; waiting time can be cut.
 5. Remove one of them (tap the name, **Remove**).
-6. **Continue**, allow access to all photos, tap **No** once, then **Yes**. Only your own
-   photos show up and only Apple sees the video: tap **No** until harmless ones come. When
-   the app asks **Is everyone here?**, tap **Yes, start**.
+6. **Continue**, allow access to all photos, tap **No →** once. Only your own photos show up
+   and only Apple sees the video: tap **No →** until harmless ones come. Once the test
+   players are ready, tap **Yes** (it says **START**); the app asks **Is everyone here?**,
+   tap **Yes, start**.
 7. In the first round tap the flag on the photo, then **Delete photo**.
 8. Play until the podium has revealed all three places and **Play again** appears (about
    ten seconds), then stop the recording.

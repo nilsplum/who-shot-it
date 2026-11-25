@@ -17,10 +17,11 @@
  * photo plugin (`test/e2e/fake-phone.js`) and drawn stand-in photos (`demo-photos.mjs`),
  * so they upload nobody's real photos. They accept the terms, join, wait half a minute
  * after the last of them joined before they say Yes to their photos (so the host has time
- * to show the lobby, for example removing a player; then the person answers "Is everyone
- * here?"), guess a random player a moment after each photo appears, wait through each
- * leaderboard, and stay on the end screen for two minutes (joining the next game when
- * anyone taps "Play again") before they leave. They also stop when the game is gone or the
+ * to show the lobby, for example removing a player), but never the Yes that would start the
+ * game (stamped START): the start stays the person's, whose Yes then asks "Is everyone
+ * here?" on their phone. They guess a random player a moment after each photo appears,
+ * wait through each leaderboard, and stay on the end screen for two minutes (joining the
+ * next game when anyone taps "Play again") before they leave. They also stop when the game is gone or the
  * host removed them. Ctrl+C ends them all.
  */
 import { chromium } from '@playwright/test';
@@ -113,8 +114,9 @@ async function play(page, [name, avatar], since) {
     if (Date.now() - since > READY_AFTER_MS) {
       const proceed = page.getByRole('button', { name: 'Continue' });
       if (await proceed.count()) await proceed.click();
-      // Exactly "Yes": "Is everyone here?" is the person's to answer, not the demo players'.
-      const yes = page.getByRole('button', { name: 'Yes', exact: true });
+      // Never the Yes stamped START (the one that would start the game): the start, and in a
+      // first game "Is everyone here?", stay the person's.
+      const yes = page.locator('[data-act="yes"]:not([data-start])');
       if (await yes.count() && await yes.isEnabled()) await yes.click();
     }
     // Read without waiting: a locator would wait for a photo the lobby does not show. The

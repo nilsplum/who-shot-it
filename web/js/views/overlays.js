@@ -1,6 +1,7 @@
 /**
- * Everything drawn over the screens: the start of a game ("Is everyone here?" before a
- * group's first game, "Get ready", then the 3-2-1 as a film leader),
+ * Everything drawn over the screens: the start of a game ("Is everyone here?" on every phone
+ * when a group's first game was not confirmed on the last player's phone, "Get ready", then
+ * the 3-2-1 as a film leader),
  * the "Reconnecting…" banner, the photo held to look at, and the two full screens without
  * game content (joining, and "this game is open somewhere else": the same player connected
  * again, for example after the app was restored while an older connection was still alive).
@@ -23,9 +24,13 @@ import { SPINNER, esc, progress } from '../ui.js';
 export const BANNER_DELAY_MS = 1500;
 
 /**
- * A group's first game asks before it starts, on every phone once everyone said "Yes"
- * (`view.start`): Yes starts it, No lets the group wait for whoever is missing ("Start now"
- * appears in the lobby, `views/lobby.js`). Anyone may answer for the group.
+ * The room-wide "Is everyone here?", the fallback: a group's first game normally asks on
+ * the last player's phone before their Yes (the 'start' sheet, `views/sheets.js`), and the
+ * room starts at once. Only when everyone said "Yes" without that (the last one left or was
+ * removed, two said Yes at the same moment, the last Yes came from an older app) does every
+ * phone ask (`view.start` 'ask' with `everyone`): Yes starts it, No lets the group wait for
+ * whoever is missing ("Start now" appears in the lobby, `views/lobby.js`). Anyone may answer
+ * for the group.
  */
 const ASK = {
   key: 'ask',
@@ -62,7 +67,7 @@ const leader = (n) => `<div class="screen h-dvh"><div class="relative grid flex-
 </div></div>`;
 
 /**
- * The start of a game, or null: "Is everyone here?" (`ASK`) in a group's first lobby, then
+ * The start of a game, or null: the room-wide "Is everyone here?" (`ASK`, the fallback), then
  * the room's three steps (`view.phase` 'countdown', `src/game/rules.js`): "Get ready" while
  * photos are still on their way (a bar: how far the group's uploads are, `sendShare`, this
  * phone's own counted exactly) or while the phones get the first photo (a spinner: it takes

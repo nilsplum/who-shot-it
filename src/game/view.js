@@ -34,9 +34,10 @@
  * - A player's `ready` is their "Yes" (`saidYes`): their photos are in, or still on their
  *   way (`sending`, the upload runs in the background). While the start waits for photos
  *   still on their way, `uploads` says how many players have theirs in (`uploadWait`).
- * - In the lobby, `start` says how the game will start (`startMode`: 'ask' shows "Is
- *   everyone here?" once `everyone` said "Yes", 'button' shows "Start now", usable once
- *   `everyone` did, 'auto' neither); else null.
+ * - In the lobby, `start` says how the game will start (`startMode`: 'ask' is a group's first
+ *   game, where the last Yes asks "Is everyone here?" on its own phone, and every phone asks
+ *   once `everyone` said "Yes" without that; 'button' shows "Start now" once `everyone` did;
+ *   'auto' neither); else null.
  * - `games` is how many games this group started in this room (`room.games`): the same on
  *   every phone, so the lobby's bubble draws the same order of lines on all of them, and
  *   another order each game (`web/js/nudge.js`).

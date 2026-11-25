@@ -2,7 +2,8 @@
  * The bottom sheets: settings (with a "?" explanation per setting), how to play, avatar
  * picker, invite (QR and share), and the confirmations for leaving, reporting a photo
  * (opened by ⚑: the others wait while it is open, and Delete counts down to the room's own
- * deletion, `flagLeft` from `main.js`) and removing a player.
+ * deletion, `flagLeft` from `main.js`), removing a player, and "Is everyone here?" on the
+ * last player's phone before their Yes starts a group's first game.
  *
  * Mechanisms: `main.js` keeps the open sheet's name in `session.sheet` and paints the
  * result of `sheetScreen` into `#sheet` with the same part mechanism as the screens, so a
@@ -78,6 +79,17 @@ function inviteBody({ view }) {
     <button class="btn bg-coral text-white" data-act="share">Share invite</button>`;
 }
 
+/**
+ * "Is everyone here?", on the phone whose Yes would start a group's first game (`main.js`
+ * `sayYes`): "Yes, start" says that Yes, confirmed, so the game starts at once on every
+ * phone; "No, wait" (like the backdrop and the back button) closes it and changes nothing,
+ * so the player stays not ready and taps Yes again once their friend is there. It closes by
+ * itself once that Yes would no longer start the game (`main.js` `onMessage`).
+ */
+const START = `${title('Is everyone here?')}
+  ${text('Anyone who joins later plays without photos.')}
+  ${buttons('<button class="btn bg-green text-navy" data-act="yesstart">Yes, start</button>', '<button class="btn" data-act="close">No, wait</button>')}`;
+
 const LEAVE = `${title('Leave the game?')}
   ${buttons('<button class="btn bg-red text-white" data-act="leavenow">Leave</button>', '<button class="btn" data-act="close">Stay</button>')}`;
 
@@ -120,6 +132,7 @@ export function sheetScreen(c) {
     leave: () => LEAVE,
     report: () => (inRoom ? reportBody(c) : ''),
     remove: () => (inRoom ? removeBody(c) : ''),
+    start: () => (inRoom ? START : ''),
   };
   const body = bodies[name] ? bodies[name]() : '';
   if (!body) return null;

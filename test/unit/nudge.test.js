@@ -5,16 +5,18 @@
  * the bulge of its letters, and its lines' manners.
  */
 import { describe, expect, test } from 'vitest';
-import { NUDGE, NUDGE_CALLS, NUDGE_LINES, bulgeRows, lastToSayYes, nudgeAt, nudgeTrack, shortName } from '../../web/js/nudge.js';
+import { NUDGE, NUDGE_CALLS, NUDGE_LINES, bulgeRows, lastToSayYes, nudgeAt, nudgeTrack, shortName, startsWith } from '../../web/js/nudge.js';
 
-/** A lobby view as the room sends it, seen from `me`: `players` as [name, ready, connected?]. */
+/** A lobby view as the room sends it, seen from `me`: `players` as [name, ready, connected?, photos?]. */
 function lobby(players, { me = 'Ann', games = 0, phase = 'lobby', onResults = false } = {}) {
   return {
     code: 'ABCD',
     games,
     phase,
     me: { id: me, onResults },
-    players: players.map(([name, ready, connected = true], i) => ({ id: name, name, avatar: ['🦊', '🐼', '🐸', '🦄', '🐙'][i], ready, connected })),
+    players: players.map(([name, ready, connected = true, photoCount = ready ? 4 : 0], i) => ({
+      id: name, name, avatar: ['🦊', '🐼', '🐸', '🦄', '🐙'][i], ready, connected, sending: false, photoCount,
+    })),
   };
 }
 
@@ -36,6 +38,19 @@ describe('the last one', () => {
     expect(lastToSayYes(lobby([['Ann', false]]))).toBeNull();
     expect(lastToSayYes(lobby([['Ann', true], ['Ben', false]], { phase: 'countdown' }))).toBeNull();
   });
+});
+
+test("the last one's Yes starts the game (its START), with photos, or without when someone else has some", () => {
+  const view = lobby([['Ann', true], ['Ben', false]], { me: 'Ben' });
+  expect(startsWith(view, true)).toBe(true);
+  expect(startsWith(view, false)).toBe(true);
+  // Nobody else has photos: only a Yes with photos would start it.
+  const empty = lobby([['Ann', true, true, 0], ['Ben', false]], { me: 'Ben' });
+  expect(startsWith(empty, true)).toBe(true);
+  expect(startsWith(empty, false)).toBe(false);
+  // Not on the others' phones, and not while two are still to say Yes.
+  expect(startsWith(lobby([['Ann', true], ['Ben', false]]), true)).toBe(false);
+  expect(startsWith(lobby([['Ann', false], ['Ben', false]], { me: 'Ben' }), true)).toBe(false);
 });
 
 describe('the bubble', () => {

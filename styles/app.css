@@ -73,6 +73,7 @@
   --color-coral: #ff5a5f; /* the main action of a screen */
   --color-green: #3ddc97; /* yes, ready, right */
   --color-green-dark: #1f3a31; /* behind the right card */
+  --color-ice: #c2e6ff; /* "No →" in the lobby, with dark blue text, next to the green Yes */
   --color-red: #ff6b6f; /* wrong, leaving and deleting, no swaps left, a player who is offline */
   --color-red-dark: #40222b; /* behind a wrong pick, behind a player who is offline */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
@@ -152,7 +153,7 @@
   --animate-shake: shake 0.4s ease-out; /* the screen as FINAL ROUND lands */
   --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal, as it turns green (web/js/reveal.js) */
   --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when it was my pick */
-  --animate-stamp: stamp 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; /* the reveal's ✓ or ✗, stamped onto its card */
+  --animate-stamp: stamp 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; /* the reveal's ✓ or ✗, stamped onto its card; START, stamped onto the last player's Yes */
   --animate-result: result 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; /* the reveal: my points, or "Wrong", rising off my card */
   --animate-pop-in: pop-in 0.56s cubic-bezier(0.2, 0.8, 0.2, 1); /* a podium place's player bursting out of its orb, a little too big first (`--pop`, views/end.js) */
   --animate-rays: rays-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both, turn 14s linear infinite; /* the rays behind the winner: they open up, then turn for as long as the podium shows */
@@ -166,7 +167,7 @@
   --animate-hand: turn 1s linear both;
   --animate-weave: weave 0.33s steps(1) infinite;
   --animate-beacon: beacon 1.6s ease-in-out infinite; /* an offline player (red): a slow glow, like a warning light at sea */
-  --animate-breathe: breathe 1.4s ease-in-out infinite; /* "Start now": a glow swells around it and fades, so nobody misses it */
+  --animate-breathe: breathe 1.4s ease-in-out infinite; /* "Start now" (after every phone was asked, the fallback): a glow swells around it and fades, so nobody misses it */
 
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
   @keyframes spin { to { transform: rotate(360deg); } }

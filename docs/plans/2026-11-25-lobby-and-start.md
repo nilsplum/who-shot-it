@@ -37,6 +37,11 @@ to date with every commit.
   the new field. To try on the phones: the bubble's look and moves (commit 8's list).
 - Commit 3: the room takes a confirmed last Yes (`sending` with `start`). No app sends it yet
   (commit 4 does), so nothing changes for players; installed apps go on as before.
+- Commit 4: the app sends it: Yes left with START for the last player, "No →" in ice blue,
+  "Is everyone here?" on the last phone only. This is why the server is deployed before this
+  app is released (to do 1). The test players (`demo-players.mjs`) never take the START Yes:
+  when recording, say Yes after them (`docs/guides/demo-players.md`). To try on the phones:
+  the stamp landing, the sheet, the buttons (commit 8's list).
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -777,7 +782,7 @@ Read: `src/game/rules.js`, `src/game/state.js`, `src/game/view.js`, `src/room.js
 
 ### Commit 4: lobby: Yes left with the START stamp for the last one, "No →" in ice, "Is everyone here?" on the last phone
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `web/js/views/lobby.js`, `views/sheets.js`, `views/overlays.js`, `web/js/main.js`,
 `web/js/nudge.js`, `web/js/store.js`, `web/js/ui.js`, `styles/app.css`,
@@ -1093,3 +1098,27 @@ Status: planned.
 - **No new capability flag in the hello**: the room needs no word from the app beyond the
   flag on its Yes; an app that never sends it (every installed one) gets the room-wide
   question exactly as before, and the room keeps honouring `asks` for it.
+
+**25 November 2026, commit 4 (Yes with START, "No →" in ice, "Is everyone here?" on the last phone)**
+
+- **One entry for both ways of saying Yes** (`sayYes` in `main.js`, 'yes' or 'guess'):
+  "Play without photos" by the last player asks too when it would start the game (someone
+  else has photos in); when nobody has any, it is a plain Yes (it cannot start the game).
+- **The START Yes's accessible name is "Yes, start the game"**: screen readers say what it
+  does. A test or script that looks for the sheet's "Yes, start" must match it exactly, or it
+  finds both buttons (the store images script and the tests do).
+- **The badge keeps the button's height**: one pixel of padding and no line gap make it a
+  little lower than the button's text line (52 px with or without it, checked in the e2e
+  test).
+- **"No, wait" on the last phone sends nothing**: the player stays not ready and keeps START;
+  the sheet closes by itself when that Yes would no longer start the game (`onMessage`).
+- **After "No, wait" on the room-wide question** ('button'), the last player's START Yes starts
+  the game without the sheet: the group already said it is waiting for someone (the e2e
+  fallback test plays this).
+- **The test players never take the Yes stamped START** (`demo-players.mjs`), so the start and
+  its question stay the person's; the guide says to say Yes after them, or Change and Yes
+  again.
+- **The store images script** waits for the last phone's START before it taps it, so it always
+  takes the sheet's path (not the room-wide question).
+- **`gridEdges`** (the e2e check that the photos line up with the buttons) now measures from
+  Yes's left edge to "No →"'s right edge.

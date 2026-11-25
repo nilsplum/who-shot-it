@@ -7,7 +7,10 @@
  * - `lastToSayYes(view)`: who it is, from the view the room sent (`src/game/view.js`): the
  *   room has at least two players, exactly one of them has not said Yes, and everyone else is
  *   connected and said Yes, so that player's Yes is the one the start waits for (the room's
- *   own rule, `everyoneSaidYes` in src/game/state.js).
+ *   own rule, `everyoneSaidYes` in src/game/state.js). On their own phone their Yes carries
+ *   a stamped START and, in a group's first game, asks "Is everyone here?" there first
+ *   (`startsWith`, `views/lobby.js`, `main.js` `sayYes`); on the others' phones the bubble
+ *   teases them.
  * - The bubble (the lobby's `nudge` part, `views/lobby.js`) comes and goes in a rhythm
  *   (`NUDGE`): the first appearance the moment the wait begins, on screen for 5 s, leaving
  *   for a moment, then away until the next one, 15 s after the last began. `nudgeTrack` keeps
@@ -82,6 +85,18 @@ export function lastToSayYes(view) {
   const waiting = view.players.filter((p) => !p.ready);
   if (waiting.length !== 1) return null;
   return view.players.every((p) => p === waiting[0] || p.connected) ? waiting[0] : null;
+}
+
+/**
+ * Whether this phone's Yes would start the game: this phone is the last one, and the game
+ * would have a photo then (`withPhotos`: this Yes brings some; else someone else's photos are
+ * in or on their way), as the room's own rule needs. A "Play without photos" when nobody has
+ * any would not start it, so it is not treated as the start.
+ */
+export function startsWith(view, withPhotos) {
+  const last = lastToSayYes(view);
+  if (!last || !view.me || last.id !== view.me.id) return false;
+  return withPhotos || view.players.some((p) => p.id !== last.id && (p.photoCount > 0 || p.sending));
 }
 
 /**

@@ -7,7 +7,8 @@
  * and a phone network's delay. Two more app phones and five light bots (`bots.js`) fill the
  * table, so the room and the sockets carry what a real group causes. The test plays the
  * lobby (the first set, "No" SKIPS times a glance apart, more sets than the bucket held at
- * first, holding a photo, "Yes", "Is everyone here?") and a short game, and prints what each
+ * first, holding a photo, the last "Yes" asking "Is everyone here?" on this phone, "Yes,
+ * start") and a short game, and prints what each
  * step took: the
  * lobby's waits, the 3-2-1 as it was painted,
  * how long the room waited for phones, when each photo appeared, how many messages went
@@ -43,11 +44,11 @@ const LIMITS = {
   /** The preview shows at once; the sharp version follows (a photo kept only in iCloud downloads first). */
   heldPreview: 500,
   heldSharp: 5000,
-  /** "Yes" makes the player ready at once: no bar, the photos go in the background. */
+  /** The last "Yes" (stamped START) until "Is everyone here?" on its own phone: a paint, no message. */
+  asked: 300,
+  /** "Yes, start" makes the player ready at once: no bar, the photos go in the background. */
   ready: 300,
-  /** The last "Yes" until every phone asks "Is everyone here?". */
-  asked: 1000,
-  /** Its "Yes, start" until the 3-2-1 (photos still on their way, the first photo on every phone). */
+  /** "Yes, start" until the 3-2-1 (photos still on their way, the first photo on every phone). */
   yes: 3000,
   /** How long the room may stand in `load` (or a leaderboard wait) for phones that all kept up. */
   roomWait: 1000,
@@ -169,7 +170,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
   try {
     for (const { page } of others) {
       await page.getByRole('button', { name: 'Continue' }).click();
-      await page.getByRole('button', { name: 'Yes', exact: true }).click();
+      await page.locator('[data-act="yes"]').click();
       await expect(page.getByText('✓ Ready')).toBeVisible();
     }
     // Holding a photo: its preview at once (the hold starts after 350 ms, `main.js` HOLDS),
@@ -180,20 +181,19 @@ test('a game at phone speed: what the players wait for stays within its limits',
     report.preview = Math.max(0, (await msUntil(host, () => document.querySelectorAll('#look img').length >= 1)) - 350);
     report.sharp = report.preview + (await msUntil(host, () => document.querySelectorAll('#look img').length >= 2));
     await host.mouse.up();
-    // Yes: Ann is the last one, so everyone is asked "Is everyone here?"; her Yes to that
-    // begins the start: her photos still on their way, then the first photo on every phone,
-    // then the 3-2-1.
-    await host.getByRole('button', { name: 'Yes', exact: true }).click();
+    // Yes: Ann is the last one, so her Yes (stamped START) asks "Is everyone here?" on her own
+    // phone in the group's first game. She reads it for a moment, then "Yes, start": she is
+    // ready at once and the start begins (her photos still on their way, then the first photo
+    // on every phone, then the 3-2-1).
+    await host.locator('[data-act="yes"][data-start]').click();
     const tapped = Date.now();
-    await msUntil(host, () => document.getElementById('app').textContent.includes('✓ Ready'));
-    report.ready = Date.now() - tapped;
-    // The group's first game asks first; Ann reads it for a moment (her upload goes on
-    // meanwhile), then starts.
-    await msUntil(host, () => Boolean(document.querySelector('#cover [data-act="go"]')));
+    await msUntil(host, () => Boolean(document.querySelector('[data-act="yesstart"]')));
     report.asked = Date.now() - tapped;
     await host.waitForTimeout(GLANCE_MS);
-    await host.getByRole('button', { name: 'Yes, start' }).click();
+    await host.getByRole('button', { name: 'Yes, start', exact: true }).click();
     const answered = Date.now();
+    await msUntil(host, () => document.getElementById('app').textContent.includes('✓ Ready'));
+    report.ready = Date.now() - answered;
     await msUntil(host, () => Boolean(document.querySelector('#cover [data-count]')), null, 60_000);
     report.yes = Date.now() - answered;
     // The game: everyone answers each photo at once, so the rounds run on the room's own timers.
@@ -238,7 +238,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
     `  first set after entering the lobby  ${report.firstSet} ms`,
     `  "No" ${SKIPS} times, a glance apart     ${report.no.join(', ')} ms`,
     `  holding a photo: preview, sharp     ${report.preview} ms, ${report.sharp} ms`,
-    `  "Yes" until "✓ Ready", the question ${report.ready} ms, ${report.asked} ms`,
+    `  "Yes" until the question, "✓ Ready" ${report.asked} ms, ${report.ready} ms`,
     `  "Yes, start" until the 3-2-1        ${report.yes} ms`,
     `  the 3-2-1 as painted                ${report.countdown}`,
     `  the room waiting for phones         ${report.roomWaits.map((w) => `${w.label} ${w.ms} ms`).join(', ') || 'never'}`,
@@ -255,8 +255,8 @@ test('a game at phone speed: what the players wait for stays within its limits',
   for (const ms of report.no) expect(ms, '"No"').toBeLessThanOrEqual(LIMITS.no);
   expect(report.preview, 'a held photo\'s preview').toBeLessThanOrEqual(LIMITS.heldPreview);
   expect(report.sharp, 'a held photo turning sharp').toBeLessThanOrEqual(LIMITS.heldSharp);
-  expect(report.ready, '"Yes" until "✓ Ready"').toBeLessThanOrEqual(LIMITS.ready);
-  expect(report.asked, '"Yes" until "Is everyone here?"').toBeLessThanOrEqual(LIMITS.asked);
+  expect(report.asked, 'the last "Yes" until "Is everyone here?" on its phone').toBeLessThanOrEqual(LIMITS.asked);
+  expect(report.ready, '"Yes, start" until "✓ Ready"').toBeLessThanOrEqual(LIMITS.ready);
   expect(report.yes, '"Yes, start" until the 3-2-1').toBeLessThanOrEqual(LIMITS.yes);
   expect(report.countdown, 'the 3-2-1, each number once').toBe('3 2 1');
   for (const w of report.roomWaits) expect(w.ms, `the room waiting (${w.label})`).toBeLessThanOrEqual(LIMITS.roomWait);

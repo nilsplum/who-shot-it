@@ -90,8 +90,15 @@ async function takeScreens(browser, library) {
     await page.locator('[data-act="swap"]').nth(3).waitFor();
   }
   await snap(host, 'photos');
-  for (const page of everyone) await page.getByRole('button', { name: 'Yes', exact: true }).click();
-  await host.getByRole('button', { name: 'Yes, start' }).click();
+  // Everyone says Yes; the last one's Yes (stamped START) asks "Is everyone here?" on that
+  // phone in this first game, and "Yes, start" starts it.
+  for (const page of everyone.slice(0, -1)) {
+    await page.locator('[data-act="yes"]').click();
+    await page.getByText('✓ Ready').waitFor();
+  }
+  const last = everyone.at(-1);
+  await last.locator('[data-act="yes"][data-start]').click();
+  await last.getByRole('button', { name: 'Yes, start', exact: true }).click();
   await host.locator('[data-part="stage"] img').waitFor({ timeout: 30000 });
   await guests[0].locator('[data-act="answer"]').first().click();
   await snap(host, 'guess');
