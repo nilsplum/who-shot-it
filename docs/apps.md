@@ -132,8 +132,9 @@ and the **EU trader status** (Business, Agreements, Compliance, Digital Services
 Complete Compliance Requirements). **TestFlight's groups** (the app, TestFlight): one
 internal group for the team, made *without* automatic distribution (otherwise Apple puts
 every build there by itself, production builds too), and one external group with a public
-link (Friends). `./scripts/release-apps.sh staging ios` puts each staging build into both and
-refuses while an internal group gets every build. Then `./scripts/release-apps.sh production
+link (Friends). The team's members are added on the website (the group, Testers, +): Apple's
+API cannot add internal testers. `./scripts/release-apps.sh staging ios` puts each staging
+build into both groups and refuses while an internal group gets every build. Then `./scripts/release-apps.sh production
 ios --submit` does the rest.
 
 **App Review asks new apps for a screen recording** ("Guideline 2.1, Information Needed"):

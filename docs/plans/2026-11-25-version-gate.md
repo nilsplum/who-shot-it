@@ -9,7 +9,21 @@ section 6 says how far it is.
 What only the operator can do, and what is worth knowing, kept up to date with every commit.
 
 **Done**
-- Nothing yet.
+- Commits 1 to 6, merged into `main`.
+- Staging deployed on 25 November 2026 from `main` at 84f9cc5 (`./scripts/deploy.sh staging
+  --min 1.0.7 --newest ios=1.0.11 --newest android=none`, every test green): Cloudflare
+  version 37fe025b, which serves its gate (read back): 1.0.7 and newer may play, newest
+  iPhone 1.0.11, Android none.
+- 1.0.11 uploaded as build 100110 for staging (`./scripts/release-apps.sh staging ios`): in
+  TestFlight's Team, and sent to Apple's beta check for the public link. 1.0.9 and 1.0.10
+  passed that check meanwhile, so the public link gives 1.0.10 (staging) now and 1.0.11 once
+  approved.
+- App Store Connect, so TestFlight carries only staging builds: the public link's group
+  (Friends) lost the production builds 1.0.0, 1.0.5, 1.0.6 and 1.0.7; the team's group was
+  made again without automatic distribution (staging builds 1.0.9 to 1.0.11), the old one
+  deleted. Nothing was expired; 1.0.5 is untouched in App Review.
+- Production untouched, as the operator asked: Cloudflare version 9226b0f0 runs exactly
+  1.0.5's code (checked file by file), without a gate (every app may play there).
 
 **How to work from now on** (docs/apps.md, Releasing)
 - Every `./scripts/deploy.sh staging|production` shows which app versions that server lets
@@ -20,7 +34,13 @@ What only the operator can do, and what is worth knowing, kept up to date with e
   show "Update" on their start screen.
 
 **To do by hand**
-- Nothing.
+- Add yourself to the new team group: App Store Connect, the app, TestFlight, Internal
+  Testing, Team, Testers (+), tick yourself, Add. Apple's API refuses internal testers ("Tester(s)
+  cannot be assigned", even back into the old group), so until then your TestFlight gets
+  builds only through the public link.
+- The next production release deploys `main` to production (`./scripts/deploy.sh
+  production`): then set its gate too, `--newest ios=<the App Store's version>`, and a
+  minimum once the old versions should go.
 
 ## 1. What the operator asked for (verbatim)
 
@@ -275,6 +295,11 @@ Status: done (25 November 2026; its decisions in section 7).
   against "the old state, compatible with 1.0.5": it runs exactly 1.0.5's code (Cloudflare
   version 9226b0f0, deployed from 847b99b, whose files match the live ones byte for byte), so
   it was not deployed; it gets the gate with its next release.
+- **The team's group, carried over:** Apple's API made the new group and moved the builds, but
+  refused to put the one tester into it, and then also back into the old one (409 "Tester(s)
+  cannot be assigned"): internal testers are added on the website only. The old group was
+  deleted anyway (it had no tester left and was the one thing still getting production
+  builds), and docs/apps.md says the team's members are added on the website.
 - **Commit 4:** the asking and checking is one Node helper (`scripts/helpers/gate.mjs`), which
   talks to the person on stderr and hands the script two lines on stdout (the gate, and the
   minimum if it went up), so the typed phrase stays the scripts' one `confirm_phrase`. Only
