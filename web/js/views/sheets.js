@@ -1,6 +1,7 @@
 /**
- * The bottom sheets: settings (with a "?" explanation per setting), how to play, avatar
- * picker, invite (QR and share), and the confirmations for leaving, reporting a photo
+ * The bottom sheets: settings (with a "?" explanation per setting), how to play (with the
+ * quiet "⭐ Rate the game" link: the player's own choice, so a plain link to the store's
+ * review page, never a prompt), avatar picker, invite (QR and share), and the confirmations for leaving, reporting a photo
  * (opened by ⚑: the others wait while it is open, and Delete counts down to the room's own
  * deletion, `flagLeft` from `main.js`), removing a player, and "Is everyone here?" on the
  * last player's phone before their Yes starts a group's first game.
@@ -51,7 +52,18 @@ function settingsBody(c) {
   return { list: rows, footer: '<button class="btn bg-green text-navy" data-act="close">Done</button>' };
 }
 
-function helpBody() {
+/**
+ * "⭐ Rate the game" under "Got it", for whoever wants to rate on their own (`c.rateLink`,
+ * `reviewLink` for this phone, or none: then nothing shows). A link, not a prompt: no
+ * question, nothing offered, nothing about the player's mood, and it never shows by itself,
+ * only in the sheet the player opened; its line says the one real reason a rating matters
+ * for a free game without ads. It opens the store, like the legal link opens the browser.
+ */
+const rateLink = (link) => (link
+  ? `<div class="link underline"><a href="${esc(link)}" target="_blank" rel="noopener">⭐ Rate the game</a></div><p class="-mt-2 text-center text-xs text-muted">It helps other groups find it.</p>`
+  : '');
+
+function helpBody(c) {
   return `${title('How to play')}
   ${steps([
     ['📱', `Everyone opens ${esc(APP.name)} on their phone.`],
@@ -62,6 +74,7 @@ function helpBody() {
     ['🗑️', 'Each photo is deleted right after its round.'],
   ])}
   <button class="btn bg-coral text-white" data-act="close">Got it</button>
+  ${rateLink(c.rateLink)}
   <div class="link underline">${legalLink()}</div>`;
 }
 
@@ -127,7 +140,7 @@ export function sheetScreen(c) {
   const inRoom = Boolean(c.view && c.view.me);
   const bodies = {
     settings: () => settingsBody(c),
-    help: helpBody,
+    help: () => helpBody(c),
     avatar: () => avatarBody(c),
     invite: () => (inRoom ? inviteBody(c) : ''),
     leave: () => LEAVE,

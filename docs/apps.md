@@ -8,7 +8,7 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 
 | What | Android | iPhone |
 |---|---|---|
-| The app's own plugin `Phone` (photo access, random previews, a photo in its upload size, from iCloud only when asked, settings page, screen on) | `android/app/src/main/java/com/hivedone/whoshotit/PhonePlugin.java` | `ios/App/App/PhonePlugin.swift` |
+| The app's own plugin `Phone` (photo access, random previews, a photo in its upload size, from iCloud only when asked, settings page, screen on, the store's own rating window) | `android/app/src/main/java/com/hivedone/whoshotit/PhonePlugin.java` | `ios/App/App/PhonePlugin.swift` |
 | Registering it | `MainActivity.java` | `MainViewController` in `PhonePlugin.swift`, used by `SceneDelegate.swift` |
 | Permissions, invite links `whoshotit://join/<CODE>`, portrait only | `AndroidManifest.xml` | `Info.plist` |
 | Privacy manifest | (none on Android) | `PrivacyInfo.xcprivacy` |
@@ -25,9 +25,18 @@ step; only its stylesheet is built (`scripts/helpers/styles.sh`), which
 The two `PhonePlugin` files are twins: a change to one is made to the other in the same
 commit, and `web/js/phone.js` documents the methods both offer.
 
+**The store's rating window** (`requestReview`, asked at the moment `web/js/review.js`
+picks): StoreKit's on the iPhone, Google Play's In-App Review card on Android, the one
+library not from Capacitor (pinned in `android/app/build.gradle`, approved in AGENTS.md
+§7, notice in `web/vendor/google-play-review.LICENSE.txt`). Neither tells the app whether it
+showed. To see it: an iPhone build from Xcode (`./scripts/dev.sh ios`) usually shows it every
+time (Apple's development mode), TestFlight never does; on Android it shows only in an app
+installed from Google Play (the internal testing track), and a build from this Mac completes
+silently.
+
 **Changes made to Capacitor's generated projects:** Android minimum version 10 (API 29,
-for the photo decoder), no cloud backups, no FileProvider, no Google services, no template
-tests; iPhone only (runs scaled on iPads), portrait only, at least iOS 15.4 (the stylesheet
+for the photo decoder), no cloud backups, no FileProvider, no Google services but the
+rating window's library (above), no template tests; iPhone only (runs scaled on iPads), portrait only, at least iOS 15.4 (the stylesheet
 needs cascade layers; phones on older iOS keep the last version that ran there). `npx cap sync` (run by the build
 script) copies `web/` in and updates the plugin lists; it never undoes these changes.
 

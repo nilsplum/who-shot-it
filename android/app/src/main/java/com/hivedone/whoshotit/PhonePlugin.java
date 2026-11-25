@@ -1,7 +1,7 @@
 /*
  * The app's own native plugin "Phone" on Android: photo access, random previews to choose
- * from and the chosen photos for upload, the app's page in the phone's settings, and keeping
- * the screen on. JavaScript reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js`
+ * from and the chosen photos for upload, the app's page in the phone's settings, keeping the
+ * screen on, and Google Play's own rating card. JavaScript reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js`
  * documents every method; the iPhone twin is `ios/App/App/PhonePlugin.swift`).
  *
  * Invariants:
@@ -20,6 +20,9 @@
  * - Slow work (decoding and shrinking) runs on the plugin's own threads, never on
  *   Capacitor's single plugin thread or the UI thread, so one slow photo never blocks
  *   the next call.
+ * - The rating card is Google Play's own (In-App Review, the one library that is not
+ *   Capacitor's, android/app/build.gradle): Google alone decides whether it shows and never
+ *   says, so `requestReview` answers with nothing in every case, also without Google Play.
  */
 package com.hivedone.whoshotit;
 
@@ -48,6 +51,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import com.google.android.play.core.review.ReviewManager;
+import com.google.android.play.core.review.ReviewManagerFactory;
 import java.io.ByteArrayOutputStream;
 import java.util.HashSet;
 import java.util.Locale;
@@ -276,5 +281,27 @@ public class PhonePlugin extends Plugin {
             else getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             call.resolve();
         });
+    }
+
+    /**
+     * Asks Google Play for its rating card over the app: first the review flow's ticket, then
+     * the card itself. Google shows it by its own quota and only for an app installed from
+     * Google Play (a build from the computer completes silently), and never tells the app, so
+     * this resolves with nothing once the flow is done or has failed.
+     */
+    @PluginMethod
+    public void requestReview(PluginCall call) {
+        try {
+            ReviewManager manager = ReviewManagerFactory.create(getContext());
+            manager.requestReviewFlow().addOnCompleteListener(ticket -> {
+                if (!ticket.isSuccessful() || getActivity() == null) {
+                    call.resolve();
+                    return;
+                }
+                manager.launchReviewFlow(getActivity(), ticket.getResult()).addOnCompleteListener(flow -> call.resolve());
+            });
+        } catch (Exception e) {
+            call.resolve();
+        }
     }
 }

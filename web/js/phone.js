@@ -1,9 +1,9 @@
 /**
  * Everything the app needs from the phone, in one place: photo access, random previews
- * and the chosen photos, keeping the screen on and opening the app's settings (the app's
- * own native plugin `Phone`, `docs/apps.md`), the share sheet, invite links, the Android
- * back button and vibration (Capacitor's official App, Share and Haptics plugins), and
- * where the server is.
+ * and the chosen photos, keeping the screen on, opening the app's settings and the store's
+ * own rating window (the app's own native plugin `Phone`, `docs/apps.md`), the share sheet,
+ * invite links, the Android back button and vibration (Capacitor's official App, Share and
+ * Haptics plugins), which platform it runs on, and where the server is.
  *
  * Mechanisms: inside the store apps Capacitor injects `window.Capacitor` with a proxy per
  * native plugin. The same page opened in a plain browser has no `Phone` plugin: it is the
@@ -26,6 +26,9 @@ const plugin = (name) => (typeof window !== 'undefined' && window.Capacitor && w
 
 /** True inside the store apps (and the tests' fake of them): this page can play. */
 export const inApp = () => Boolean(plugin('Phone'));
+
+/** 'ios' or 'android' inside the store apps, 'web' in a plain browser: Capacitor's own answer. */
+export const platform = () => (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'web');
 
 /** Where the API, the room sockets and the photos are, seen from a page at `origin`. */
 export function serverOrigin(origin = location.origin) {
@@ -103,6 +106,18 @@ export function openSettings() {
 export function keepAwake(on) {
   const phone = plugin('Phone');
   if (phone) phone.keepAwake({ on }).catch(() => {});
+}
+
+/**
+ * Asks the phone for the store's own rating window (`requestReview`: StoreKit's on the
+ * iPhone, Google Play's In-App Review card on Android), at the moment `review.js` picks.
+ * Fire and forget: the phone alone decides whether it shows, and the plugin answers with
+ * nothing either way (also when the store is missing or fails), so there is nothing to wait
+ * for or to tell the player. Nothing without the plugin.
+ */
+export function askForRating() {
+  const phone = plugin('Phone');
+  if (phone && typeof phone.requestReview === 'function') phone.requestReview().catch(() => {});
 }
 
 // ---------- Vibration ----------

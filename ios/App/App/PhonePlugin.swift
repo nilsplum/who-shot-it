@@ -1,6 +1,6 @@
 // The app's own native plugin "Phone" on iPhone: photo access, random previews to choose
-// from and the chosen photos for upload, the app's page in Settings, and keeping the screen
-// on. JavaScript reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js`
+// from and the chosen photos for upload, the app's page in Settings, keeping the screen on,
+// and the App Store's own rating window. JavaScript reaches it as `window.Capacitor.Plugins.Phone` (`web/js/phone.js`
 // documents every method; the Android twin is
 // `android/app/src/main/java/com/hivedone/whoshotit/PhonePlugin.java`).
 //
@@ -24,9 +24,12 @@
 //   outside the app's "Continue" step.
 // - Slow work runs on the plugin's own concurrent queue, never on Capacitor's serial plugin
 //   queue or the main thread, so one slow photo never blocks the next call.
+// - The rating window is StoreKit's own: iOS alone decides whether it shows and never says,
+//   so `requestReview` answers with nothing in every case.
 
 import Capacitor
 import Photos
+import StoreKit
 import UIKit
 
 @objc(PhonePlugin)
@@ -40,6 +43,7 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "photo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "keepAwake", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestReview", returnType: CAPPluginReturnPromise),
     ]
 
     private let work = DispatchQueue(label: "com.hivedone.whoshotit.photos", qos: .userInitiated, attributes: .concurrent)
@@ -204,6 +208,25 @@ public class PhonePlugin: CAPPlugin, CAPBridgedPlugin {
         let on = call.getBool("on") ?? false
         DispatchQueue.main.async {
             UIApplication.shared.isIdleTimerDisabled = on
+            call.resolve()
+        }
+    }
+
+    /// Asks iOS for its rating window ("Enjoying Who Shot It?") over the scene the player sees.
+    /// iOS shows it at most three times in 365 days per person, never in TestFlight and usually
+    /// always in a build from Xcode; it never tells the app, so this resolves with nothing.
+    /// StoreKit's call belongs on the main thread; iOS 16 brought `AppStore.requestReview`,
+    /// 15.4 and 15.x keep `SKStoreReviewController`.
+    @objc func requestReview(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            let active = UIApplication.shared.connectedScenes.first { $0.activationState == .foregroundActive }
+            if let scene = active as? UIWindowScene {
+                if #available(iOS 16.0, *) {
+                    AppStore.requestReview(in: scene)
+                } else {
+                    SKStoreReviewController.requestReview(in: scene)
+                }
+            }
             call.resolve()
         }
     }

@@ -54,8 +54,15 @@ to date with every commit.
   loads (its hand turning, its outer ring filling in white as the group's photos come in, no
   words), then counts 3-2-1 on the same frame. App only, nothing to deploy. To try on the
   phones: a start on a slow network (commit 8's list).
-- Next: commits 7 (the rating) and 8 (the release), then the merge into `main` (The branch
-  and the merge, above).
+- Commit 7: after a close game, from the group's 3rd game in its room, every phone still on
+  the results asks for the store's own rating window 2 s after the podium's story, once per
+  app start; "How to play" has the quiet "⭐ Rate the game" link (App Store write-review page;
+  on Android once `STORES.android` is set). Native on both phones (the twins compile on this
+  Mac); on Android Google's In-App Review library 2.0.2, the one approved exception to the
+  open-source rule. The legal page changed (one privacy sentence, "Licences", the date): it
+  goes live with the next deploy, the app asks for the terms again with 1.0.9 anyway. To try:
+  to do 3.
+- Next: commit 8 (the release), then the merge into `main` (The branch and the merge, above).
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -940,7 +947,7 @@ observation), `test/unit/countdown.test.js`.
 
 ### Commit 7: rating: the phone's own window after a close game from the group's 3rd game, and a quiet link
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `web/js/phone.js`, `main.js` (`startPodium`), `web/js/podium.js`, `views/end.js`,
 `views/sheets.js`, `web/shared/config.js` (`STORES`, `SCORING`), `ios/App/App/PhonePlugin.swift`,
@@ -1195,3 +1202,38 @@ Status: planned.
   run, like the others.
 - **The countdown draft's "Film leader, in the app"** shows the loading during its lead (the
   ring filling over 0.3 s) instead of an empty cover, so it plays what the app plays.
+
+**25 November 2026, commit 7 (the rating)**
+
+- **Google's library is `com.google.android.play:review` 2.0.2** (the current release, from
+  Google's Maven repository). It brings three Google pieces with it: Play Core Common 2.0.4
+  (the same Play Core terms) and Google Play services Basement 18.4.0 and Tasks 18.2.0 (the
+  Android Software Development Kit License). All four are named in
+  `web/vendor/google-play-review.LICENSE.txt` and in one line on the legal page. Google states
+  that these Play services libraries collect no end-user data, and that a rating given in the
+  card is the player's own review on Google Play; so the Data safety answers, the iPhone's
+  privacy label and the privacy manifest stay as they are, and the privacy policy gets the one
+  sentence planned ("The app stores").
+- **A close game needs a winner with points**: a 0 to 0 end is a tie by the numbers but no
+  moment players are happy about.
+- **The rule reads the view of the moment it asks** (2 s after the story), and asks only while
+  that phone still shows the same end screen (the same room, phase 'end' or still on its
+  results); the wait holds nothing.
+- **The review link is computed once at the start** (`RATE_LINK` in main.js, from
+  `reviewLink(platform())`) and reaches "How to play" through `context()`, so the views never
+  ask the phone anything.
+- **Swift**: `Task { @MainActor in … }` around StoreKit's call, which is main-actor isolated;
+  `AppStore.requestReview(in:)` from iOS 16, `SKStoreReviewController.requestReview(in:)` on
+  15.4 to 15.x, the scene the player sees. **Java**: the review flow's ticket, then the card;
+  every path resolves, also without Google Play.
+- **Both twins were compiled on this Mac** (Xcode 26.6 for the iPhone simulator, Gradle's Java
+  compile with the library downloaded); nothing native has an automated test, so the window
+  itself is tried by hand (Operator handoff, to do 3).
+- **No end-to-end test plays three games** to reach a rating (over a minute more per run): the
+  unit tests hold the rule (close, the 3rd game, once per app start), the e2e test that a first
+  game never asks, and that "How to play" shows the App Store's write-review link (the fake
+  phone says it is an iPhone).
+- **"How to play" on the smallest phone** now scrolls a little (the legal link sits just below
+  the fold inside the sheet), as a long sheet does; on usual phones everything fits.
+- **The legal page's date moves to 25 November 2026** (`LEGAL.version`); 1.0.9 shows the terms
+  once more anyway, as every new version does.

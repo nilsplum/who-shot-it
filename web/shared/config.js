@@ -59,7 +59,7 @@ export const SERVER = {
  * (pinned by a test). `minAge` is also the age set in both stores.
  */
 export const LEGAL = {
-  version: '2026-11-22',
+  version: '2026-11-25',
   minAge: 16,
 };
 
@@ -93,6 +93,18 @@ export const STORES = {
   android: null,
   ios: 'https://apps.apple.com/app/id6837810354',
 };
+
+/**
+ * Where a player writes a review on their own ("⭐ Rate the game" in "How to play",
+ * `views/sheets.js`), by platform (`phone.platform`): on the iPhone the App Store's
+ * write-review page (Apple's documented `action=write-review`), on Android the Google Play
+ * page; null while that store has no public page (`STORES`) and in a plain browser.
+ */
+export function reviewLink(platform) {
+  if (platform === 'ios') return STORES.ios ? `${STORES.ios}?action=write-review` : null;
+  if (platform === 'android') return STORES.android;
+  return null;
+}
 
 /**
  * Avatars a player can pick: a curated set, so every group finds different ones (the picker

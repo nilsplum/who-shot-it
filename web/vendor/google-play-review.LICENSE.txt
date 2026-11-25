@@ -1,0 +1,22 @@
+Google Play In-App Review, in the Android app only (not loaded by web pages, not in the iPhone
+app), unmodified, from Google's Maven repository (https://maven.google.com). It shows Google
+Play's own rating card (https://developer.android.com/guide/playcore/in-app-review).
+
+- com.google.android.play:review 2.0.2
+- com.google.android.play:core-common 2.0.4 (needed by review)
+- com.google.android.gms:play-services-basement 18.4.0 (needed by review)
+- com.google.android.gms:play-services-tasks 18.2.0 (needed by review)
+
+Copyright Google LLC. Not open source.
+
+review and core-common: Play Core Software Development Kit Terms of Service,
+https://developer.android.com/guide/playcore/license (Google allows copying and distributing
+it as part of an app, without changing it).
+
+play-services-basement and play-services-tasks: Android Software Development Kit License,
+https://developer.android.com/studio/terms
+
+Google states that these Google Play services libraries collect no end-user data
+(https://developers.google.com/android/guides/play-data-disclosure); a rating a player gives
+in the card goes to Google Play as a public review
+(https://developer.android.com/guide/playcore/in-app-review, Data Safety).

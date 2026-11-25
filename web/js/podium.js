@@ -6,7 +6,8 @@
  *
  * Mechanisms: main.js `startPodium` calls `playPodium` once per game end (`session.shown`),
  * in the same task as the end screen (views/end.js) is painted in its final state, so no
- * frame shows the end first. It covers every place (`data-covered`: an orb where its
+ * frame shows the end first. It resolves when the story has ended (or the end screen is
+ * gone), the moment main.js counts the rating's pause from (`review.js`). It covers every place (`data-covered`: an orb where its
  * player stands, the player hidden, its block dimmed) and hides the facts, the ranking and
  * "Play again" (`data-playing`). The orbs pop in, third first. Then each place in turn:
  * its orb fills in a few jumps (`--charge` turns its ring, `--fill` brightens its block),

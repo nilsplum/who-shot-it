@@ -30,6 +30,10 @@
  *   `reveal.js`, `board.js` or `podium.js` play the story over it once (`session.shown`), so
  *   a repaint or a reconnect never plays it again or cuts it. Their sparks and fireworks
  *   (`sparks.js`) end the moment another screen is painted.
+ * - The rating: once the podium's story of a close game from the group's 3rd game has ended,
+ *   every phone still on those results asks the phone for the store's own rating window
+ *   (`startPodium`, `review.js`, `phone.askForRating`), at most once while the app runs. "How
+ *   to play" carries a quiet link to the store's review page instead (`RATE_LINK`).
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
@@ -81,7 +85,7 @@
  */
 
 import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
+import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, reviewLink, termsToken } from '../shared/config.js';
 import { makeId, shuffle } from '../shared/random.js';
 import { createRoom, uploadPhotos } from './api.js';
 import { playBoard } from './board.js';
@@ -89,10 +93,11 @@ import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { cut, nextNumberIn, onTheClock } from './countdown.js';
 import { startEffect, stopEffects } from './effects.js';
-import { askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, share } from './phone.js';
+import { askForRating, askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, platform, share } from './phone.js';
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
 import { playReveal } from './reveal.js';
+import { RATING, rateNow } from './review.js';
 import { fitNudge, nudgeAt, nudgeTrack, startsWith } from './nudge.js';
 import { createPainter } from './render.js';
 import { clearSparks } from './sparks.js';
@@ -137,6 +142,8 @@ let flagTimer = null;
 let counting = false;
 /** The paint due on the 3-2-1's next second (`paintStart`). */
 let nextNumber = 0;
+/** This phone's store page for writing a review ("How to play"), or null (`reviewLink`); the platform never changes while the app runs. */
+const RATE_LINK = reviewLink(platform());
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -184,7 +191,7 @@ function startShare(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view, flagLeft: clock.left(flagTimer), nudge: nudgeAt(session.view, session.nudge, performance.now()) };
+  return { device, session, view: session.view, flagLeft: clock.left(flagTimer), nudge: nudgeAt(session.view, session.nudge, performance.now()), rateLink: RATE_LINK };
 }
 
 function screen() {
@@ -263,7 +270,11 @@ function startReveal() {
 /**
  * The podium's reveal, once per game end (`session.shown`): `podium.js` plays it over the
  * end screen just painted in its final state (`views/end.js`), in the same task as the
- * paint. Reduce Motion, or an end screen already shown, keeps the final state.
+ * paint. Reduce Motion, or an end screen already shown, keeps the final state. When the
+ * story has ended (at once without it), `RATING.afterMs` later, the phone asks for the
+ * store's rating window if `review.js` says this is the moment; the wait holds nothing: it
+ * reads the view of that moment, and asks only while this phone still shows the same end
+ * screen (not after "Play again" or leaving).
  */
 function startPodium() {
   const v = session.view;
@@ -271,8 +282,12 @@ function startPodium() {
   const screenEl = $('app').firstElementChild;
   if (!screenEl || session.shown.has(key)) return;
   session.shown.add(key);
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  playPodium(screenEl, buzz);
+  const story = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? Promise.resolve() : playPodium(screenEl, buzz);
+  story.then(() => setTimeout(() => {
+    const now = session.view;
+    const onEnd = now && now.me && now.code === v.code && (now.phase === 'end' || now.me.onResults);
+    if (onEnd && rateNow(now)) askForRating();
+  }, RATING.afterMs));
 }
 
 /**

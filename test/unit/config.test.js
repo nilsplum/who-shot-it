@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import {
-  APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SERVER, SETTINGS, SETTINGS_DEFAULTS, isRoomCode, normalizeSetting, normalizeSettings, presetOf,
+  APP, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SERVER, SETTINGS, SETTINGS_DEFAULTS, STORES, isRoomCode, normalizeSetting, normalizeSettings, presetOf, reviewLink,
 } from '../../web/shared/config.js';
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
@@ -93,6 +93,12 @@ describe('avatars and reactions', () => {
       expect(newer, file).toEqual([]);
     }
   });
+});
+
+test('a player reviews on the iPhone\'s write-review page, on Google Play once it has a page, and nowhere in a browser', () => {
+  expect(reviewLink('ios')).toBe(STORES.ios ? `${STORES.ios}?action=write-review` : null);
+  expect(reviewLink('android')).toBe(STORES.android);
+  expect(reviewLink('web')).toBe(null);
 });
 
 test('room codes use only the unambiguous alphabet', () => {

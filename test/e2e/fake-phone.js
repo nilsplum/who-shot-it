@@ -5,9 +5,11 @@
  * asks, like a player tapping "Allow all" on a real phone. A stand-in for Capacitor's
  * Haptics plugin writes down what the phone would feel (`window.felt`: an impact's
  * strength, or a vibration as "120 ms"), and every big version the app asks for
- * (`window.pulled`, with its `download` switch) and how many previews it was handed
- * (`window.previewed`). Everything else of the app (screens, sockets, uploads, server) is
- * the real thing.
+ * (`window.pulled`, with its `download` switch), how many previews it was handed
+ * (`window.previewed`) and how often the app asked for the store's rating window
+ * (`window.rated`). It says it is an iPhone (Capacitor's `getPlatform`), so "How to play"
+ * shows the App Store's review link. Everything else of the app (screens, sockets, uploads,
+ * server) is the real thing.
  *
  * By default the stand-in is instant and its photos are tiny, which keeps the game tests
  * quick. The speed test (`speed.spec.js`) makes it behave like a real phone instead
@@ -81,12 +83,14 @@ export function installFakePhone({ photos, size = photos.length, preview = null,
   /** Every big version the app asked for, and whether it allowed a download: { id, download }. */
   window.pulled = [];
   window.previewed = 0;
+  window.rated = 0;
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const library = Array.from({ length: size }, (_, i) => {
     const p = photos[i % photos.length];
     return { id: `photo-${i + 1}`, data: typeof p === 'string' ? p : p.data, screenshot: Boolean(p.screenshot), inCloud: Boolean(cloud) && (i + 1) % cloud.every === 0 };
   });
   window.Capacitor = {
+    getPlatform: () => 'ios',
     Plugins: {
       Phone: {
         photoAccess: async () => ({ access }),
@@ -112,6 +116,9 @@ export function installFakePhone({ photos, size = photos.length, preview = null,
         },
         openSettings: async () => {},
         keepAwake: async () => {},
+        requestReview: async () => {
+          window.rated += 1;
+        },
       },
       Haptics: {
         impact: async ({ style }) => {

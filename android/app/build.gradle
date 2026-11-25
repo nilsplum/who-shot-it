@@ -2,6 +2,7 @@
 // versionName is "1.2.3", versionCode 10203, so every release counts up. Release builds
 // are signed by ./scripts/release-apps.sh with the upload key from secrets/ (passed in as
 // Android Studio's own "injected signing" properties, so no password is stored here).
+// Its one library that is not Capacitor's is Google Play's In-App Review (below).
 apply plugin: 'com.android.application'
 
 def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
@@ -43,6 +44,12 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
+    // Google Play's own rating card (PhonePlugin.requestReview), the only way an app may show
+    // it. Google's Play Core SDK terms: free to ship, not to change; approved by the operator as
+    // the one exception to the open-source rule (AGENTS.md, Third-Party Services). It brings
+    // Play Core Common and Google Play services Basement and Tasks with it; all four are named in
+    // web/vendor/google-play-review.LICENSE.txt and on the legal page. Pinned exactly.
+    implementation "com.google.android.play:review:2.0.2"
 }
 
 apply from: 'capacitor.build.gradle'

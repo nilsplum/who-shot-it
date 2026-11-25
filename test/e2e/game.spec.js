@@ -10,7 +10,8 @@
  * Delete), five rounds with their reveals (played step by step, the verdict felt) and
  * leaderboards (one ending in the new order with the medal on the leader, "Show again" held on
  * one phone and seen on another, FINAL ROUND before the last photo), the podium's
- * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
+ * reveal (third, second, first, then "Play again"; a group's first game asks for no rating),
+ * "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. A slow phone:
  * the start waits in its film leader for its photos still on their way (the ring shows how
  * far, no words), and a leaderboard waits for it to load the next photos. The room-wide "Is everyone here?" as
@@ -22,7 +23,7 @@
  * their arrow pages through (turning at each end), and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
  * swaps (the turn to the swaps left, ✕ at none, a refused tap), the hold and "No →"'s slide
- * in the photo choice, the terms
+ * in the photo choice ("How to play" explaining them, with its quiet "⭐ Rate the game"), the terms
  * after an update, and the website (the same page in a plain browser): invite page and
  * legal page.
  */
@@ -30,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { LIMITS, REACTIONS, STORES } from '../../web/shared/config.js';
+import { RATING } from '../../web/js/review.js';
 import { addBots } from './bots.js';
 import { library, newPhone } from './fake-phone.js';
 
@@ -267,6 +269,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
   // and the winner (each a heavy thud), and only then does "Play again" appear.
   await expect(host.getByRole('button', { name: 'Play again' })).toBeVisible();
   expect(await host.evaluate(() => window.revealed)).toEqual([['3', 'MEDIUM'], ['2', 'HEAVY'], ['1', 'HEAVY']]);
+  // A group's first game asks for no rating, however close (the store's window waits for its
+  // 3rd game, web/js/review.js): nothing a moment after the story, still on the results.
+  await host.waitForTimeout(RATING.afterMs + 500);
+  expect(await host.evaluate(() => window.rated)).toBe(0);
   // Play again is everyone's: a guest opens the next game, the others keep their results
   // until they join it, and the lobby quietly says who it is waiting on.
   await guests[0].getByRole('button', { name: 'Play again' }).click();
@@ -587,6 +593,13 @@ test('choosing photos: a tap swaps one and shows the swaps left (✕ at none), a
   await phone.getByRole('button', { name: 'Continue' }).click();
   const tiles = phone.locator('[data-act="swap"]');
   await expect(tiles).toHaveCount(4);
+  // "How to play" explains the swap and the hold in one line, and offers the App Store's own
+  // review page in a quiet link (this phone is an iPhone), never a prompt.
+  await phone.getByRole('button', { name: 'How to play' }).click();
+  await expect(phone.getByText('Tap a photo to swap just that one. Hold it to see it big.')).toBeVisible();
+  await expect(phone.getByRole('link', { name: '⭐ Rate the game' })).toHaveAttribute('href', `${STORES.ios}?action=write-review`);
+  await expect(phone.getByText('It helps other groups find it.')).toBeVisible();
+  await phone.getByRole('button', { name: 'Got it' }).click();
   // Big versions are prepared ahead for photos still waiting in the bucket, only from what
   // the phone stores (no download); the set on screen may download.
   await expect.poll(() => phone.evaluate(() => window.pulled.some((p) => p.download === false))).toBe(true);
