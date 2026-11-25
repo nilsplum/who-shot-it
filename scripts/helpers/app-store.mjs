@@ -1,10 +1,18 @@
 /**
- * Talks to App Store Connect through its API, so a release needs no clicking:
- *   node scripts/helpers/app-store.mjs status       builds, TestFlight beta check, public link, versions
- *   node scripts/helpers/app-store.mjs submit       fills the App Store page and sends it to App Review
- *   node scripts/helpers/app-store.mjs testflight   puts this version's build on the public TestFlight link (also part of submit)
- *   node scripts/helpers/app-store.mjs withdraw     takes the version in App Review back, to send a newer build
- * `./scripts/release-apps.sh ios --submit` runs `submit --wait` right after the upload.
+ * Talks to App Store Connect through its API, so a release needs no clicking. Run only by
+ * `./scripts/release-apps.sh` (the one way to use it), which checks the environment and asks
+ * for the typed confirmations first:
+ *   status                     the newest builds with their environment, TestFlight, versions (release-apps.sh status)
+ *   uploaded <environment>     exit 0 when this version's build for that environment is in App
+ *                              Store Connect, 10 when not (release-apps.sh asks before it builds)
+ *   testflight <environment>   puts that build on the public TestFlight link (a staging upload; also part of submit)
+ *   submit                     fills the App Store page and sends the production build to App Review
+ *   withdraw                   takes the version in App Review back, to send a newer build (release-apps.sh withdraw)
+ * `--wait`: the build was just uploaded, so wait until Apple has processed it.
+ *
+ * Builds are found by their number, which carries the environment (`buildNumber` in
+ * web/shared/config.js: 1.0.9 is 100090 for staging, 100091 for production), so `submit`
+ * can only ever attach a production build to the App Store version.
  *
  * `submit` takes the iPhone listing from `listing.mjs` (LISTINGS.ios and IMAGES.ios, from
  * `store/android_ios_listing.js`, `store/ios_listing.js` and `store/images/ios_*`): every
@@ -33,16 +41,25 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { LEGAL } from '../../web/shared/config.js';
+import { ENVIRONMENTS, LEGAL, buildNumber } from '../../web/shared/config.js';
 import { IMAGES, LISTINGS, problems } from './listing.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const BUNDLE_ID = JSON.parse(read('capacitor.config.json')).appId;
 const VERSION = JSON.parse(read('package.json')).version;
-const BUILD = String(VERSION.split('.').map(Number).reduce((n, part, i) => n + part * [10000, 100, 1][i], 0));
-/** `--wait`: the build was just uploaded, so wait until Apple has processed it. */
+const [command, named] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+/** The environment of the build this run is about: App Review only ever gets production's. */
+const ENVIRONMENT = command === 'submit' ? 'production' : named;
+const BUILD = ENVIRONMENTS[ENVIRONMENT] ? String(buildNumber(VERSION, ENVIRONMENT)) : null;
 const WAIT = process.argv.includes('--wait');
+
+/** The environment a build number was made for; builds before environments had a digit (10007 and lower) were all production. */
+function environmentOf(number) {
+  const n = Number(number);
+  if (n < 100000) return 'production, before staging';
+  return Object.keys(ENVIRONMENTS).find((name) => ENVIRONMENTS[name].build === n % 10) || 'unknown';
+}
 /** Everything the iPhone store gets (store/android_ios_listing.js and store/ios_listing.js). */
 const listing = LISTINGS.ios;
 const contact = listing.reviewContact;
@@ -97,7 +114,7 @@ async function status() {
     const detail = builds.included.find((x) => x.type === 'buildBetaDetails' && x.id === b.relationships.buildBetaDetail.data.id);
     const version = builds.included.find((x) => x.type === 'preReleaseVersions' && x.id === b.relationships.preReleaseVersion.data.id);
     const review = (await get(`/v1/betaAppReviewSubmissions?filter[build]=${b.id}`)).data[0];
-    console.log(`  build ${version.attributes.version} (${b.attributes.version}): ${b.attributes.processingState}, TestFlight internal ${detail.attributes.internalBuildState}, external ${detail.attributes.externalBuildState}${review ? `, beta check ${review.attributes.betaReviewState}` : ''}`);
+    console.log(`  build ${version.attributes.version} (${b.attributes.version}, ${environmentOf(b.attributes.version)}): ${b.attributes.processingState}, TestFlight internal ${detail.attributes.internalBuildState}, external ${detail.attributes.externalBuildState}${review ? `, beta check ${review.attributes.betaReviewState}` : ''}`);
   }
   for (const g of (await get(`/v1/apps/${app.id}/betaGroups`)).data) {
     const a = g.attributes;
@@ -125,9 +142,9 @@ const AGE_RATING = {
 };
 
 /**
- * The uploaded build of this version (BUILD, from package.json) once Apple has processed it,
- * which takes about 15 minutes. Right after an upload (`--wait`) it waits for it (at most
- * 40 minutes, asking once a minute); otherwise it stops with the reason.
+ * The uploaded build of this version for this run's environment (BUILD) once Apple has
+ * processed it, which takes about 15 minutes. Right after an upload (`--wait`) it waits for
+ * it (at most 40 minutes, asking once a minute); otherwise it stops with the reason.
  */
 async function findBuild(app) {
   let builds = [];
@@ -137,8 +154,16 @@ async function findBuild(app) {
     if (minute === 0) console.log(`… waiting for Apple to process build ${BUILD}`);
     await new Promise((resolve) => setTimeout(resolve, 60_000));
   }
-  if (!builds.length) throw new Error(`Build ${VERSION} (${BUILD}) is not uploaded or not processed yet: ./scripts/release-apps.sh ios, then wait about 15 minutes.`);
+  if (!builds.length) throw new Error(`Build ${VERSION} (${BUILD}, ${ENVIRONMENT}) is not uploaded or not processed yet: ./scripts/release-apps.sh ${ENVIRONMENT} ios, then wait about 15 minutes.`);
   return builds[0];
+}
+
+/** Whether this version's build for this run's environment was uploaded already (processed or not): exit 0 if so, 10 if not. */
+async function uploaded() {
+  const app = await findApp();
+  const found = (await get(`/v1/builds?filter[app]=${app.id}&filter[version]=${BUILD}`)).data[0];
+  console.log(found ? `Build ${VERSION} (${BUILD}, ${ENVIRONMENT}) is in App Store Connect (${found.attributes.processingState}).` : `Build ${VERSION} (${BUILD}, ${ENVIRONMENT}) is not uploaded yet.`);
+  process.exit(found ? 0 : 10);
 }
 
 async function appInfo(app) {
@@ -168,7 +193,7 @@ async function setVersion(app) {
   if (!version) {
     // Apple keeps one version on its way at a time: the next one starts once the last is live.
     const busy = versions.find((v) => !['READY_FOR_SALE', 'REMOVED_FROM_SALE', 'DEVELOPER_REMOVED_FROM_SALE', 'REPLACED_WITH_NEW_VERSION'].includes(v.attributes.appStoreState));
-    if (busy) throw new Error(`Version ${busy.attributes.versionString} is still with Apple (${busy.attributes.appStoreState}); a new one can follow once it is live, or take it back first with \`node scripts/helpers/app-store.mjs withdraw\`.`);
+    if (busy) throw new Error(`Version ${busy.attributes.versionString} is still with Apple (${busy.attributes.appStoreState}); a new one can follow once it is live, or take it back first: ./scripts/release-apps.sh withdraw`);
     // App Store Connect copies the texts and screenshots of the live version into the new one.
     version = (await api('POST', '/v1/appStoreVersions', { data: { type: 'appStoreVersions', attributes: { platform: 'IOS', versionString: VERSION }, relationships: { app: ref('apps', app.id) } } })).data;
   }
@@ -329,7 +354,7 @@ async function withdraw() {
   const open = (await get(`/v1/reviewSubmissions?filter[app]=${app.id}&filter[state]=WAITING_FOR_REVIEW,IN_REVIEW`)).data[0];
   if (!open) throw new Error('No version is waiting for or in App Review.');
   await patch('reviewSubmissions', open.id, { canceled: true });
-  console.log('✓ Taken back from App Review; `submit` sends the current version in its place.');
+  console.log('✓ Taken back from App Review; ./scripts/release-apps.sh production ios --submit sends the current version in its place.');
 }
 
 async function submit() {
@@ -347,13 +372,14 @@ async function submit() {
   await sendToTestFlight(app);
 }
 
-const command = process.argv[2];
 try {
+  if (['uploaded', 'testflight'].includes(command) && !BUILD) throw new Error(`${command} needs the environment: ${Object.keys(ENVIRONMENTS).join(' or ')}`);
   if (command === 'status') await status();
+  else if (command === 'uploaded') await uploaded();
   else if (command === 'submit') await submit();
   else if (command === 'testflight') await sendToTestFlight(await findApp());
   else if (command === 'withdraw') await withdraw();
-  else throw new Error('Use: node scripts/helpers/app-store.mjs status|submit|testflight|withdraw');
+  else throw new Error('Use ./scripts/release-apps.sh (it runs this with status, uploaded, testflight, submit or withdraw).');
 } catch (error) {
   console.error(`✗ ${error.message}`);
   process.exit(1);

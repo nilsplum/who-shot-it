@@ -1,12 +1,20 @@
 // The Android app's build. The version comes from package.json (the one place it is set):
-// versionName is "1.2.3", versionCode 10203, so every release counts up. Release builds
-// are signed by ./scripts/release-apps.sh with the upload key from secrets/ (passed in as
-// Android Studio's own "injected signing" properties, so no password is stored here).
+// versionName is "1.2.3". versionCode is the build number ./scripts/release-apps.sh passes in
+// (-PbuildNumber, `buildNumber` in web/shared/config.js: the version as a number times ten
+// plus the environment's digit, 102030 or 102031), so every upload counts up and says which
+// server it talks to; a release bundle made any other way refuses to build, so none can reach
+// Google Play by hand with the wrong number or server. A debug build (./scripts/dev.sh android)
+// needs no number. Release builds are signed by ./scripts/release-apps.sh with the upload key
+// from secrets/ (passed in as Android Studio's own "injected signing" properties, so no
+// password is stored here).
 // Its one library that is not Capacitor's is Google Play's In-App Review (below).
 apply plugin: 'com.android.application'
 
 def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
-def (major, minor, patch) = appVersion.tokenize('.').collect { it as int }
+def buildNumber = project.findProperty('buildNumber')
+if (buildNumber == null && gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {
+    throw new GradleException('Release builds come only from ./scripts/release-apps.sh staging|production android (it sets the build number and the server).')
+}
 
 android {
     namespace = "com.hivedone.whoshotit"
@@ -15,7 +23,7 @@ android {
         applicationId "com.hivedone.whoshotit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode major * 10000 + minor * 100 + patch
+        versionCode((buildNumber ?: '1') as int)
         versionName appVersion
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

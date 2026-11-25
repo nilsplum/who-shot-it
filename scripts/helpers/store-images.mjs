@@ -3,7 +3,7 @@
  * `ios_screenshot-*` and `android_screenshot-*`, at each store's size): each one a short
  * headline, one plain sentence and the matching app screen in a phone frame. The captions
  * and their order are the listing's (`screenshots` in store/android_ios_listing.js). Run by
- * `./scripts/release-apps.sh --store-images` when the app's look or a caption changes; the
+ * `./scripts/release-apps.sh staging|production --store-images` when the app's look or a caption changes; the
  * iPhone's are uploaded by `app-store.mjs`, the Android's by hand.
  *
  * The app screens are real: three phones play a game against a local server (its own

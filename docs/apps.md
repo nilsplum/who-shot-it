@@ -12,7 +12,7 @@ cannot do. The server (`src/`, Cloudflare) is the same for both.
 | Registering it | `MainActivity.java` | `MainViewController` in `PhonePlugin.swift`, used by `SceneDelegate.swift` |
 | Permissions, invite links `whoshotit://join/<CODE>`, portrait only | `AndroidManifest.xml` | `Info.plist` |
 | Privacy manifest | (none on Android) | `PrivacyInfo.xcprivacy` |
-| Version (from `package.json`) | `android/app/build.gradle` | passed in by `./scripts/release-apps.sh` |
+| Version (from `package.json`) and build number (its environment's, `buildNumber`) | `android/app/build.gradle`, the number passed in by `./scripts/release-apps.sh` | both passed in by `./scripts/release-apps.sh` |
 | Icons and launch screens | drawn from `web/icons/icon.svg` by `scripts/helpers/app-assets.mjs` | same |
 
 Official plugins: `@capacitor/app` (invite links, Android back button, resume),
@@ -47,29 +47,44 @@ needs `npx cap migrate` once and newer tools (Node 24, Xcode 27).
 
 ## Releasing
 
-**Every release:**
-1. Raise `"version"` in `package.json` (for example `1.0.0` to `1.0.1`) and `APP.version` in
-   `web/shared/config.js` to the same (a test checks it). The stores refuse a version
-   number twice, and every new version asks players to accept the terms once more.
-2. If the server changed: `./scripts/deploy.sh` first. Installed apps update slowly, so the
-   server must keep understanding the previous app version.
-3. `./scripts/release-apps.sh` (or `ios` / `android` only). It runs every test, builds,
-   signs and uploads:
-   - **iPhone:** to App Store Connect. About 15 minutes later the build is in TestFlight
-     for the team (install it on your iPhone with Apple's TestFlight app). With `--submit`
-     the script then fills in the App Store page from the listings in `store/` and sends the
-     version to App Review; it goes live by itself after approval. It also sends the build to
-     the public TestFlight link (the "Friends" group), which gets it after Apple's beta check
-     (usually within a day); `node scripts/helpers/app-store.mjs testflight` does only that,
-     so friends can play a version before it goes to App Review. `node
-     scripts/helpers/app-store.mjs status` shows where things stand (builds, TestFlight beta
-     check, review); `withdraw` takes a version Apple has not approved yet back, so
-     `--submit` can send a newer build in its place.
-   - **Android:** to Google Play, released on the production track: Google reviews it
-     (hours to a few days), then it goes live. `--android-track internal` releases to the
-     internal test track instead.
+Two deployed environments (`ENVIRONMENTS` in `web/shared/config.js`; README, Release):
+**staging** for the test builds, with its own server, rooms and photos, and **production**
+for the store apps. Every script names the one it is for; production comes only from a
+clean `main`, and what reaches people only after a typed confirmation (`--confirm
+"<phrase>"` gives it in advance). A build's number says which it is for: the version as a
+number times ten plus 0 (staging) or 1 (production), so 1.0.9 is 100090 or 100091.
 
-   `--no-upload` only builds (`dist/who-shot-it-<version>.aab`, `dist/ios/App.ipa`).
+**Trying a version (staging):**
+1. Raise `"version"` in `package.json` (for example `1.0.9` to `1.0.10`) and `APP.version` in
+   `web/shared/config.js` to the same (a test checks it). Each environment takes a version
+   once, and every new version asks players to accept the terms once more.
+2. If the server changed: `./scripts/deploy.sh staging`.
+3. `./scripts/release-apps.sh staging` (or `ios` / `android` only): every test, then the apps
+   built for staging. The iPhone app is in TestFlight for the team about 15 minutes later
+   (install it with Apple's TestFlight app) and on the public TestFlight link (the "Friends"
+   group) after Apple's beta check (usually within a day); the Android app is on Google
+   Play's internal test track.
+
+**Releasing it (production):**
+1. Merge into `main`.
+2. If the server changed: `./scripts/deploy.sh production` (it asks you to type "deploy to
+   production"). Installed apps update slowly, so the server must keep understanding the
+   app versions people still have.
+3. `./scripts/release-apps.sh production ios` uploads the store build to TestFlight's team:
+   try it against production (and record App Review's video with it, below). Then
+   `./scripts/release-apps.sh production ios --submit` fills in the App Store page from the
+   listings in `store/` and sends exactly that build to App Review (type "submit <version>
+   to App Review"); without the step before, it builds and uploads first. It goes live by
+   itself after approval, and the public TestFlight link gets it too.
+4. `./scripts/release-apps.sh production android` releases on Google Play's production track
+   (type "release <version> on Google Play"): Google reviews it (hours to a few days), then
+   it goes live.
+
+`./scripts/release-apps.sh status` shows where App Store Connect stands (the newest builds
+with their environment, TestFlight, App Review); `./scripts/release-apps.sh withdraw` takes a
+version Apple has not approved yet back, so `--submit` can send a newer build in its place.
+`--no-upload` only builds (`dist/who-shot-it-<version>-<environment>.aab`,
+`dist/ios/App.ipa`).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with
 Xcode 26 or newer (from April 2027 Apple accepts only builds made with Xcode 27 or newer,
@@ -97,16 +112,16 @@ Two settings have no API and are made by hand once: **App Privacy** (Apps, the a
 column App Privacy, Get Started: "Yes, we collect data", tick the data types of `privacy` in
 `store/ios_listing.js`, each for App Functionality only, not linked, no tracking, Publish)
 and the **EU trader status** (Business, Agreements, Compliance, Digital Services Act,
-Complete Compliance Requirements). Then `./scripts/release-apps.sh ios --submit` does the
-rest.
+Complete Compliance Requirements). Then `./scripts/release-apps.sh production ios --submit`
+does the rest.
 
 **App Review asks new apps for a screen recording** ("Guideline 2.1, Information Needed"):
 made on an iPhone with the TestFlight build, from launching the app through a whole game,
 including reporting a photo and removing a player; one phone and the test players are
 enough ([guides/demo-players.md](guides/demo-players.md), step by step). The answers to
 its other questions are the review notes in `store/ios_listing.js`. The video is
-`store/ios_review-video.mp4` (git-ignored); `node scripts/helpers/app-store.mjs submit`
-attaches it to every submission and sends a rejected version back to App Review.
+`store/ios_review-video.mp4` (git-ignored); `./scripts/release-apps.sh production ios
+--submit` attaches it to every submission and sends a rejected version back to App Review.
 
 **Google Play:** step by step in [guides/android.md](guides/android.md) (account, forms,
 the first upload by hand, the key for automatic uploads).

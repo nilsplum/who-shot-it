@@ -28,23 +28,32 @@ room, stored in the EU.
 | `./scripts/setup.sh` | Installs the pinned dependencies and the test browser. Run once and after dependency changes. |
 | `./scripts/test.sh` | All tests: unit + integration (inside the Workers runtime), then phone-sized browsers playing a full game with a stand-in photo library. `--no-e2e` skips the browsers. |
 | `./scripts/dev.sh [android\|ios\|store\|drafts]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. `store`: both store pages as players will see them, at `http://localhost:8788`. `drafts`: pick a draft to try out in the browser, at `http://localhost:8789`. |
-| `./scripts/deploy.sh` | Checks, runs every test, deploys the server to Cloudflare. |
-| `./scripts/release-apps.sh [android] [ios]` | Runs every test, builds the signed apps and uploads them to App Store Connect and Google Play; `--submit` also fills in the App Store page and sends it to App Review (`--no-upload`: only build into `dist/`). |
+| `./scripts/deploy.sh staging\|production` | Checks, runs every test, deploys the server to that environment on Cloudflare. Production only from a clean `main`, after typing "deploy to production". |
+| `./scripts/release-apps.sh staging\|production [ios] [android]` | Runs every test, builds the signed apps for that environment's server and uploads them: staging to TestFlight and Google Play's internal track, production to TestFlight's team and Google Play's production track; `--submit` sends the production iPhone version to App Review (`--no-upload`: only build into `dist/`). `status`: where App Store Connect stands. |
 
 Needs Node.js 22.12 or newer (`package.json`, `engines`); app builds need Android Studio
 (Android) or a Mac with Xcode 26+ (iPhone), see [docs/apps.md](docs/apps.md).
 
 ## Release
 
-**Server** (one time: `npx wrangler login` on the machine you deploy from): `./scripts/deploy.sh`.
-It refuses while a `TODO_OPERATOR:` value is left or the machine is not logged in, and
-deploys only if every test passes. Keep Cloudflare's cookie-setting extras (Bot Fight Mode,
-Web Analytics, Zaraz) off: the privacy policy promises no cookies and no analytics.
+**Three environments:** local (`./scripts/dev.sh`, the tests), **staging** (the test builds
+and their own server, rooms and photos) and **production** (the store apps everyone
+installs, the website). New work goes to staging first and to production once it is ready;
+production keeps understanding every app version people still have. Every script that
+reaches one names it, and production comes only from a clean `main`, after a typed
+confirmation (`--confirm "<phrase>"` gives it in advance).
 
-**Apps:** raise `"version"` in `package.json` and `APP.version` (a test keeps them equal),
-run `./scripts/release-apps.sh --submit`. It uploads both apps and sends them to review;
-both go live by themselves after approval. Store setup and the first release by hand:
-[docs/apps.md](docs/apps.md); everything the stores get (texts, images, form answers): `store/`.
+**Server** (one time: `npx wrangler login` on the machine you deploy from):
+`./scripts/deploy.sh staging` or `./scripts/deploy.sh production`. It refuses while a
+`TODO_OPERATOR:` value is left or the machine is not logged in, and deploys only if every
+test passes. Keep Cloudflare's cookie-setting extras (Bot Fight Mode, Web Analytics, Zaraz)
+off: the privacy policy promises no cookies and no analytics.
+
+**Apps:** raise `"version"` in `package.json` and `APP.version` (a test keeps them equal), then
+`./scripts/release-apps.sh staging` for TestFlight, and `./scripts/release-apps.sh
+production --submit` for the stores (the same version: its build number says which
+environment it is for). Store setup and the first release by hand: [docs/apps.md](docs/apps.md);
+everything the stores get (texts, images, form answers): `store/`.
 
 **The servers' addresses** are `ENVIRONMENTS` in `web/shared/config.js` (and `wrangler.jsonc`;
 a test keeps them in step): production `who-shot-it.<subdomain>.workers.dev`, staging

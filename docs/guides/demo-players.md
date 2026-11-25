@@ -48,9 +48,12 @@ App Review asks new apps for a screen recording made on a real iPhone ("Guidelin
 Information Needed"). It must start with opening the app and show the typical use,
 including reporting a photo and removing a player. What worked:
 
-1. **Before recording:** turn on a Focus mode (Do Not Disturb), so no banners or system
-   messages appear in the video. Delete the app and install it again from TestFlight, so
-   the terms screen shows: it appears only at the first start after installing.
+1. **Before recording:** upload the build that goes to App Review
+   (`./scripts/release-apps.sh production ios`, from `main`): in TestFlight it is the one whose
+   build number ends in 1, and it plays on the production server like the store app. Turn on a
+   Focus mode (Do Not Disturb), so no banners or system messages appear in the video. Delete
+   the app and install that build from TestFlight, so the terms screen shows: it appears only
+   at the first start after installing.
 2. Start the screen recording (Control Center, the round button), then open the app from
    the home screen.
 3. Accept the terms, enter a name, **Create game**, keep **Classic**, **Start game**.
@@ -66,9 +69,10 @@ including reporting a photo and removing a player. What worked:
 9. Send it to the Mac (Photos, Share, AirDrop). Cut out waiting time and anything that is
    not the app, and save the result as `store/ios_review-video.mp4` (git-ignored: it shows
    your phone and your photos).
-10. `node scripts/helpers/app-store.mjs submit` attaches it and sends the version to App
-    Review. The notes Apple reads are in `store/ios_listing.js` (`reviewNotes`): when the
-    video shows something different (for example what was cut), the first note says so.
+10. `./scripts/release-apps.sh production ios --submit` attaches it to exactly the build you
+    recorded and sends the version to App Review. The notes Apple reads are in
+    `store/ios_listing.js` (`reviewNotes`): when the video shows something different (for
+    example what was cut), the first note says so.
 
 ## When something does not work
 

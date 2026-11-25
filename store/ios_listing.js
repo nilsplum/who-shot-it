@@ -5,7 +5,7 @@
  * iPhone listing; `store/images/ios_*` are its images.
  *
  * Mechanisms: `scripts/helpers/listing.mjs` merges and checks it (LISTINGS.ios);
- * `node scripts/helpers/app-store.mjs submit` (`./scripts/release-apps.sh ios --submit`)
+ * `node scripts/helpers/app-store.mjs submit` (`./scripts/release-apps.sh production ios --submit`)
  * uploads every field below except `privacy` and `developer`, and sets besides: content
  * rights (players share their own photos), the age rating (user generated content and
  * contests yes, everything else no, raised to LEGAL.minAge in web/shared/config.js, the age

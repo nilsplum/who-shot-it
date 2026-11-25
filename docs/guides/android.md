@@ -1,7 +1,8 @@
 # Publishing the Android app (operator guide)
 
-Everything for Android is built and tested: `./scripts/release-apps.sh android` builds the
-signed app and uploads it. What is left are the Google Play account and the one-time forms.
+Everything for Android is built and tested: `./scripts/release-apps.sh production android`
+builds the signed store app and uploads it (`staging` instead builds a test app for the
+internal track, talking to the staging server; docs/apps.md, Releasing). What is left are the Google Play account and the one-time forms.
 Follow the steps in order; each says where to click and what to enter. The answers match
 the app and the privacy policy; the texts and images come from the Android listing
 (`store/android_ios_listing.js`, `store/android_listing.js` and `store/images/android_*`).
@@ -54,19 +55,20 @@ Countries: Production, Countries / regions, add all.
 
 ## 4. The first release (once, by hand)
 
-1. On this Mac: `./scripts/release-apps.sh android --no-upload`. The first run creates the
-   upload key in `secrets/`: **back up the `secrets/` folder now** (a password manager).
+1. On this Mac, from `main`: `./scripts/release-apps.sh production android --no-upload`. The
+   first run creates the upload key in `secrets/`: **back up the `secrets/` folder now** (a
+   password manager).
 2. Personal account: Testing, Closed testing, create a track, add at least 12 testers
-   (their Google account emails), upload `dist/who-shot-it-<version>.aab`, roll out; after
-   14 days with 12 testers apply for production access. Organization account: go straight
-   to Production, Create new release.
-3. Upload `dist/who-shot-it-<version>.aab`, accept **Play App Signing** (Google signs what
+   (their Google account emails), upload `dist/who-shot-it-<version>-production.aab`, roll
+   out; after 14 days with 12 testers apply for production access. Organization account: go
+   straight to Production, Create new release.
+3. Upload `dist/who-shot-it-<version>-production.aab`, accept **Play App Signing** (Google signs what
    players install; a lost upload key can then be replaced). Release name: the version.
    Release notes: "First version." Save, Review release, Start rollout.
 4. Google reviews the app (hours to a few days). Friends with Android can test earlier:
    Testing, Internal testing, add their emails, and share the link Google shows.
 5. Once the app's page is public on Google Play, set `STORES.android` in
-   `web/shared/config.js` to it and run `./scripts/deploy.sh`, so shared invite links show
+   `web/shared/config.js` to it and run `./scripts/deploy.sh production`, so shared invite links show
    the Google Play button too (it stays hidden while the page would say "not found").
 
 ## 5. Automatic uploads from then on (once)
@@ -84,7 +86,8 @@ Countries: Production, Countries / regions, add all.
 
 ## 6. Every later release
 
-Raise `"version"` in `package.json`, then `./scripts/release-apps.sh android` (or without
-`android` for both stores). It tests, builds, signs and uploads to the production track;
-Google reviews it and then it goes live. `--android-track internal` sends it to the
-internal testers instead.
+Raise `"version"` in `package.json`, then `./scripts/release-apps.sh staging android` for the
+internal testers (a test build on the staging server), and from `main`
+`./scripts/release-apps.sh production android` for everyone (type "release <version> on
+Google Play"): it tests, builds, signs and uploads to the production track; Google reviews it
+and then it goes live. Without `android`, both stores.

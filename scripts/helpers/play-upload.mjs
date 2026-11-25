@@ -1,6 +1,8 @@
 /**
  * Uploads an Android App Bundle to Google Play and releases it on a track, through the
- * Google Play Developer API (androidpublisher v3). Run by `./scripts/release-apps.sh`:
+ * Google Play Developer API (androidpublisher v3). Run only by `./scripts/release-apps.sh`,
+ * which picks the track from the build's environment (staging: internal, production:
+ * production, after a typed confirmation):
  *   node scripts/helpers/play-upload.mjs <bundle.aab> <internal|production> <version>
  *
  * Signs in as the service account in `secrets/google-play.json` (git-ignored; created in
