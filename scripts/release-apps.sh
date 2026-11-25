@@ -7,11 +7,12 @@
 #       internal test track. From any branch; never to App Review or the production track.
 #   ./scripts/release-apps.sh production [ios] [android] [--submit]
 #       Store builds, talking to the production server, only from a clean main: the iPhone app
-#       to TestFlight's team (to try the exact build before review), the Android app to Google
+#       to App Store Connect, where it waits for App Review (never in TestFlight, which carries
+#       only staging builds, so every tester plays on staging), the Android app to Google
 #       Play's production track (after typing "release <version> on Google Play"). --submit
-#       then fills in the App Store page from store/ and sends the version to App Review and
-#       the public TestFlight link (after typing "submit <version> to App Review"); an iPhone
-#       build of this version uploaded before is sent as it is, without building again.
+#       then fills in the App Store page from store/ and sends the version to App Review
+#       (after typing "submit <version> to App Review"); an iPhone build of this version
+#       uploaded before is sent as it is, without building again.
 #   ./scripts/release-apps.sh status
 #       Which app versions each server lets play and the newest it offers (its version gate,
 #       set by ./scripts/deploy.sh), then where App Store Connect stands: the newest builds
@@ -39,7 +40,7 @@
 # projects (npx cap sync).
 #
 # Signing and uploading: the iPhone app is signed and uploaded with the App Store Connect
-# API key in secrets/ (it also runs the checks, the public TestFlight link and App Review;
+# API key in secrets/ (it also runs the checks, TestFlight's groups and App Review;
 # scripts/helpers/app-store.mjs); the team is the one in the iPhone project. The Android
 # app is signed with the upload key in secrets/ (git-ignored; the first Android build
 # creates it: back up secrets/) and uploaded with the Google Play service account key
@@ -245,15 +246,15 @@ release_ios() {
   if [ "$upload" = false ]; then
     echo "✓ dist/ios/App.ipa: upload it with Apple's Transporter app."
   elif [ "$submit" = true ]; then
-    echo "→ iPhone: filling in the App Store page and sending it to App Review and the public TestFlight link"
+    echo "→ iPhone: filling in the App Store page and sending it to App Review"
     node scripts/helpers/app-store.mjs submit --wait
     tell_newest ios "the App Store, after Apple's approval"
   elif [ "$environment" = staging ]; then
-    echo "→ iPhone: putting it on the public TestFlight link too"
+    echo "→ iPhone: putting it into TestFlight's groups (the team at once, the public link after Apple's beta check)"
     node scripts/helpers/app-store.mjs testflight staging --wait
     tell_newest ios "TestFlight"
   else
-    echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight for the team, talking to production; to send it to App Review: ./scripts/release-apps.sh production ios --submit"
+    echo "✓ Uploaded $version ($build) for App Review (it is not in TestFlight, which has only staging builds); to send it: ./scripts/release-apps.sh production ios --submit"
   fi
 }
 

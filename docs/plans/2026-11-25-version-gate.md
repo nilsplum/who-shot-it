@@ -210,6 +210,22 @@ Status: done (25 November 2026; its decisions in section 7).
 Status: done (25 November 2026). `test/unit/config.test.js` now also holds that the app's
 version comes after `SILENT_VERSION`.
 
+### Commit 6: TestFlight carries only staging builds
+
+Added on 25 November 2026, after the operator's answer before the release: "ensure that there
+is no such complexity of any versino using production even thoough they are in testflight
+... Everything should be clean and robust, without any backwards compatibility ... We dont
+have any testflight users". `scripts/helpers/app-store.mjs`: `testflight` refuses a
+production build and an internal group that gets every build by itself, and puts each
+staging build into every group itself; `submit` sends to App Review only (no longer to the
+public link). `scripts/release-apps.sh`, README, `docs/apps.md` (Releasing, First release:
+the groups), `docs/guides/demo-players.md` (the App Review recording is made with the staging
+build), AGENTS.md. Once in App Store Connect (through the API, approved by the operator): the
+production builds leave the public link's group, and the team's group is made again without
+automatic distribution, the old one deleted.
+
+Status: done (25 November 2026; its decisions in section 7).
+
 ## 7. Decision log
 
 - **Given at deploy, not committed** (the operator left it to the Starlabs comparison):
@@ -249,6 +265,16 @@ version comes after `SILENT_VERSION`.
   sheet; the code it tried stays in the field (`device.lastRoom`). The end-to-end test gives
   the phones the answers of a server with a gate (Playwright's `route` and
   `routeWebSocket`), since the local server has none, like `./scripts/dev.sh`.
+- **Commit 6:** Apple cannot switch automatic distribution off on an existing internal
+  group (`hasAccessToAllBuilds` is not among the attributes a change may set, only a new
+  group's), so the team's group is made again without it and the old one deleted; its
+  settings (feedback on, Mac and Vision Pro availability) and its one tester are carried
+  over. Nothing is expired: production builds simply belong to no group, and 1.0.5 stays in
+  App Review untouched. A production iPhone upload without `--submit` stays possible (it
+  waits for App Review); there is no TestFlight step for it any more. Production was checked
+  against "the old state, compatible with 1.0.5": it runs exactly 1.0.5's code (Cloudflare
+  version 9226b0f0, deployed from 847b99b, whose files match the live ones byte for byte), so
+  it was not deployed; it gets the gate with its next release.
 - **Commit 4:** the asking and checking is one Node helper (`scripts/helpers/gate.mjs`), which
   talks to the person on stderr and hands the script two lines on stdout (the gate, and the
   minimum if it went up), so the typed phrase stays the scripts' one `confirm_phrase`. Only

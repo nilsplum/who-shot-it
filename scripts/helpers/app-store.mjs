@@ -5,7 +5,7 @@
  *   status                     the newest builds with their environment, TestFlight, versions (release-apps.sh status)
  *   uploaded <environment>     exit 0 when this version's build for that environment is in App
  *                              Store Connect, 10 when not (release-apps.sh asks before it builds)
- *   testflight <environment>   puts that build on the public TestFlight link (a staging upload; also part of submit)
+ *   testflight staging         puts the staging build into every TestFlight group (the team at once, the public link after Apple's beta check)
  *   submit                     fills the App Store page and sends the production build to App Review
  *   withdraw                   takes the version in App Review back, to send a newer build (release-apps.sh withdraw)
  * `--wait`: the build was just uploaded, so wait until Apple has processed it.
@@ -29,10 +29,13 @@
  * are made by hand once (store/ios_listing.js): App Privacy and the EU trader status; until
  * then Apple refuses the submission and this script prints Apple's reason.
  *
- * TestFlight: every upload reaches the team's internal group at once, but the people with
- * the public link (the external groups) get a build only after Apple's beta check. Nothing
- * sends it there by itself, so `testflight` does (friends can play a version before it is
- * in the App Store), and `submit` ends with it: the public link never keeps an old version.
+ * TestFlight carries only staging builds, so every build a tester installs plays on the
+ * staging server; production builds go to App Review alone. Apple puts a build into an
+ * internal group by itself only when that group gets every build automatically, production
+ * builds included, so the groups are set up without that (docs/apps.md, First release) and
+ * `testflight` refuses while one is not: it puts each staging build into every group itself,
+ * where the team has it at once and the public link (the external groups) after Apple's beta
+ * check (usually within a day).
  *
  * Signs in with the team API key in `secrets/` (`app-store-connect.p8` and
  * `app-store-connect.json` with keyId and issuerId; git-ignored). The key and the token
@@ -118,7 +121,8 @@ async function status() {
   }
   for (const g of (await get(`/v1/apps/${app.id}/betaGroups`)).data) {
     const a = g.attributes;
-    console.log(`  TestFlight group ${a.name} (${a.isInternalGroup ? 'internal' : 'external'})${a.publicLinkEnabled ? `: public link ${a.publicLink}` : ''}`);
+    const every = a.isInternalGroup && a.hasAccessToAllBuilds ? ', gets every build by itself: production builds too (docs/apps.md, First release)' : '';
+    console.log(`  TestFlight group ${a.name} (${a.isInternalGroup ? 'internal' : 'external'}${every})${a.publicLinkEnabled ? `: public link ${a.publicLink}` : ''}`);
   }
   for (const v of (await get(`/v1/apps/${app.id}/appStoreVersions`)).data) console.log(`  App Store version ${v.attributes.versionString}: ${v.attributes.appStoreState}`);
 }
@@ -293,17 +297,21 @@ async function setPriceAndCountries(app) {
 }
 
 /**
- * This version's build for the public TestFlight link. First the test information Apple's
- * beta check reads: what the app is, where feedback goes, the privacy policy, the same
- * contact as the App Review, and its test steps as notes (a reviewer needs to know that a
- * game takes two phones). Then the build's "What to Test", which testers see too
- * (`whatsNew`), the build in every external group, and the build sent to the beta check;
- * the testers get it once Apple approves it (usually within a day). Running it again only
- * updates the texts: a build already in a group or sent to the check stays as it is.
+ * This version's staging build for TestFlight. First the test information Apple's beta check
+ * reads: what the app is, where feedback goes, the privacy policy, the same contact as the
+ * App Review, and its test steps as notes (a reviewer needs to know that a game takes two
+ * phones). Then the build's "What to Test", which testers see too (`whatsNew`), the build in
+ * every group, and the build sent to the beta check: the team has it at once, the public
+ * link once Apple approves it (usually within a day). Running it again only updates the
+ * texts: a build already in a group or sent to the check stays as it is. It refuses a
+ * production build, and a group that would get every build by itself.
  */
 async function sendToTestFlight(app) {
-  const groups = (await get(`/v1/apps/${app.id}/betaGroups`)).data.filter((g) => !g.attributes.isInternalGroup);
-  if (!groups.length) throw new Error('No external TestFlight group: create one with a public link in App Store Connect (the app, TestFlight, External Testing, +).');
+  if (ENVIRONMENT !== 'staging') throw new Error('TestFlight carries only staging builds; a production build goes to App Review: ./scripts/release-apps.sh production ios --submit');
+  const groups = (await get(`/v1/apps/${app.id}/betaGroups`)).data;
+  const every = groups.find((g) => g.attributes.isInternalGroup && g.attributes.hasAccessToAllBuilds);
+  if (every) throw new Error(`The TestFlight group ${every.attributes.name} gets every build by itself, production builds too: set it up again without that (docs/apps.md, First release).`);
+  if (!groups.some((g) => !g.attributes.isInternalGroup)) throw new Error('No external TestFlight group: create one with a public link in App Store Connect (the app, TestFlight, External Testing, +).');
   const detail = (await get(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
   await patch('betaAppReviewDetails', detail.id, {
     contactFirstName: contact.firstName, contactLastName: contact.lastName, contactPhone: contact.phone, contactEmail: contact.email,
@@ -369,7 +377,6 @@ async function submit() {
   await setScreenshots(loc);
   await setPriceAndCountries(app);
   await sendToReview(app, version);
-  await sendToTestFlight(app);
 }
 
 try {

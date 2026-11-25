@@ -63,19 +63,19 @@ number times ten plus 0 (staging) or 1 (production), so 1.0.9 is 100090 or 10009
    built for staging. The iPhone app is in TestFlight for the team about 15 minutes later
    (install it with Apple's TestFlight app) and on the public TestFlight link (the "Friends"
    group) after Apple's beta check (usually within a day); the Android app is on Google
-   Play's internal test track.
+   Play's internal test track. TestFlight carries only staging builds, so every tester plays
+   on staging; production builds go to App Review alone.
 
 **Releasing it (production):**
 1. Merge into `main`.
 2. If the server changed: `./scripts/deploy.sh production` (it asks you to type "deploy to
    production"). Installed apps update slowly, so the server must keep understanding every
    app version its version gate lets play (below).
-3. `./scripts/release-apps.sh production ios` uploads the store build to TestFlight's team:
-   try it against production (and record App Review's video with it, below). Then
-   `./scripts/release-apps.sh production ios --submit` fills in the App Store page from the
-   listings in `store/` and sends exactly that build to App Review (type "submit <version>
-   to App Review"); without the step before, it builds and uploads first. It goes live by
-   itself after approval, and the public TestFlight link gets it too.
+3. `./scripts/release-apps.sh production ios --submit` builds and uploads the store build,
+   fills in the App Store page from the listings in `store/` and sends it to App Review
+   (type "submit <version> to App Review"). It goes live by itself after approval. (Without
+   `--submit` it only uploads; `--submit` later sends that build as it is.) The same app was
+   tried on staging first: the store build differs only in its server.
 4. `./scripts/release-apps.sh production android` releases on Google Play's production track
    (type "release <version> on Google Play"): Google reviews it (hours to a few days), then
    it goes live.
@@ -129,11 +129,16 @@ Two settings have no API and are made by hand once: **App Privacy** (Apps, the a
 column App Privacy, Get Started: "Yes, we collect data", tick the data types of `privacy` in
 `store/ios_listing.js`, each for App Functionality only, not linked, no tracking, Publish)
 and the **EU trader status** (Business, Agreements, Compliance, Digital Services Act,
-Complete Compliance Requirements). Then `./scripts/release-apps.sh production ios --submit`
-does the rest.
+Complete Compliance Requirements). **TestFlight's groups** (the app, TestFlight): one
+internal group for the team, made *without* automatic distribution (otherwise Apple puts
+every build there by itself, production builds too), and one external group with a public
+link (Friends). `./scripts/release-apps.sh staging ios` puts each staging build into both and
+refuses while an internal group gets every build. Then `./scripts/release-apps.sh production
+ios --submit` does the rest.
 
 **App Review asks new apps for a screen recording** ("Guideline 2.1, Information Needed"):
-made on an iPhone with the TestFlight build, from launching the app through a whole game,
+made on an iPhone with the staging build from TestFlight (it looks exactly like the store
+app), from launching the app through a whole game,
 including reporting a photo and removing a player; one phone and the test players are
 enough ([guides/demo-players.md](guides/demo-players.md), step by step). The answers to
 its other questions are the review notes in `store/ios_listing.js`. The video is

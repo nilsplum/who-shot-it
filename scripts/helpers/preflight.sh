@@ -141,7 +141,7 @@ check_ios_team() {
 }
 
 # App Store Connect is reached with a team API key (docs/apps.md, Keys in secrets/): the
-# iPhone uploads' checks, the public TestFlight link, App Review and the status.
+# iPhone uploads' checks, TestFlight's groups, App Review and the status.
 check_app_store_key() {
   [ -f secrets/app-store-connect.p8 ] && [ -f secrets/app-store-connect.json ] || fail "The App Store Connect API key is missing (secrets/app-store-connect.p8 and .json)." "Create it as described in docs/apps.md (Keys in secrets/), or build without uploading: --no-upload"
 }
