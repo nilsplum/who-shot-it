@@ -8,8 +8,8 @@
  * phone only ("No, wait" changes nothing, "Yes, start" starts), the start
  * behind an opaque 3-2-1, a flagged photo (hidden from the others, Cancel, then
  * Delete), five rounds with their reveals (played step by step, the verdict felt) and
- * leaderboards (one ending in the new order, "Show again" held on one phone and seen on
- * another, FINAL ROUND before the last photo), the podium's
+ * leaderboards (one ending in the new order with the medal on the leader, "Show again" held on
+ * one phone and seen on another, FINAL ROUND before the last photo), the podium's
  * reveal (third, second, first, then "Play again"), "Play again" from a guest while the
  * others still look at their results, and leaving with the code remembered. A leaderboard
  * that waits for a phone still loading the next photos. The room-wide "Is everyone here?" as
@@ -200,9 +200,10 @@ test('friends play a full game and start another one', async ({ browser }) => {
       await page.locator('[data-act="answer"]').first().click();
     }
     for (const page of everyone) await expect(page.locator('[aria-label$=": their photo"]')).toHaveCount(1);
-    // Everyone answered: the time to look at the answer has the cool look, on the reveal and
-    // the leaderboard. The reveal plays step by step (web/js/reveal.js): the host felt the
-    // verdict as their card popped (one firm pulse right, two wrong), then the reactions came.
+    // Everyone answered: the time to look at the answer has the cool look on the reveal (the
+    // leaderboard has no timer bar). The reveal plays step by step (web/js/reveal.js): the
+    // host felt the verdict as their card popped (one firm pulse right, two wrong), then the
+    // reactions came.
     await expect(bar).toHaveAttribute('data-kind', 'look');
     await expect.poll(() => host.evaluate(() => window.felt.at(-1))).toBe('MEDIUM');
     await expect(host.locator('[data-after]')).toHaveAttribute('data-go', '');
@@ -219,6 +220,27 @@ test('friends play a full game and start another one', async ({ browser }) => {
         .sort((a, b) => a.top - b.top)
         .every((r, i, all) => r.shown === r.rank && (i === 0 || all[i - 1].rank <= r.rank)));
       await expect.poll(standing).toBe(true);
+      // Its story ends (the screen lets go of `data-playing`) with the medal on each leader
+      // who has points (the rows ranked first with a total above 0) and nowhere else, and
+      // there is no timer bar on the board.
+      await expect(host.locator('[data-playing]')).toHaveCount(0);
+      await expect(host.locator('#tbar')).toHaveCount(0);
+      const leaders = await rows.evaluateAll((els) => els.filter((el) => el.dataset.rank === '1' && Number(el.querySelector('[data-cell="total"]').textContent) > 0).length);
+      await expect(host.locator('[data-part="board"] [data-medal]')).toHaveCount(leaders);
+      if (leaders) await expect(rows.first().locator('[data-medal]')).toBeVisible();
+      // A row lifted over the others (`data-lift`: a little bigger) must not make the list
+      // scroll sideways: a list that scrolls vertically scrolls sideways too, so it leaves
+      // room at its sides. The row's own transition is switched off for the measure.
+      const sideways = await host.locator('[data-part="board"]').evaluate((list) => {
+        const row = list.querySelector('[data-rank]');
+        row.style.transition = 'none';
+        row.setAttribute('data-lift', '');
+        const extra = list.scrollWidth - list.clientWidth;
+        row.removeAttribute('data-lift');
+        row.style.transition = '';
+        return extra;
+      });
+      expect(sideways, 'the lifted row sticks out of the list').toBe(0);
       // Holding "Show again" on one phone shows the photo on every phone.
       const button = guests[0].getByRole('button', { name: 'Show the photo again' });
       const box = await button.boundingBox();

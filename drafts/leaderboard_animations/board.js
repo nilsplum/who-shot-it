@@ -1,7 +1,9 @@
 /**
- * Leaderboard: cause before effect, as the app plays it now (main.js `startBoard`), with
- * more to feel. Every row first stands where it stood before this round, with its old rank
- * and total, and the old leader wears the gold medal. The round's points pop in, top to
+ * Leaderboard: cause before effect, with more to feel than the app's old entrance had; it was
+ * chosen and the app plays it now (web/js/board.js, which also handles a tied lead and the
+ * first round's points: the draft's players never tie and all have points). Every row first
+ * stands where it stood before this round, with its old rank and total, and the old leader
+ * wears the gold medal. The round's points pop in, top to
  * bottom, and each throws a gold coin in a little arc into its total, which bumps and rolls
  * up like a slot machine (each digit a reel, the last one spinning fastest, the reels
  * stopping from left to right). The first coin to land is a light tap. Then the rows slide

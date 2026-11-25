@@ -23,6 +23,10 @@
  *   apps stop counting down; `left` is then frozen at the moment it stopped.
  * - `now` and every `left` change by themselves as time passes (`CLOCK_FIELDS`); the room
  *   leaves them out when it decides whether a phone's view changed (`src/room.js`).
+ * - On the reveal and the leaderboard `round.results` says, for every player, their pick and
+ *   points of the round, their streak (right answers in a row, shown as a badge) and the part
+ *   of the points the streak earned (`bonus`): the apps tell the streak's story from these
+ *   and never recompute a rule. The reveal lasts longer while a streak is told (`timerMs`).
  * - A photo link is relative (`API.photo`); the app prefixes the server's origin.
  * - `upcoming` lists the links of the photos a phone may load now, in play order (from the
  *   deal on, during the start: the whole game; then from the round on screen; `null` for a

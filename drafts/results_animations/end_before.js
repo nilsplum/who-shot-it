@@ -9,7 +9,17 @@
  * stylesheet (style.css imports the app's and scans this folder).
  */
 
-import { CONFETTI, LEAVE_BUTTON, avatar, esc, reactionsRow, topBar } from '/js/ui.js';
+import { LEAVE_BUTTON, avatar, esc, reactionsRow, topBar } from '/js/ui.js';
+
+/**
+ * The ten confetti pieces the app's reveal threw for a right guess before its reveal was
+ * played step by step (it had `CONFETTI` in web/js/ui.js; the app has coins now): kept here
+ * with their `animate-burst` entrance (style.css), as this end screen used them.
+ */
+const CONFETTI = Array.from({ length: 10 }, (_, i) => {
+  const angle = (i / 10) * 2 * Math.PI;
+  return `<i class="pointer-events-none absolute top-1/2 left-1/2 size-2.25 animate-burst rounded-xs bg-player motion-reduce:hidden" style="--x:${Math.round(Math.cos(angle) * 90)}px;--y:${Math.round(Math.sin(angle) * 60)}px;--player:var(--color-p${i})"></i>`;
+}).join('');
 
 /** The podium's places, left to right: second, first, third (first in yellow, the others in silver and bronze). */
 const PLACES = [

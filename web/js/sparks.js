@@ -5,11 +5,12 @@
  * rushing into a point (`inflow`) and the fireworks (`fireworks`).
  *
  * Mechanisms: `podium.js` calls these while it reveals the podium, `reveal.js` for a
- * round's reveal (the pop on my card, its coins), and `countdown.js` its flash, the white
- * frame that ends the 3-2-1 as the first round begins (right after main.js cleared the
- * screen before). The canvas is made on first use (a sibling of #app, so a jolt of the
- * screen never moves the light) and removed again as soon as nothing shines, and one frame
- * loop runs only meanwhile. Movement is in pixels per second over the real time between
+ * round's reveal (the pop on my card, its coins), `streak.js` for a streak's bonus arriving
+ * in my points, `board.js` for the leaderboard's coins and the flying medal, and
+ * `countdown.js` its flash, the white frame that ends the 3-2-1 as the first round begins
+ * (right after main.js cleared the screen before). The canvas is made on first use (a
+ * sibling of #app, so a jolt of the screen never moves the light) and removed again as soon
+ * as nothing shines, and one frame loop runs only meanwhile. Movement is in pixels per second over the real time between
  * frames, so it looks the same at 60 and 120 frames a second. Light adds up (`lighter`) the
  * way light does.
  *
@@ -40,6 +41,12 @@ let blink = null;
 let looping = false;
 let last = 0;
 const named = new Map();
+
+/** The middle of an element on the screen, where light is aimed at it (the canvas covers the screen, so these are its pixels). */
+export function middle(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
 
 /** A theme colour by its name (`--color-<name>` in styles/app.css), as the canvas takes it. */
 export function colour(name) {
@@ -117,6 +124,16 @@ export function spray(at, tint, count, reach) {
     const a = Math.random() * Math.PI * 2;
     const v = reach * 3 * (0.6 + Math.random() * 0.5);
     spark({ x: at.x, y: at.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 3, gravity: 160, life: 0.6 + Math.random() * 0.5, size: 2.4, tint, hot: 0.2 });
+  }
+}
+
+/**
+ * Gold coins spraying up out of `at`, over `width` px, and falling: `count` of them, every
+ * third one paler (a jackpot: the reveal's pop, the streak's bonus arriving in the points).
+ */
+export function coins(at, width, count = 26) {
+  for (let i = 0; i < count; i += 1) {
+    spark({ x: at.x + (Math.random() - 0.5) * width * 0.6, y: at.y, vx: (Math.random() - 0.5) * 340, vy: -330 - Math.random() * 230, drag: 0.4, gravity: 1100, life: 0.75 + Math.random() * 0.3, size: 3.4, tint: colour(i % 3 ? 'yellow' : 'p11'), hot: 0.2 });
   }
 }
 

@@ -2,9 +2,9 @@
  * The game's state machine (src/game/rules.js), event by event and timer by timer.
  */
 import { describe, expect, test } from 'vitest';
-import { LIMITS, SCORING, TIMING } from '../../web/shared/config.js';
+import { LIMITS, SCORING, TIMING, streakBonus, streakExtraMs } from '../../web/shared/config.js';
 import { apply, nextWake } from '../../src/game/rules.js';
-import { isServablePhoto, referencedPhotoIds } from '../../src/game/state.js';
+import { isServablePhoto, referencedPhotoIds, timerMs } from '../../src/game/state.js';
 import { T0, idOf, roomWith, seededRandom } from '../helpers.js';
 
 const rng = seededRandom(7);
@@ -509,6 +509,59 @@ describe('scores and stats', () => {
     expect(res[others[1].id].points).toBe(0);
     expect(d.room.game.stats.fastest).toEqual({ id: others[0].id, ms: 2000 });
     expect(d.room.game.stats.fooled[owner]).toBe(1);
+  });
+});
+
+describe('streaks', () => {
+  /** Everyone picks the owner (all right), the round is revealed; returns the round's results. */
+  function allRight(d) {
+    const owner = ownerOf(d);
+    for (const p of d.room.players) d.do('answer', { playerId: p.id, pick: owner });
+    return { owner, results: d.room.game.results };
+  }
+  /** On to the next round: the reveal and the leaderboard run out, the next photo is loaded. */
+  const next = (d) => loadAll(d.wait(timerMs(d.room)).wait(TIMING.boardMs));
+
+  test('every result says the streak and what it earned, after the owner\'s share, and a longer streak makes the reveal longer', () => {
+    const d = loadAll(started(['Ann', 'Ben', 'Cleo'], { time: 10, points: 'fixed', streak: true }));
+    for (let n = 1; n <= 4; n++) {
+      const { owner, results } = allRight(d);
+      const other = d.room.players.find((p) => p.id !== owner).id;
+      // The streak counts every right answer in a row; its bonus is the room's formula.
+      expect(results[other]).toMatchObject({ streak: n, bonus: streakBonus(n), points: SCORING.fixed + streakBonus(n) });
+      // The owner's points, bonus included, are scaled by "Own photo: Fewer points" (80%); the bonus is what the streak added to them.
+      expect(results[owner]).toMatchObject({ streak: n, points: Math.round(((SCORING.fixed + streakBonus(n)) * 80) / 100) });
+      expect(results[owner].bonus).toBe(results[owner].points - Math.round((SCORING.fixed * 80) / 100));
+      // The reveal lasts its own time, and longer from a streak of 4 on, while a bonus is told.
+      expect(timerMs(d.room)).toBe(TIMING.revealMs + streakExtraMs(n));
+      if (n < 4) next(d);
+    }
+    expect(streakExtraMs(3)).toBe(0);
+    expect(streakExtraMs(4)).toBeGreaterThan(0);
+    expect(d.room.deadline).toBe(d.now + TIMING.revealMs + streakExtraMs(4));
+  });
+
+  test('a wrong or missing answer ends the streak, and nobody is told one when the setting is off', () => {
+    const d = loadAll(started(['Ann', 'Ben', 'Cleo'], { time: 10, points: 'fixed', streak: true }));
+    allRight(d);
+    next(d);
+    const owner = ownerOf(d);
+    const [wrong, silent, ...rest] = d.room.players.filter((p) => p.id !== owner);
+    d.do('answer', { playerId: wrong.id, pick: wrong.id });
+    d.do('answer', { playerId: owner, pick: owner });
+    d.wait(TIMING.answerGraceMs + 10_000);
+    const res = d.room.game.results;
+    expect(res[wrong.id]).toEqual({ pick: wrong.id, points: 0, streak: 0, bonus: 0 });
+    expect(res[silent.id]).toEqual({ pick: null, points: 0, streak: 0, bonus: 0 });
+    expect(res[owner]).toMatchObject({ streak: 2 });
+    expect(rest).toHaveLength(0);
+
+    const off = loadAll(started(['Ann', 'Ben', 'Cleo'], { time: 10, points: 'fixed', streak: false }));
+    allRight(off);
+    next(off);
+    const { results } = allRight(off);
+    expect(Object.values(results).every((r) => r.streak === 0 && r.bonus === 0)).toBe(true);
+    expect(timerMs(off.room)).toBe(TIMING.revealMs);
   });
 });
 

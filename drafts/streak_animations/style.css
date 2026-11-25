@@ -1,0 +1,34 @@
+/*
+ * The streak animation's stylesheet, built by Tailwind like the app's: it imports the app's
+ * (styles/app.css) and adds what the reveal needs, written the way app.css writes it, so a
+ * chosen one moves over as it is.
+ *
+ * Mechanisms: reveal.js, tower.js and badge.js use these as whole class names; `--tone` (a
+ * theme colour, set by reveal.js as the bonus heats up) is read with a fallback.
+ *
+ * Invariant: only theme colours (`var(--color-…)`), and nothing here animates: every motion
+ * is a transform, scale, rotate or opacity set by the story.
+ */
+
+@import '../../styles/app.css';
+@source '.';
+
+/* The numbers over the photo: legible on any picture, wrapped in layers of dark that fade out far from the digits. */
+@utility streak-points {
+  text-shadow: 0 0.04em 0 var(--color-navy), 0 0 0.1em var(--color-navy), 0 0 0.22em var(--color-navy), 0 0 0.45em color-mix(in srgb, var(--color-stage) 95%, transparent), 0 0.08em 0.7em color-mix(in srgb, var(--color-stage) 90%, transparent);
+}
+
+/* The bonus: the colour of its tier, which `--tone` sets and the story changes as the streak heats up. */
+@utility streak-bonus {
+  color: var(--tone, var(--color-green));
+}
+
+/* The badge over the photo: an even, smooth and strong shadow all around it, none of it offset. */
+@utility streak-halo {
+  box-shadow: 0 0 0.9rem 0.1rem color-mix(in srgb, var(--color-stage) 90%, transparent), 0 0 2.2rem 0.4rem color-mix(in srgb, var(--color-stage) 65%, transparent);
+}
+
+/* A block of the tower stands on a darker edge, like a thing with a thickness. */
+@utility streak-edge {
+  box-shadow: 0 0.2rem 0 color-mix(in srgb, var(--color-navy) 45%, transparent), 0 0.5rem 1rem color-mix(in srgb, var(--color-stage) 60%, transparent);
+}

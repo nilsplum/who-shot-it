@@ -11,6 +11,13 @@
 @import '../../styles/app.css';
 @source '.';
 
+/* The confetti piece of the end screen as it was (end_before.js): the app's reveal has coins now. */
+@theme {
+  --animate-burst: burst 0.9s ease-out forwards;
+
+  @keyframes burst { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(220deg); opacity: 0; } }
+}
+
 /* Shared: a player not revealed yet, the blocks waiting dimmed, a revealed block glowing. */
 [data-hidden] { visibility: hidden; }
 [data-place] > div:last-child { transition: filter 0.5s, box-shadow 0.5s; }

@@ -1,10 +1,10 @@
 /**
  * Shared UI building blocks: HTML escaping, avatars (and how an offline player looks, and
  * who may remove them), the top bar and its buttons, the logo with the big title, the two
- * ways to show a wait (the spinner and the progress bar), the timer bar, the list of rules
- * or steps, the quiet scrollbars, the one toast, the row that scrolls sideways with its
- * arrow (the lobby's players, the reactions), and the reaction row with its floating
- * emojis.
+ * ways to show a wait (the spinner and the progress bar), the timer bar, the streak's badge,
+ * the list of rules or steps, the quiet scrollbars, the one toast, the row that scrolls
+ * sideways with its arrow (the lobby's players, the reactions), and the reaction row with its
+ * floating emojis.
  *
  * Mechanisms: every view (`web/js/views/`) builds HTML strings with these helpers;
  * `web/js/main.js` paints them. All transient feedback goes through `toast`; confirmations
@@ -110,8 +110,9 @@ export const SPINNER = '<div class="mx-auto size-10 animate-spin rounded-full bo
 
 /**
  * A wait whose amount is known: what it waits for, how far it is (`share`, 0 to 1, as a
- * percentage) and a bar filling up. It takes the timer bar's slot exactly (same height), so a
- * leaderboard that starts waiting for photos swaps one for the other without anything moving.
+ * percentage) and a bar filling up. It is as tall as the timer bar's slot, so a screen that
+ * starts waiting for photos swaps one for the other without anything moving (the leaderboard
+ * keeps a slot of that height empty until it waits, `views/board.js`).
  */
 export function progress(share, label) {
   const pct = Math.round(Math.max(0, Math.min(1, share)) * 100);
@@ -122,8 +123,8 @@ export function progress(share, label) {
 
 /**
  * The timer bar's two looks, by what the time is for: `answer`, warm (coral to green), the
- * time to pick; `look`, cool (blue to violet), the time to look at the answer on the reveal
- * and the leaderboard, which runs on by itself.
+ * time to pick; `look`, cool (blue to violet), the time to look at the answer on the reveal,
+ * which runs on by itself.
  */
 const TIMER_LOOKS = {
   answer: 'from-coral via-yellow to-green',
@@ -131,13 +132,45 @@ const TIMER_LOOKS = {
 };
 
 /**
- * The timer bar under the top bar (game and leaderboard), in one of its looks, centred in a
+ * The timer bar under the top bar (the round and its reveal), in one of its looks, centred in a
  * slot as tall as `progress`; `data-kind` names it for the tests. `main.js` shrinks `#tbar`
  * with one animation per timer, which the browser runs by itself (`syncBar`), and sets
  * `data-off` on it while no timer runs (the empty track stays).
  */
 export const timerBar = (kind) =>
   `<div class="flex h-7 flex-col justify-center"><div class="h-1.5 overflow-hidden rounded-full bg-raised"><i id="tbar" class="block h-full origin-left bg-linear-to-r/srgb ${TIMER_LOOKS[kind]} data-off:opacity-0" data-kind="${kind}"></i></div></div>`;
+
+/**
+ * The tiers of a streak (right answers in a row), from which number on: its colour as the
+ * light's theme name (`tint`, also the colour of the bonus while it counts up, `streak.js`),
+ * and as the badge's band (a whole class name, so Tailwind builds it). A longer streak looks
+ * warmer: yellow, orange, coral, pink, violet.
+ */
+const STREAK_TIERS = [
+  { from: 2, tint: 'yellow', band: 'border-yellow' },
+  { from: 4, tint: 'p6', band: 'border-p6' },
+  { from: 7, tint: 'coral', band: 'border-coral' },
+  { from: 10, tint: 'p8', band: 'border-p8' },
+  { from: 15, tint: 'violet', band: 'border-violet' },
+];
+
+/** The look of a streak of `n` right answers in a row: its tier (`level`, 1 to 5) and the tier's colours. */
+export function streakLook(n) {
+  const level = Math.max(1, STREAK_TIERS.filter((t) => n >= t.from).length);
+  return { level, ...STREAK_TIERS[level - 1] };
+}
+
+/**
+ * A player's streak as a small badge: a white card, a little askew, with the number of right
+ * answers in a row and a flame under a band in the tier's colour. `normal` on the reveal (at
+ * the bottom middle of the photo, in a soft halo that keeps it legible on any photo),
+ * `small` on the avatar of a row of the leaderboard. The number is dark on white, so it reads
+ * at once; the whole badge is one element with `data-streak`, so a change is one replacement.
+ */
+export function streakBadge(n, size = 'normal') {
+  const small = size === 'small';
+  return `<span class="relative inline-flex -rotate-6 items-center gap-0.5 rounded-md border-t-4 ${streakLook(n).band} bg-white ${small ? 'px-1 py-px text-2xs shadow-lift' : 'px-2 py-0.5 text-base streak-halo'} leading-none font-extrabold text-navy" data-streak="${n}" aria-label="${n} right answers in a row">${n}<i class="not-italic" aria-hidden="true">🔥</i></span>`;
+}
 
 /** A few rules or steps, each with an emoji in front (the terms, "How to play"); the texts are HTML. */
 export const steps = (items) =>

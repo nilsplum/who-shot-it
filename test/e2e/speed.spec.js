@@ -24,6 +24,7 @@
  * slowdown, not a busy computer.
  */
 import { expect, test } from '@playwright/test';
+import { TIMING } from '../../web/shared/config.js';
 import { addBots } from './bots.js';
 import { library, newPhone, realPhone } from './fake-phone.js';
 
@@ -52,7 +53,8 @@ const LIMITS = {
   yes: 3000,
   /** How long the room may stand in `load` (or a leaderboard wait) for phones that all kept up. */
   roomWait: 1000,
-  board: { min: 4900, max: 5600 },
+  /** A leaderboard lasts its story and the rest after it (`TIMING.boardMs`), to within the phones' latency. */
+  board: { min: TIMING.boardMs - 100, max: TIMING.boardMs + 600 },
   photoPainted: 300,
   /** Readiness reports per phone: one per round. */
   loaded: ROUNDS + 1,

@@ -14,7 +14,8 @@
  * in the "who has answered" row opens "Remove?" (`views/sheets.js`) for the host, and for
  * everyone while that player is offline. The scores live on the leaderboard between the
  * rounds; the reveal shows only my own points of the round, rising off my card for a
- * moment. While someone else flagged the photo (`round.flag`, not mine), the stage says so
+ * moment (or, when my streak earned a bonus, settling above my streak's badge while the
+ * streak's story is told, `web/js/streak.js`). While someone else flagged the photo (`round.flag`, not mine), the stage says so
  * instead of showing it and the cards wait; the flagger keeps the photo under the report
  * sheet.
  *
@@ -25,7 +26,9 @@
  * plays (`data-playing` on the screen) the cards look as they did in the round and the ✓,
  * the ✗ and the reactions wait (the `reveal-` utilities in styles/app.css); `data-go` lets
  * each go and plays its entrance. A repaint, a reconnect or Reduce Motion simply shows the
- * result.
+ * result. My streak (right answers in a row, 2 or more) is a small badge at the bottom
+ * middle of the photo (`ui.streakBadge`, in a slot of its own that the story finds and swaps),
+ * painted in its final state like everything else.
  *
  * Layout: the photo takes all the height the rest leaves free (the screen has its exact
  * height) and is the one thing that gives way, so the page never scrolls. The cards get
@@ -44,7 +47,7 @@
  * green with a ✓, my wrong pick red with a ✗ (colour never carries the meaning alone).
  */
 
-import { LEAVE_BUTTON, SPINNER, avatar, barTitle, canRemove, esc, progress, reactionsRow, timerBar, topBar } from '../ui.js';
+import { LEAVE_BUTTON, SPINNER, avatar, barTitle, canRemove, esc, progress, reactionsRow, streakBadge, timerBar, topBar } from '../ui.js';
 
 function bar(view) {
   return topBar(LEAVE_BUTTON, barTitle(`${view.round.n} / ${view.round.total}`));
@@ -55,6 +58,15 @@ const CENTRED = 'absolute inset-0 grid place-items-center';
 /** A short notice in the middle of the stage, in place of the photo. */
 const notice = (icon, title, line = '') =>
   `<div class="${CENTRED} px-6 text-center"><div><div class="text-6xl leading-none">${icon}</div><b class="mt-3 block text-xl">${title}</b>${line ? `<span class="mt-1 block text-muted">${line}</span>` : ''}</div></div>`;
+
+/**
+ * My streak's badge at the bottom middle of the photo, on the reveal once my streak is 2 or
+ * more: a slot as tall as the badge, so the story finds the place before and after it.
+ */
+function streakSlot(view) {
+  const mine = view.round.results && view.round.results[view.me.id];
+  return view.phase === 'reveal' && mine && mine.streak >= 2 ? `<div class="pointer-events-none absolute inset-x-0 bottom-3 flex h-7 items-end justify-center" data-streak-slot>${streakBadge(mine.streak)}</div>` : '';
+}
 
 /**
  * The photo, or what the phone waits for. Pixel mode draws on a canvas. A photo gone during
@@ -75,7 +87,7 @@ function stage(view, { photo, src: url, loading }) {
   const media = view.phase === 'show' && r.mode === 'pixel' ? '<canvas class="size-full object-contain"></canvas>' : `<img class="size-full object-contain" alt="" src="${src}">`;
   // Phase and round in the markup make the reveal repaint the plain photo, ending any effect.
   return `<div class="absolute inset-0 overflow-hidden" data-round="${r.n}" data-phase="${view.phase}">${media}</div>
-    <button class="absolute top-2 right-2 size-8.5 rounded-full bg-stage/70 text-md text-white opacity-70" data-act="report" aria-label="Report this photo">⚑</button>`;
+    <button class="absolute top-2 right-2 size-8.5 rounded-full bg-stage/70 text-md text-white opacity-70" data-act="report" aria-label="Report this photo">⚑</button>${streakSlot(view)}`;
 }
 
 const player = (view, id) => view.players.find((p) => p.id === id);

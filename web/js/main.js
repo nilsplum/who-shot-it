@@ -19,16 +19,17 @@
  *   are sent as small messages; the server decides what happens.
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
  *   (`moments`), each new number of the 3-2-1 (when it is painted, `paintStart`), the
- *   reveal's verdict (as my card pops, `reveal.js`, which `startReveal` hands `buzz`), a
- *   swap or its refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the
- *   podium's charges, bursts and first fireworks (`podium.js`, which `startPodium` hands
- *   `buzz`).
+ *   reveal's verdict (as my card pops, `reveal.js`, which `startReveal` hands `buzz`) and my
+ *   streak's blocks and bonus (`streak.js`, which `reveal.js` hands `buzz`), a
+ *   swap or its refusal (action `swap`), the leaderboard's first coin, its medal landing
+ *   and FINAL ROUND landing (`board.js`, which `startBoard` hands `buzz`), and the podium's
+ *   charges, bursts and first fireworks (`podium.js`, which `startPodium` hands `buzz`).
  * - Entrances: a screen that tells a story when it appears (the reveal: the answer, my
- *   card, its pop; the leaderboard: who overtakes whom; FINAL ROUND; the podium's charges)
- *   is painted in its final state, and `startReveal`, `startBoard` or `startPodium` plays
- *   the story over it once (`session.shown`), so a repaint or a reconnect never plays it
- *   again or cuts it. Their sparks and fireworks (`sparks.js`) end the moment another screen
- *   is painted.
+ *   card, its pop, my streak's tower; the leaderboard: who overtakes whom; FINAL ROUND; the
+ *   podium's charges) is painted in its final state, and `startReveal`, `startBoard` or `startPodium` has
+ *   `reveal.js`, `board.js` or `podium.js` play the story over it once (`session.shown`), so
+ *   a repaint or a reconnect never plays it again or cuts it. Their sparks and fireworks
+ *   (`sparks.js`) end the moment another screen is painted.
  * - Photo access is asked once ("Continue", then the phone's own question) and checked
  *   again whenever the app comes back to the front, since the player may have changed
  *   it in the phone's settings. Whenever the app may read photos (from its start, once the
@@ -82,6 +83,7 @@ import { CLOSE } from '../shared/api.js';
 import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, termsToken } from '../shared/config.js';
 import { makeId, shuffle } from '../shared/random.js';
 import { createRoom, uploadPhotos } from './api.js';
+import { playBoard } from './board.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { cut, nextNumberIn, onTheClock } from './countdown.js';
@@ -216,93 +218,29 @@ function startStage() {
 }
 
 /**
- * When each step of the leaderboard's entrance starts, in ms: the old order stands for a
- * moment, then the totals count up for COUNT_MS while the round's points pop in, then the
- * rows slide home (their own transition, `views/board.js`, is as long: 0.7 s), and last the
- * changed ranks pop. About 2 s, well inside the board's time.
- */
-const BOARD_STEPS = { count: 400, slide: 1100, ranks: 1800 };
-const COUNT_MS = 700;
-/** When FINAL ROUND hits the screen: 45% into its 0.6 s `smash` (styles/app.css). */
-const SMASH_LANDS_MS = 270;
-
-/**
- * The leaderboard's entrance, once per board (`session.shown`), cause before effect. The
- * painted markup is the final state, so this first puts the start state over it, in the
- * same task as the paint (no frame shows the end first): every row where it stood before
- * this round, with its old rank and total, its points not there yet. Then step by step
- * (`BOARD_STEPS`): the totals count up while the points pop in; the rows slide home, the
- * ones moving up lifted above the others (`data-lift`); the changed ranks pop. FINAL ROUND
- * instead falls onto the screen, which shakes and vibrates (`land`) as it lands. With
- * Reduce Motion, or for a board already shown, the final state simply stays. A step whose
- * rows were replaced meanwhile (a repaint: someone left) does nothing; the new rows are
- * final.
+ * The leaderboard's entrance, once per board (`session.shown`): `board.js` plays it over the
+ * board just painted in its final state (`views/board.js`), in the same task as the paint,
+ * cause before effect (the points into the totals, who overtakes whom, the medal to the
+ * leader); FINAL ROUND instead falls onto the screen, which shakes and vibrates (`land`) as
+ * it lands. With Reduce Motion, or for a board already shown, the final state simply stays.
+ * The room's board time (`TIMING.boardMs`) is the story's length and a rest after it.
  */
 function startBoard() {
   const v = session.view;
-  const part = document.querySelector('[data-part="board"]');
+  const screenEl = $('app').firstElementChild;
   const key = `board|${v.code}|${v.round.n}`;
-  if (!part || session.shown.has(key)) return;
+  if (!screenEl || !screenEl.querySelector('[data-part="board"]') || session.shown.has(key)) return;
   session.shown.add(key);
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const final = part.querySelector('[data-cell="final"]');
-  if (final) {
-    final.toggleAttribute('data-go', true);
-    setTimeout(() => {
-      if (!final.isConnected) return;
-      $('app').firstElementChild.toggleAttribute('data-go', true);
-      buzz('land');
-    }, SMASH_LANDS_MS);
-    return;
-  }
-  const cell = (row, name) => row.querySelector(`[data-cell="${name}"]`);
-  const rows = [...part.querySelectorAll('[data-rank]')].map((row) => ({
-    row, rank: cell(row, 'rank'), total: cell(row, 'total'), gain: cell(row, 'gain'),
-    from: Number(cell(row, 'total').dataset.from), to: Number(cell(row, 'total').textContent),
-  }));
-  const later = (ms, run) => setTimeout(() => rows.every((r) => r.row.isConnected) && run(), ms);
-  for (const r of rows) {
-    r.row.style.setProperty('--shift', r.row.dataset.shift);
-    r.rank.textContent = r.row.dataset.was;
-    r.total.textContent = r.from;
-    if (r.gain) r.gain.style.visibility = 'hidden';
-  }
-  later(BOARD_STEPS.count, () => {
-    for (const r of rows.filter((x) => x.gain)) {
-      r.gain.style.visibility = '';
-      r.gain.toggleAttribute('data-go', true);
-    }
-    const begin = performance.now();
-    const count = (t) => {
-      if (!rows.every((r) => r.row.isConnected)) return;
-      const k = Math.min(1, (t - begin) / COUNT_MS);
-      const eased = 1 - (1 - k) ** 3;
-      for (const r of rows) r.total.textContent = Math.round(r.from + (r.to - r.from) * eased);
-      if (k < 1) requestAnimationFrame(count);
-    };
-    requestAnimationFrame(count);
-  });
-  later(BOARD_STEPS.slide, () => {
-    for (const r of rows) {
-      r.row.toggleAttribute('data-lift', Number(r.row.dataset.shift) > 0);
-      r.row.style.setProperty('--shift', 0);
-    }
-  });
-  later(BOARD_STEPS.ranks, () => {
-    for (const r of rows) {
-      r.row.toggleAttribute('data-lift', false);
-      if (r.row.dataset.was === r.row.dataset.rank) continue;
-      r.rank.textContent = r.row.dataset.rank;
-      r.rank.toggleAttribute('data-go', true);
-    }
-  });
+  playBoard(screenEl, buzz);
 }
 
 /**
  * The reveal's story, once per round (`session.shown`): `reveal.js` plays it over the round's
  * screen just painted in its final state (`views/game.js`), in the same task as the paint,
  * and makes the verdict felt as my card pops: one firm pulse for a right guess, two for
- * anything else (the room's own results, never the optimistic pick). With Reduce Motion the
+ * anything else (the room's own results, never the optimistic pick). My streak and what it
+ * earned come from the same results (a room that does not send them tells no streak). With Reduce Motion the
  * result simply stays and the verdict is felt at once; a reveal already shown (a repaint, a
  * reconnect) is neither played nor felt again.
  */
@@ -315,7 +253,7 @@ function startReveal() {
   const mine = v.round.results && v.round.results[v.me.id];
   const verdict = !mine || !mine.pick ? 'none' : mine.pick === v.round.owner ? 'right' : 'wrong';
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) buzz(verdict === 'right' ? 'yes' : 'no');
-  else playReveal(screenEl, { verdict, points: mine ? mine.points : 0 }, buzz);
+  else playReveal(screenEl, { verdict, points: mine ? mine.points : 0, streak: (mine && mine.streak) || 0, bonus: (mine && mine.bonus) || 0 }, buzz);
 }
 
 /**

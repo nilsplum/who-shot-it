@@ -78,7 +78,7 @@
   --color-red-dark: #40222b; /* behind a wrong pick, behind a player who is offline */
   --color-warning: #33241f; /* the "Reconnecting…" banner */
   --color-warning-ink: #ffcfa8;
-  --color-blue: #5b8cff; /* the timer while everyone looks at the answer (reveal, leaderboard), to violet */
+  --color-blue: #5b8cff; /* the timer while everyone looks at the answer (the reveal), to violet */
   --color-violet: #a66bff;
   --color-silver: #cfd6e6; /* the podium's second and third place (first is yellow) */
   --color-bronze: #e0a070;
@@ -159,7 +159,9 @@
   --animate-set-out: set-out 0.42s cubic-bezier(0.3, 1.25, 0.5, 1) both;
   --animate-set-in: set-in 0.42s cubic-bezier(0.3, 1.25, 0.5, 1) both;
   --animate-appear: appear 0.35s var(--ease-bounce); /* the leaderboard: a round's points, a new rank */
-  --animate-smash: smash 0.6s ease-out both; /* FINAL ROUND falling onto the leaderboard (it lands at 45%, main.js) */
+  --animate-lb-hit: lb-hit 0.38s ease-out; /* the leaderboard: a total, hit by its coin */
+  --animate-lb-medal: lb-medal 0.5s var(--ease-bounce) both; /* the leaderboard: the gold medal landing on a leader */
+  --animate-smash: smash 0.6s ease-out both; /* FINAL ROUND falling onto the leaderboard (it lands at 45%, web/js/board.js) */
   --animate-shake: shake 0.4s ease-out; /* the screen as FINAL ROUND lands */
   --animate-reveal: pop 0.45s var(--ease-bounce); /* the owner's card on the reveal, as it turns green (web/js/reveal.js) */
   --animate-win: win 0.6s var(--ease-bounce); /* the owner's card when it was my pick */
@@ -193,6 +195,9 @@
   @keyframes set-out { to { translate: 115% 0; } }
   @keyframes set-in { from { translate: -115% 0; } }
   @keyframes appear { from { transform: scale(0.4); opacity: 0; } }
+  @keyframes lb-hit { 35% { scale: 1.2; color: var(--color-white); } }
+  /* Lands as big as it flew (`web/js/board.js`), squashes a little with a wobble, and settles at its own tilt (`lb-medal`). */
+  @keyframes lb-medal { from { scale: 1.35; } 55% { scale: 0.85; rotate: -10deg; } }
   /* From a fifth of its size to `--pop` times it (half way), then its own size. */
   @keyframes pop-in { from { scale: 0.2; opacity: 0; } 50% { scale: var(--pop, 1.3); opacity: 1; } }
   @keyframes rays-in { from { opacity: 0; scale: 0.4; } }
@@ -328,6 +333,90 @@
 /* The number (or ✕) a swapped or refused photo shows, sized to its tile (a size container), so it reads on a 5 x 5 grid as on a 2 x 2. */
 @utility tile-count {
   font-size: 48cqmin;
+}
+
+/*
+ * The leaderboard between two photos (views/board.js), played by `web/js/board.js`: a coin
+ * thrown from a round's points into the total, which rolls up like a slot machine, and the
+ * gold medal that flies to the new leader. The elements below exist only while they move
+ * (the coin, the reels, the flying medal), except the medal on a leader, which the view
+ * paints (hidden by the view until it lands, while the screen has `data-playing`).
+ */
+
+/* A coin thrown from a points chip into its total: a small glowing gold disc. */
+@utility lb-coin {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 25;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 35% 35%, var(--color-white), var(--color-yellow) 45%, var(--color-p6));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-yellow) 80%, transparent);
+}
+/*
+ * A total rolling up like a slot machine: a window one digit high, a reel of digits per place
+ * (`data-reel`); the digits fade at the window's top and bottom edge, like a reel turning away.
+ */
+@utility lb-odo {
+  display: inline-flex;
+  height: 1.2em;
+  overflow: hidden;
+  vertical-align: bottom;
+  mask: linear-gradient(transparent, black 22%, black 78%, transparent);
+}
+@utility lb-reel {
+  display: flex;
+  flex-direction: column;
+  & > i { height: 1.2em; line-height: 1.2em; font-style: normal; }
+}
+/*
+ * A leader's gold medal, tilted on the top left of their avatar, inside the row (the list
+ * scrolls, so anything above the first row would be cut off); and the one in flight.
+ */
+@utility lb-medal {
+  position: absolute;
+  left: -0.8rem;
+  top: -0.2rem;
+  font-size: var(--text-4xl);
+  line-height: 1;
+  rotate: -22deg;
+  filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--color-stage) 80%, transparent));
+}
+@utility lb-flyer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 25;
+  margin: -0.5em 0 0 -0.5em;
+  font-size: var(--text-4xl);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/*
+ * The streak (right answers in a row): its badge on the reveal and the leaderboard
+ * (`ui.js` `streakBadge`) and its story on the reveal (`web/js/streak.js`).
+ */
+
+/* The numbers over the photo: legible on any picture, wrapped in layers of dark that fade out far from the digits. */
+@utility streak-points {
+  text-shadow: 0 0.04em 0 var(--color-navy), 0 0 0.1em var(--color-navy), 0 0 0.22em var(--color-navy), 0 0 0.45em color-mix(in srgb, var(--color-stage) 95%, transparent), 0 0.08em 0.7em color-mix(in srgb, var(--color-stage) 90%, transparent);
+}
+/* The bonus: the colour of its tier, which `--tone` sets and the story changes as the streak warms up. */
+@utility streak-bonus {
+  color: var(--tone, var(--color-green));
+}
+/* The badge over the photo: an even, smooth and strong shadow all around it, none of it offset. */
+@utility streak-halo {
+  box-shadow: 0 0 0.9rem 0.1rem color-mix(in srgb, var(--color-stage) 90%, transparent), 0 0 2.2rem 0.4rem color-mix(in srgb, var(--color-stage) 65%, transparent);
+}
+/* A block of the streak's tower stands on a darker edge, like a thing with a thickness. */
+@utility streak-edge {
+  box-shadow: 0 0.2rem 0 color-mix(in srgb, var(--color-navy) 45%, transparent), 0 0.5rem 1rem color-mix(in srgb, var(--color-stage) 60%, transparent);
 }
 
 /*
