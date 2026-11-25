@@ -155,6 +155,30 @@ describe('lobby and start', () => {
     expect(d.room).toMatchObject({ phase: 'countdown', start: 'auto' });
   });
 
+  test('the last Yes, confirmed on its phone ("Yes, start"), starts the first game without asking everyone', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo'], { asks: true }));
+    d.by('Ann', 'ready', { photos: ['a1'] });
+    // A confirmed Yes that is not the last one (Cleo came while Ben's question was open) is just a Yes.
+    d.by('Ben', 'sending', { upload: 'benupload01', start: true });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'ask' });
+    // Cleo's last Yes without the confirmation (an app that does not ask on its own phone):
+    // every phone asks, as before.
+    d.by('Cleo', 'sending', { upload: 'cleoupload1' });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'ask' });
+    // She changes and says Yes again, confirmed on her phone: the start begins at once.
+    d.by('Cleo', 'unready').by('Cleo', 'sending', { upload: 'cleoupload2', start: true });
+    expect(d.room).toMatchObject({ phase: 'countdown', start: 'auto' });
+  });
+
+  test('after "No, wait" on every phone, the last one\'s confirmed Yes starts the game', () => {
+    const d = driver(roomWith(['Ann', 'Ben', 'Cleo'], { asks: true }));
+    d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).by('Cleo', 'ready', { photos: [] });
+    d.by('Ben', 'start', { go: false });
+    expect(d.room).toMatchObject({ phase: 'lobby', start: 'button' });
+    d.by('Cleo', 'unready').by('Cleo', 'sending', { upload: 'cleoupload1', start: true });
+    expect(d.room.phase).toBe('countdown');
+  });
+
   test('Yes starts the first game; without an app that can ask, it starts by itself; an empty room asks again', () => {
     const d = driver(roomWith(['Ann', 'Ben'], { asks: true }));
     d.by('Ann', 'ready', { photos: ['a1'] }).by('Ben', 'ready', { photos: [] }).by('Ann', 'start', { go: true });

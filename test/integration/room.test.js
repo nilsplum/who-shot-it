@@ -1,9 +1,9 @@
 /**
  * The Worker and the room's Durable Object together, over real HTTP and WebSocket requests
  * in the Workers runtime: who may call the API, creating and joining rooms, uploads, what
- * the room stores and sends (only real changes, only to phones that see them), the game
- * flow driven by the alarm, photo access rules, flags, reports and removed players, and
- * deleting everything at the end.
+ * the room stores and sends (only real changes, only to phones that see them), the start
+ * (the last Yes confirmed on its phone), the game flow driven by the alarm, photo access
+ * rules, flags, reports and removed players, and deleting everything at the end.
  */
 import { env, exports } from 'cloudflare:workers';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
@@ -224,6 +224,29 @@ describe('what the room stores and sends', () => {
     await ann.until((v) => v.settings.rounds === 5);
     expect(views(ben)).toBe(dealt.ben + 1);
     expect(views(ann)).toBe(dealt.ann + 2);
+  });
+});
+
+describe('the start', () => {
+  test('the last Yes, confirmed on its phone, starts the first game without asking every phone', async () => {
+    const code = await createRoom();
+    // Today's apps, which can also ask on every phone (`asks`).
+    const ann = await connect(code);
+    const ben = await connect(code);
+    ann.key = keyFor('Ann');
+    ben.key = keyFor('Ben');
+    ann.send({ type: 'hello', key: ann.key, name: 'Ann', avatar: '🦊', asks: true });
+    ben.send({ type: 'hello', key: ben.key, name: 'Ben', avatar: '🐼', asks: true });
+    await ann.until((v) => v.players.length === 2);
+    expect((await upload(code, ann.key, JPEGS)).status).toBe(204);
+    await ben.until((v) => v.players.some((p) => p.ready));
+    // Ben is the last one; his phone asked "Is everyone here?", he said Yes: one message.
+    ben.send({ type: 'sending', upload: 'benupload01', start: true });
+    await ann.until((v) => v.phase === 'countdown');
+    await ben.until((v) => v.phase === 'countdown');
+    // No phone ever saw a lobby where everyone had said Yes (the question on every phone).
+    const asked = (p) => p.messages.some((m) => m.type === 'state' && m.view.phase === 'lobby' && m.view.start && m.view.start.everyone);
+    expect(asked(ann) || asked(ben)).toBe(false);
   });
 });
 

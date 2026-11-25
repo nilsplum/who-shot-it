@@ -48,11 +48,14 @@
  *   is the one the player last said "Yes" to (`ready`), so a "Change" or a newer "Yes" that
  *   overtook it on the way wins. A phone's hello says which of its uploads is still on its
  *   way (`join`), so a "Yes" whose app was closed meanwhile is not waited for.
- * - A group's first game asks before it starts: once everyone said "Yes", every phone asks
- *   "Is everyone here?" (`startMode` 'ask'); anyone's Yes starts it, anyone's No lets the
- *   group wait for whoever is missing, and then "Start now" (anyone's, only while everyone
- *   said "Yes") starts it (`start`). Later games start by themselves; a room everyone left
- *   asks the next group again. The room also counts the games a group started (`games`,
+ * - A group's first game asks before it starts: the last "Yes" asks "Is everyone here?" on
+ *   its own phone and arrives confirmed (`sending` with `start`), so the game starts at once
+ *   (`confirmStart`). Only when everyone said "Yes" without that (the last one left or was
+ *   removed, two said Yes at the same moment, or the last Yes came from an app that does not
+ *   ask on its own phone) does every phone ask (`startMode` 'ask'): anyone's Yes starts it,
+ *   anyone's No lets the group wait for whoever is missing, and then "Start now" (anyone's,
+ *   only while everyone said "Yes") starts it (`start`). Later games start by themselves; a
+ *   room everyone left asks the next group again. The room also counts the games a group started (`games`,
  *   when a 3-2-1 ends, so a start that falls back to the lobby does not count), back to 0
  *   with the next group.
  * - The start (`countdown`), once everyone said "Yes" (`everyoneSaidYes`), in three steps
@@ -101,6 +104,17 @@ function backToLobby(room) {
   room.phase = 'lobby';
   room.deadline = null;
   room.game = null;
+}
+
+/**
+ * The group's answer to "Is everyone here?" is Yes, given on the last phone (its confirmed
+ * "Yes, start", `sending`) or on any phone (`start`): the game starts now, but only while
+ * everyone said "Yes" and the room would otherwise ask. A confirmation that crossed someone's
+ * "Change" or a newcomer does nothing, so the room asks again once everyone said "Yes".
+ * Runs `everyoneSaidYes`, a loop over the room's few players; it holds nothing across a wait.
+ */
+function confirmStart(room) {
+  if (startMode(room) !== 'auto' && everyoneSaidYes(room)) room.start = 'auto';
 }
 
 /** Everyone said "Yes": the start begins, first with the photos still on their way. */
@@ -393,14 +407,19 @@ const HANDLERS = {
   /**
    * "Yes": the player's photos are on their way, in the upload with this id. From now on
    * they count as having said "Yes" (`saidYes`); a set they had in before is replaced. The
-   * same id again (a repeated message) changes nothing.
+   * same id again (a repeated message) changes nothing. `start`: it is the last "Yes", and its
+   * phone already asked "Is everyone here?" ("Yes, start"), so the game starts now
+   * (`confirmStart`). It travels with the Yes, not as a message of its own: between two
+   * messages the room would send every phone a lobby where everyone said "Yes", and every
+   * phone would flash the question for a moment.
    */
-  sending(room, { playerId, upload }) {
+  sending(room, { playerId, upload, start }) {
     const p = playerById(room, playerId);
     if (!p || !inLobby(room) || !isUploadId(upload) || p.sending === upload) return;
     p.sending = upload;
     p.ready = false;
     p.photos = [];
+    if (start === true) confirmStart(room);
   },
 
   /**
@@ -418,15 +437,16 @@ const HANDLERS = {
   },
 
   /**
-   * The answer to "Is everyone here?", anyone's: No (`go` false) lets the group wait, and
-   * "Start now" will start it; Yes, or "Start now" (`go`), starts the game, but only while
-   * everyone still said "Yes" (a tap that crossed someone's "Change" does nothing).
+   * The answer to "Is everyone here?" asked on every phone (the fallback, see the header),
+   * anyone's: No (`go` false) lets the group wait, and "Start now" will start it; Yes, or
+   * "Start now" (`go`), starts the game, but only while everyone still said "Yes" (a tap that
+   * crossed someone's "Change" does nothing, `confirmStart`).
    */
   start(room, { playerId, go }) {
     if (!playerById(room, playerId) || room.phase !== 'lobby') return;
     if (!go) {
       if (startMode(room) === 'ask') room.start = 'button';
-    } else if (startMode(room) !== 'auto' && everyoneSaidYes(room)) room.start = 'auto';
+    } else confirmStart(room);
   },
 
   /** "Change": the player chooses again; their photos go, and an upload still on its way will not count. */

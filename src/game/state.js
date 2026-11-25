@@ -20,9 +20,11 @@
  * Room shape:
  *   { code, createdAt, touchedAt, closed, hostId, settings, phase, deadline, start, games,
  *     players: [Player], banned: [key], game: Game | null, final: Final | null }
- *   start: how the next game starts once everyone said "Yes" (`startMode`): 'ask' (the
- *   first game of a group asks "Is everyone here?"), 'button' (someone answered No: the
- *   group starts with "Start now") or 'auto' (by itself; a room saved before this existed)
+ *   start: how the next game starts once everyone said "Yes" (`startMode`): 'ask' (a
+ *   group's first game: the last Yes asks "Is everyone here?" on its own phone and comes
+ *   confirmed, which starts it; if everyone said Yes without that, every phone asks),
+ *   'button' (someone answered No: the group starts with "Start now", or with the last
+ *   phone's confirmed Yes) or 'auto' (by itself; a room saved before this existed)
  *   games: how many games this group started in this room, counted when a game's 3-2-1 ends
  *   and back to 0 when the room is left empty (a room saved before this existed counts from
  *   0); the apps' bubble draws its order of lines from it (`view.games`)

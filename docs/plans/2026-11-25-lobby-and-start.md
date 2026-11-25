@@ -35,6 +35,8 @@ to date with every commit.
 - Commit 2: the bubble is in the app, and the room counts the group's games (`view.games`).
   The server changed (the count), so it is part of the next deploy; installed apps ignore
   the new field. To try on the phones: the bubble's look and moves (commit 8's list).
+- Commit 3: the room takes a confirmed last Yes (`sending` with `start`). No app sends it yet
+  (commit 4 does), so nothing changes for players; installed apps go on as before.
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -743,7 +745,7 @@ Read: `src/game/rules.js`, `src/game/state.js`, `src/game/view.js`, `test/unit/r
 
 ### Commit 3: room: the last Yes can come confirmed
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `src/game/rules.js`, `src/game/state.js`, `src/game/view.js`, `src/room.js`,
 `web/shared/api.js`, `test/unit/rules.test.js`, `test/unit/view.test.js`, `test/helpers.js`,
@@ -1078,3 +1080,16 @@ Status: planned.
 - **The full-table e2e test** names its third phone "Cleopatra-Marlen" (the longest name a
   player can have), so the bubble's longest case is checked on the smallest phone, and every
   other screen of that test now shows a 16-letter name too.
+
+**25 November 2026, commit 3 (the last Yes can come confirmed)**
+
+- **One function decides that the group said Yes** (`confirmStart` in `rules.js`): the
+  confirmed last Yes (`sending` with `start`) and the room-wide question's Yes or "Start now"
+  (`start {go}`) both call it, so both obey the same rule (only while everyone said Yes and
+  the room would otherwise ask).
+- **The flag counts only on the message that makes the player say Yes**: a repeated
+  `sending` with the same id is ignored as a whole (as before), so it cannot start a game
+  later on its own.
+- **No new capability flag in the hello**: the room needs no word from the app beyond the
+  flag on its Yes; an app that never sends it (every installed one) gets the room-wide
+  question exactly as before, and the room keeps honouring `asks` for it.

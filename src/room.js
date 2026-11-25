@@ -41,7 +41,7 @@ import { bearerKey, cryptoRandom, fail, isJpeg, isPlayerKey, json, tooLarge } fr
 /** App messages that become events, each with exactly the fields the rules read. */
 const CLIENT_EVENTS = {
   leave: () => ({}),
-  sending: (m) => ({ upload: m.upload }),
+  sending: (m) => ({ upload: m.upload, start: m.start === true }),
   unready: () => ({}),
   start: (m) => ({ go: m.go === true }),
   setting: (m) => ({ key: m.key, value: m.value }),
