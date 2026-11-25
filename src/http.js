@@ -1,7 +1,7 @@
 /**
  * Small HTTP helpers shared by the Worker and the room's Durable Object: JSON responses,
- * the player key from the request, JPEG checks, which web origins may call the API, and
- * the server's random source.
+ * the player key from the request, JPEG checks, which web origins may call the API, the
+ * server's random source, and the version gate this deployment was given.
  *
  * Invariants:
  * - API responses are never cached (`no-store`); photos set their own caching.
@@ -17,7 +17,7 @@
  *   page) pass: they could claim any origin anyway, and they are not the risk here.
  */
 
-import { SERVER } from '../web/shared/config.js';
+import { SERVER, normalizeGate } from '../web/shared/config.js';
 
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -52,6 +52,19 @@ export function tooLarge(request, maxBytes) {
 
 export function cryptoRandom() {
   return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+}
+
+/**
+ * This deployment's version gate (`normalizeGate`): the JSON `./scripts/deploy.sh` gave the
+ * Worker as its `GATE` value. Without one (local development, the end-to-end tests) or with
+ * one that does not parse, every app may play and none is offered an update.
+ */
+export function gateOf(env) {
+  try {
+    return normalizeGate(JSON.parse(env.GATE || 'null'));
+  } catch {
+    return normalizeGate(null);
+  }
 }
 
 /** The request's Origin when it is one of the store apps (they get CORS headers), else null. */

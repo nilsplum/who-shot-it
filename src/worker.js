@@ -6,9 +6,10 @@
  * `web/` is the website: opened in a browser, the app's page shows the invite page
  * (`web/js/views/landing.js`) and `/legal` the legal texts. Unknown paths fall back to
  * `index.html`, which is what makes an invite link `https://<server>/<CODE>` work.
- * Here, `POST /api/rooms` creates a room with a fresh random code, and every known room
- * route (`web/shared/api.js`) is forwarded unchanged to that room's Durable Object
- * (`src/room.js`), which owns all game state.
+ * Here, `POST /api/rooms` creates a room with a fresh random code (unless the app is too old
+ * for this deployment's version gate, `gateOf`), `GET /api/gate` answers that gate, and every
+ * known room route (`web/shared/api.js`) is forwarded unchanged to that room's Durable
+ * Object (`src/room.js`), which owns all game state.
  *
  * Invariants:
  * - The Worker holds no state of its own, and a request reaches a Durable Object only if
@@ -20,10 +21,10 @@
  * - Only the store apps and the server's own pages may call the API (`src/http.js`).
  */
 
-import { API, matchRoomRoute } from '../web/shared/api.js';
-import { SERVER, isRoomCode } from '../web/shared/config.js';
+import { API, STATUS, matchRoomRoute } from '../web/shared/api.js';
+import { SERVER, isRoomCode, mayPlay } from '../web/shared/config.js';
 import { makeCode } from './game/state.js';
-import { appOrigin, cryptoRandom, fail, isAllowedOrigin, json, preflight, withCors } from './http.js';
+import { appOrigin, cryptoRandom, fail, gateOf, isAllowedOrigin, json, preflight, withCors } from './http.js';
 
 export { Room } from './room.js';
 
@@ -42,13 +43,20 @@ export function rooms(env) {
   }
 }
 
-/** The creator's chosen settings come along (invalid values become defaults in the room). */
+/**
+ * The creator's chosen settings come along (invalid values become defaults in the room), and
+ * the app's version: an app too old for this deployment's version gate gets "Update to play"
+ * (`STATUS.update`) and no room.
+ */
 async function createRoom(request, env) {
   let settings = {};
+  let version;
   try {
     const body = await request.json();
     if (body && typeof body.settings === 'object') settings = body.settings;
+    if (body) version = body.version;
   } catch {}
+  if (!mayPlay(version, gateOf(env))) return fail(STATUS.update, 'update');
   // 31^4 codes: a clash with a live room is rare, and the room answers 409 if it happens.
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = makeCode(cryptoRandom);
@@ -60,6 +68,7 @@ async function createRoom(request, env) {
 
 function route(request, env, url) {
   if (url.pathname === API.rooms() && request.method === 'POST') return createRoom(request, env);
+  if (url.pathname === API.gate() && request.method === 'GET') return json(gateOf(env));
   const match = matchRoomRoute(request.method, url.pathname);
   if (!match || !isRoomCode(match.code)) return fail(404, 'not_found');
   return rooms(env).getByName(match.code).fetch(request);

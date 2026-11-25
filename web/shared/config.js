@@ -1,7 +1,8 @@
 /**
  * The single source of truth for everything the app and the server must agree on: the
- * brand and app identity, where the server lives, the game settings (options, defaults,
- * labels, help) and the two presets, the limits, the timings and the scoring.
+ * brand and app identity, where the servers live and the store pages, the versions and the
+ * version gate's rules, the game settings (options, defaults, labels, help) and the two
+ * presets, the limits, the timings and the scoring.
  *
  * Mechanisms: the Worker and the room's Durable Object import this file (Wrangler bundles
  * it); the app loads it unchanged as an ES module from its bundle (`web/` is the app's
@@ -30,31 +31,57 @@ export const APP = {
   scheme: 'whoshotit',
   /**
    * The app's version, restated from `package.json` (the page cannot read it; a test keeps
-   * both equal). Every new version asks for the terms once more (`termsToken`).
+   * both equal). Every new version asks for the terms once more (`termsToken`), and the app
+   * tells it to its server when it creates or joins a game (the version gate, `mayPlay`).
    */
   version: '1.0.10',
 };
+
+/**
+ * The app's page in each store: the App Store page is the App Store Connect record's Apple ID
+ * (it opens once a version is approved), Google Play's is the app id's. TestFlight's is the
+ * public link of its "Friends" group (`scripts/helpers/app-store.mjs` puts every staging
+ * build there), where the test builds are installed and updated.
+ */
+const APP_STORE = 'https://apps.apple.com/app/id6837810354';
+const GOOGLE_PLAY = `https://play.google.com/store/apps/details?id=${APP.id}`;
+const TESTFLIGHT = 'https://testflight.apple.com/join/zhJxgPPs';
 
 /**
  * The deployed environments, the one table every part reads: the app (`phone.serverOrigin`,
  * by the environment its build was made for, `web/js/environment.js`), the scripts
  * (`scripts/helpers/environments.sh`) and the store links. Each has its address (the API,
  * the room sockets and the photos, and the website with the legal page and the invite
- * links), its Worker (`wrangler.jsonc`: production is the top level, staging `env.staging`)
- * and the digit its builds' numbers end in (`buildNumber`). Local development
- * (`./scripts/dev.sh`, the tests) has no entry: a page in a browser talks to the server it
- * came from.
+ * links), its Worker (`wrangler.jsonc`: production is the top level, staging `env.staging`),
+ * the digit its builds' numbers end in (`buildNumber`), and where an app built for it gets a
+ * newer version, by platform (`update`: the button of "Update", `phone.updateLink`). Local
+ * development (`./scripts/dev.sh`, the tests) has no entry: a page in a browser talks to the
+ * server it came from.
  * - production: the store apps everyone installs, the website and the store links. Every
  *   installed app has its address built in, so it never changes: a move to a domain needs a
  *   new app release, and the old address stays served until no installed app uses it any
  *   more (README, Release).
  * - staging: the test builds (TestFlight, Google Play's internal track), with their own rooms
- *   and photos, so new code is tried there without touching anyone's game.
+ *   and photos, so new code is tried there without touching anyone's game. Its iPhone app
+ *   updates in TestFlight; Google Play shows its internal testers the test version.
+ * Each deployed server also has its own version gate (`normalizeGate`), given at its deploy.
  */
 export const ENVIRONMENTS = {
-  production: { origin: 'https://who-shot-it.nils-plum.workers.dev', worker: 'who-shot-it', build: 1 },
-  staging: { origin: 'https://who-shot-it-staging.nils-plum.workers.dev', worker: 'who-shot-it-staging', build: 0 },
+  production: { origin: 'https://who-shot-it.nils-plum.workers.dev', worker: 'who-shot-it', build: 1, update: { ios: APP_STORE, android: GOOGLE_PLAY } },
+  staging: { origin: 'https://who-shot-it-staging.nils-plum.workers.dev', worker: 'who-shot-it-staging', build: 0, update: { ios: TESTFLIGHT, android: GOOGLE_PLAY } },
 };
+
+/** Whether `value` is a version as the apps carry it (`APP.version`), like `1.0.11`: minor and patch stay below 100 (`versionNumber`). */
+export const isVersion = (value) => typeof value === 'string' && /^\d{1,3}\.\d{1,2}\.\d{1,2}$/.test(value);
+
+/** A version as one number that sorts like it: 1.0.9 is 10009, 1.2.0 is 10200. */
+const versionNumber = (version) => {
+  const [major, minor, patch] = version.split('.').map(Number);
+  return major * 10000 + minor * 100 + patch;
+};
+
+/** Whether version `a` comes before version `b` (both `isVersion`). */
+export const olderThan = (a, b) => versionNumber(a) < versionNumber(b);
 
 /**
  * A build's number for the stores (the iPhone's build number, Android's version code): the
@@ -67,9 +94,42 @@ export const ENVIRONMENTS = {
  */
 export function buildNumber(version, environment) {
   if (!ENVIRONMENTS[environment]) throw new Error(`No environment "${environment}" (${Object.keys(ENVIRONMENTS).join(', ')})`);
-  const [major, minor, patch] = version.split('.').map(Number);
-  return (major * 10000 + minor * 100 + patch) * 10 + ENVIRONMENTS[environment].build;
+  return versionNumber(version) * 10 + ENVIRONMENTS[environment].build;
 }
+
+/**
+ * The version gate of a deployed server: which app versions may play on it, and the newest
+ * one people can install for it. `./scripts/deploy.sh` asks for it at every deploy (starting
+ * from what the live server serves) and hands it to the Worker (`GATE`, read by `gateOf` in
+ * `src/http.js`), so it belongs to the deployed version (a rollback restores it with the
+ * code); the server answers it at `API.gate()`, and the app asks once per start.
+ * - `min`: the oldest version that may create or join a game (`mayPlay`); an older app is
+ *   asked to update (`STATUS.update`, `CLOSE.update` in `web/shared/api.js`). A player
+ *   already in a game plays on, so a running game never breaks.
+ * - `newest`: by platform, the newest version people can install for this server (the stores
+ *   for production; TestFlight and Google Play's internal track for staging). An older app
+ *   shows "✨ Update" on its start screen. Never below `min` (the deploy refuses that), so an
+ *   app that must update always can.
+ * Every value is a version or null (no minimum, no hint). Anything malformed reads as null, so
+ * a missing or broken gate (local development, the tests, a server deployed before it, an
+ * app that cannot reach its server) lets every app play and offers no update.
+ */
+export function normalizeGate(raw) {
+  const version = (value) => (isVersion(value) ? value : null);
+  const gate = raw && typeof raw === 'object' ? raw : {};
+  const newest = gate.newest && typeof gate.newest === 'object' ? gate.newest : {};
+  return { min: version(gate.min), newest: { ios: version(newest.ios), android: version(newest.android) } };
+}
+
+/**
+ * The apps up to this version say no version (the version gate came with the next one), so
+ * the server counts each of them as this version (`mayPlay`). They cannot show "Update to
+ * play" either: a minimum above it refuses them without saying why (`src/room.js`).
+ */
+export const SILENT_VERSION = '1.0.10';
+
+/** Whether an app of `version` may create or join a game under `gate` (an app that says none counts as `SILENT_VERSION`). */
+export const mayPlay = (version, gate) => !gate.min || !olderThan(isVersion(version) ? version : SILENT_VERSION, gate.min);
 
 export const SERVER = {
   /**
@@ -114,14 +174,13 @@ export const BLOCKED_WORDS = [
 /**
  * Store pages, shown on the website's invite page (the shared links and the QR code), so a
  * friend without the app can get it. `null` hides a store until its page is public: a
- * button to a "not found" page would be a dead end. The iPhone link is the App Store
- * Connect record's Apple ID (it opens once a version is approved); the Android one is
- * `https://play.google.com/store/apps/details?id=${APP.id}` once Google Play publishes it.
- * The website shows a change only after `./scripts/deploy.sh production`.
+ * button to a "not found" page would be a dead end. Android's becomes `GOOGLE_PLAY` once
+ * Google Play publishes the app. The website shows a change only after
+ * `./scripts/deploy.sh production`.
  */
 export const STORES = {
   android: null,
-  ios: 'https://apps.apple.com/app/id6837810354',
+  ios: APP_STORE,
 };
 
 /**

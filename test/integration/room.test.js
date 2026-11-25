@@ -1,6 +1,7 @@
 /**
  * The Worker and the room's Durable Object together, over real HTTP and WebSocket requests
- * in the Workers runtime: who may call the API, creating and joining rooms, uploads, what
+ * in the Workers runtime: who may call the API, creating and joining rooms, the version gate
+ * (the one `vitest.config.js` gives the Worker), uploads, what
  * the room stores and sends (only real changes, only to phones that see them), the start
  * (the last Yes confirmed on its phone), the game flow driven by the alarm, photo access
  * rules, flags, reports and removed players, and deleting everything at the end.
@@ -8,8 +9,8 @@
 import { env, exports } from 'cloudflare:workers';
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { API, CLOSE } from '../../web/shared/api.js';
-import { LIMITS, SERVER, TIMING } from '../../web/shared/config.js';
+import { API, CLOSE, STATUS } from '../../web/shared/api.js';
+import { LIMITS, SERVER, TIMING, normalizeGate } from '../../web/shared/config.js';
 import { rooms } from '../../src/worker.js';
 import photo1 from '../fixtures/photo-1.jpg?inline';
 import photo2 from '../fixtures/photo-2.jpg?inline';
@@ -148,6 +149,57 @@ describe('rooms and players', () => {
     for (let i = 0; i < LIMITS.maxPlayers; i++) await (await connect(code, `P${i}`)).until((v) => v.me);
     const late = await connect(code, 'Late');
     expect(await late.closedWith()).toBe(CLOSE.full);
+  });
+});
+
+describe('the version gate', () => {
+  /** The gate `vitest.config.js` gives the tests' Worker. */
+  const GATE = { min: '1.0.8', newest: { ios: '1.0.12', android: null } };
+  const hello = (player, name, version) => player.send({ type: 'hello', key: keyFor(name), name, avatar: '🐼', version });
+
+  test('the server answers its gate, to the store apps too, never from a cache', async () => {
+    const origin = SERVER.appOrigins[0];
+    const res = await call(API.gate(), { headers: { Origin: origin } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.json()).toEqual(GATE);
+  });
+
+  test('an app too old for it creates no room; one from the minimum on, or one that says no version, does', async () => {
+    const create = (version) => call(API.rooms(), { method: 'POST', body: JSON.stringify({ settings: {}, version }) });
+    const old = await create('1.0.7');
+    expect(old.status).toBe(STATUS.update);
+    expect(await old.json()).toEqual({ error: 'update' });
+    expect((await create('1.0.8')).status).toBe(201);
+    expect((await create(undefined)).status).toBe(201);
+  });
+
+  test('a new player with an app too old for it is asked to update; one already in the game plays on', async () => {
+    const code = await createRoom();
+    // The tests' players say no version: they count as SILENT_VERSION, above this minimum.
+    const ann = await connect(code, 'Ann');
+    await ann.until((v) => v.me);
+    const ben = await connect(code);
+    hello(ben, 'Ben', '1.0.7');
+    expect(await ben.closedWith()).toBe(CLOSE.update);
+    const cleo = await connect(code);
+    hello(cleo, 'Cleo', '1.0.8');
+    await cleo.until((v) => v.me);
+
+    // A deploy that raises the minimum above every app here: whoever is in the game plays on.
+    await runInDurableObject(stub(code), (instance) => {
+      instance.gate = normalizeGate({ ...GATE, min: '9.0.0' });
+    });
+    const again = await connect(code, 'Ann');
+    await again.until((v) => v.me);
+    const dan = await connect(code);
+    hello(dan, 'Dan', '1.0.11');
+    expect(await dan.closedWith()).toBe(CLOSE.update);
+    // An app that says no version cannot show "Update to play": "full" ends its tries.
+    const eve = await connect(code, 'Eve');
+    expect(await eve.closedWith()).toBe(CLOSE.full);
+    expect(again.view().players.map((p) => p.name).sort()).toEqual(['Ann', 'Cleo']);
   });
 });
 

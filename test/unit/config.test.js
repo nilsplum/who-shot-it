@@ -1,13 +1,14 @@
 /**
- * The shared config (web/shared/config.js) and every file that restates one of its
- * values because it cannot import it: the web page, the legal page, the Capacitor
+ * The shared config (web/shared/config.js), with the version gate's rules, and every file
+ * that restates one of its values because it cannot import it: the web page, the legal page, the Capacitor
  * config, the native projects and wrangler.jsonc. A copy that drifts fails here. Also the
  * colours: their one home is the theme in styles/app.css, and the app's code and pages, and
  * the drafts that try out new ones (drafts/), only name them.
  */
 import { describe, expect, test } from 'vitest';
 import {
-  APP, ENVIRONMENTS, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SETTINGS, SETTINGS_DEFAULTS, STORES, buildNumber, isRoomCode, normalizeSetting, normalizeSettings, presetOf, reviewLink,
+  APP, ENVIRONMENTS, EMOJIS, LEGAL, LIMITS, PRESETS, REACTIONS, SETTINGS, SETTINGS_DEFAULTS, SILENT_VERSION, STORES, buildNumber, isRoomCode, isVersion, mayPlay,
+  normalizeGate, normalizeSetting, normalizeSettings, olderThan, presetOf, reviewLink,
 } from '../../web/shared/config.js';
 import indexHtml from '../../web/index.html?raw';
 import legalHtml from '../../web/legal.html?raw';
@@ -106,6 +107,46 @@ test('room codes use only the unambiguous alphabet', () => {
   expect(isRoomCode('AB0D')).toBe(false);
   expect(isRoomCode('abcd')).toBe(false);
   expect(isRoomCode('ABCDE')).toBe(false);
+});
+
+describe('the version gate', () => {
+  test('a version is three whole numbers, compared as numbers, not as text', () => {
+    expect(isVersion(APP.version)).toBe(true);
+    expect(isVersion('1.0.11')).toBe(true);
+    for (const v of ['1.0', '1.0.100', 'v1.0.1', '1.0.1 ', '', null, 10011]) expect(isVersion(v), String(v)).toBe(false);
+    expect(olderThan('1.0.9', '1.0.10')).toBe(true);
+    expect(olderThan('1.0.10', '1.0.9')).toBe(false);
+    expect(olderThan('1.0.10', '1.0.10')).toBe(false);
+    expect(olderThan('1.9.99', '2.0.0')).toBe(true);
+  });
+
+  test('a gate holds only versions; anything else lets every app play and offers no update', () => {
+    const open = { min: null, newest: { ios: null, android: null } };
+    expect(normalizeGate(null)).toEqual(open);
+    expect(normalizeGate('1.0.9')).toEqual(open);
+    expect(normalizeGate({ min: 'soon', newest: { ios: '1.0.12', android: 7, web: '9.9.9' } })).toEqual({ min: null, newest: { ios: '1.0.12', android: null } });
+    expect(mayPlay('0.0.1', open)).toBe(true);
+    expect(mayPlay(undefined, open)).toBe(true);
+  });
+
+  test('an app may play from the minimum on; one that says no version counts as the last one that said none', () => {
+    const gate = normalizeGate({ min: '1.0.11' });
+    expect(mayPlay('1.0.11', gate)).toBe(true);
+    expect(mayPlay('1.0.12', gate)).toBe(true);
+    expect(mayPlay('1.0.10', gate)).toBe(false);
+    expect(mayPlay(undefined, gate)).toBe(false);
+    expect(mayPlay('nonsense', gate)).toBe(false);
+    expect(mayPlay(undefined, normalizeGate({ min: SILENT_VERSION }))).toBe(true);
+  });
+
+  test('every build updates where it was installed from: the stores for production, TestFlight and Google Play for staging', () => {
+    const platforms = Object.keys(normalizeGate(null).newest);
+    for (const e of Object.values(ENVIRONMENTS)) expect(Object.keys(e.update)).toEqual(platforms);
+    expect(ENVIRONMENTS.production.update.ios).toBe(STORES.ios);
+    expect(ENVIRONMENTS.production.update.android).toBe(`https://play.google.com/store/apps/details?id=${APP.id}`);
+    expect(ENVIRONMENTS.staging.update.ios).toMatch(/^https:\/\/testflight\.apple\.com\/join\/[A-Za-z0-9]+$/);
+    expect(ENVIRONMENTS.staging.update.android).toBe(ENVIRONMENTS.production.update.android);
+  });
 });
 
 describe('values restated outside the config', () => {

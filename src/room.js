@@ -14,6 +14,11 @@
  * view only when what it shows changed (`sendView`). So a player's message reaches the
  * others only if they see a difference, and no phone's message can make every phone busy.
  *
+ * Joining checks the deployment's version gate (`gateOf`, read once per object): a new
+ * player whose app is too old for this server is asked to update (`CLOSE.update`) before
+ * anything is stored; a player already in the game plays on, so raising the minimum never
+ * breaks a running game.
+ *
  * Invariants:
  * - A Durable Object handles one event at a time, but an `await` lets the next one in.
  *   So handlers read request bodies first and then read the room, apply and commit
@@ -31,12 +36,12 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { CLOSE, matchRoomRoute } from '../web/shared/api.js';
-import { LIMITS, REACTIONS, TIMING } from '../web/shared/config.js';
+import { LIMITS, REACTIONS, TIMING, isVersion, mayPlay } from '../web/shared/config.js';
 import { makeId } from '../web/shared/random.js';
 import { apply, nextWake } from './game/rules.js';
 import { cleanName, isServablePhoto, newRoom, playerById, playerByKey, referencedPhotoIds } from './game/state.js';
 import { CLOCK_FIELDS, viewFor } from './game/view.js';
-import { bearerKey, cryptoRandom, fail, isJpeg, isPlayerKey, json, tooLarge } from './http.js';
+import { bearerKey, cryptoRandom, fail, gateOf, isJpeg, isPlayerKey, json, tooLarge } from './http.js';
 
 /** App messages that become events, each with exactly the fields the rules read. */
 const CLIENT_EVENTS = {
@@ -83,6 +88,8 @@ export class Room extends DurableObject {
      * to every phone once.
      */
     this.sent = new WeakMap();
+    /** The version gate this deployment was given; it changes only with a new deploy, which starts a new object. */
+    this.gate = gateOf(env);
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
 
@@ -300,9 +307,16 @@ export class Room extends DurableObject {
     if (msg.type === 'leave') ws.close(CLOSE.left, 'left');
   }
 
-  hello(ws, { key, name, avatar, ahead, uploading, asks }) {
+  hello(ws, { key, name, avatar, ahead, uploading, asks, version }) {
     if (!isPlayerKey(key) || !cleanName(name)) {
       ws.close(1008, 'bad_hello');
+      return;
+    }
+    // A new player whose app is too old for this server is asked to update. An app that says
+    // no version (up to SILENT_VERSION) knows no such answer and would reconnect forever, so
+    // it gets "full", which ends its tries. A player already in the game plays on.
+    if (!playerByKey(this.room, key) && !mayPlay(version, this.gate)) {
+      ws.close(isVersion(version) ? CLOSE.update : CLOSE.full, 'update');
       return;
     }
     this.dispatch({ type: 'join', key, name, avatar, ahead: ahead === true, uploading, asks: asks === true });

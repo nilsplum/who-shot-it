@@ -181,7 +181,7 @@ the integration tests' gate. Tests: unit (the rules, the pages), integration (th
 Create's 426, hello's `CLOSE.update`, a player already in the game, an app that says no
 version).
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 7).
 
 ### Commit 3: app: says its version, asks for the gate, "✨ Update" and "Update to play"
 
@@ -231,3 +231,11 @@ Status: planned.
   going; it promises nothing legally binding), one yellow "Update" button, "Not now" as a
   quiet link so the button stands alone. "✨ Update" on the start screen is a link, not a
   sheet: one tap to the store.
+- **Commit 2:** versions compare through one number (`versionNumber`, which `buildNumber`
+  already used), so a version is three whole numbers with minor and patch below 100, the same
+  limit the build numbers have. The room reads the gate once when its object starts: a deploy
+  restarts every Durable Object, so it can never hold an old one. The integration tests'
+  Worker gets a fixed gate in `vitest.config.js` (1.0.8 and newer, iPhone 1.0.12), so their
+  own players (who say no version) still play; the end-to-end server runs without one, like
+  `./scripts/dev.sh`. "This version is newer than `SILENT_VERSION`" is checked with the version
+  change (commit 5), when it becomes true.
