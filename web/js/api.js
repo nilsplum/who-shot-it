@@ -2,19 +2,20 @@
  * The app's HTTP calls to the server (everything that is not the room's WebSocket), and
  * the full addresses of server paths.
  *
- * Mechanisms: `main.js` creates rooms and uploads a player's chosen photos on "Yes"
- * through these functions; paths come from `web/shared/api.js`, the same module the
- * server routes with, prefixed with the server's origin (`phone.serverOrigin`), because
- * the app's own page is not served by the server.
+ * Mechanisms: `main.js` creates rooms, uploads a player's chosen photos on "Yes" and asks
+ * for the server's version gate through these functions; paths come from
+ * `web/shared/api.js`, the same module the server routes with, prefixed with the server's
+ * origin (`phone.serverOrigin`), because the app's own page is not served by the server.
  *
  * Invariants: the player's key travels only in the `Authorization` header, never in a
- * URL. Every call has a timeout, and a failed call throws, so the caller can show one
- * short message and let the player try again. The upload goes through `XMLHttpRequest`,
+ * URL. Every call has a timeout, and a failed call throws (with the server's `status`), so
+ * the caller can show one short message and let the player try again, or "Update to play". The upload goes through `XMLHttpRequest`,
  * the one way a page learns how much of a body is sent (`fetch` cannot tell), so the start
  * shows a real percentage while the group waits for this phone's photos.
  */
 
 import { API } from '../shared/api.js';
+import { APP, normalizeGate } from '../shared/config.js';
 import { serverOrigin } from './phone.js';
 
 /** The full address of a server path (a photo link from the view, the legal page, …). */
@@ -27,14 +28,30 @@ const auth = (key) => ({ Authorization: `Bearer ${key}` });
 
 async function request(path, options, timeoutMs) {
   const res = await fetch(serverUrl(path), { ...options, cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
   return res;
 }
 
-/** Creates a room with the creator's chosen settings; returns its code. */
+/**
+ * Creates a room with the creator's chosen settings; returns its code. It says this app's
+ * version: an app too old for the server throws with `status` `STATUS.update`.
+ */
 export async function createRoom(settings) {
-  const res = await request(API.rooms(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) }, 15000);
+  const res = await request(API.rooms(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings, version: APP.version }) }, 15000);
   return (await res.json()).code;
+}
+
+/**
+ * The server's version gate (`normalizeGate`): the oldest version that may play there and the
+ * newest one out per platform. Asked once per start; it never throws: a server out of reach,
+ * or one deployed before the gate, gives the open gate, so the app plays on and offers nothing.
+ */
+export async function fetchGate() {
+  try {
+    return normalizeGate(await (await request(API.gate(), {}, 10000)).json());
+  } catch {
+    return normalizeGate(null);
+  }
 }
 
 /**

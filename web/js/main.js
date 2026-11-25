@@ -11,6 +11,12 @@
  *   screen into "Join <CODE>".
  * - Create: "Create game" opens the "New game" step (`session.setup`, presets and
  *   settings for this phone), "Start game" creates the room with those settings.
+ * - The version gate: the app asks its server once per start which versions may play there
+ *   and which is the newest out (`fetchGate`, `session.gate`). A newer one shows "✨ Update"
+ *   on the start screen (`newerOut`). A version too old to play is told "Update to play"
+ *   (the 'update' sheet, `askUpdate`) only when the player taps "Create game" or "Join":
+ *   at once by the gate it knows, else by the server's own answer (Create's `STATUS.update`,
+ *   Join's `CLOSE.update`; the server decides, the app's copy only saves a step).
  * - In a room, `RoomSocket` delivers the player's view; every view replaces
  *   `session.view`, hands the game's photos to the queue that loads them ahead
  *   (`upcoming.js`), tells the room which round this phone is ready for (`loaded`,
@@ -84,16 +90,16 @@
  *   and the `HOLDS` table; sheets are the only dialogs.
  */
 
-import { CLOSE } from '../shared/api.js';
-import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, normalizeSetting, normalizeSettings, reviewLink, termsToken } from '../shared/config.js';
+import { CLOSE, STATUS } from '../shared/api.js';
+import { APP, EMOJIS, LIMITS, PRESETS, REACTIONS, TIMING, balancedRange, isRoomCode, mayPlay, normalizeSetting, normalizeSettings, olderThan, reviewLink, termsToken } from '../shared/config.js';
 import { makeId, shuffle } from '../shared/random.js';
-import { createRoom, uploadPhotos } from './api.js';
+import { createRoom, fetchGate, uploadPhotos } from './api.js';
 import { playBoard } from './board.js';
 import { createClock } from './clock.js';
 import { RoomSocket } from './connection.js';
 import { cut, nextNumberIn, onTheClock } from './countdown.js';
 import { startEffect, stopEffects } from './effects.js';
-import { askForRating, askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, platform, share } from './phone.js';
+import { askForRating, askPhotoAccess, buzz, inApp, keepAwake, onBack, onInvite, onResume, openSettings, photoAccess, platform, share, updateLink } from './phone.js';
 import { chosenBlobs, heldLayers, holdPhoto, leaveSet, photos, resetPhotos, roll, setNeeds, startPhotos, swap } from './photos.js';
 import { playPodium } from './podium.js';
 import { playReveal } from './reveal.js';
@@ -144,6 +150,17 @@ let counting = false;
 let nextNumber = 0;
 /** This phone's store page for writing a review ("How to play"), or null (`reviewLink`); the platform never changes while the app runs. */
 const RATE_LINK = reviewLink(platform());
+/** Where this build gets a newer version (`phone.updateLink`: its store page, TestFlight for a test build), or null in a browser. */
+const UPDATE_LINK = updateLink();
+
+/** Whether a newer version of this app is out for this phone's platform (the server's version gate), and it knows where to get it. */
+function newerOut() {
+  const newest = session.gate.newest[platform()];
+  return Boolean(UPDATE_LINK && newest && olderThan(APP.version, newest));
+}
+
+/** "Update to play": this app is too old for its server. */
+const askUpdate = () => openSheet('update');
 
 const inLobby = (v) => v.phase === 'lobby' || v.phase === 'countdown';
 const inRound = (v) => ['load', 'show', 'reveal', 'board'].includes(v.phase);
@@ -191,7 +208,7 @@ function startShare(v) {
 // ---------- Rendering ----------
 
 function context() {
-  return { device, session, view: session.view, flagLeft: clock.left(flagTimer), nudge: nudgeAt(session.view, session.nudge, performance.now()), rateLink: RATE_LINK };
+  return { device, session, view: session.view, flagLeft: clock.left(flagTimer), nudge: nudgeAt(session.view, session.nudge, performance.now()), rateLink: RATE_LINK, updateLink: UPDATE_LINK, newer: newerOut() };
 }
 
 function screen() {
@@ -412,11 +429,11 @@ function syncBar() {
  * (`upcoming.js`); `uploading`: its upload still on its way, so the room waits for that one
  * and no other (`readyWith`); `asks`: it can show the room-wide "Is everyone here?" and
  * "Start now", the fallback for when the last Yes did not come confirmed
- * (`views/overlays.js`, `views/lobby.js`).
+ * (`views/overlays.js`, `views/lobby.js`); `version`: for the server's version gate.
  */
 function hello() {
   const uploading = session.sending ? session.sending.upload : null;
-  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true, uploading, asks: true };
+  return { type: 'hello', key: keyFor(session.code), name: device.name, avatar: device.avatar, ahead: true, uploading, asks: true, version: APP.version };
 }
 
 function openSocket(code) {
@@ -477,6 +494,11 @@ function onEnd(code) {
   } else if (code === CLOSE.full) exitRoom('This game is full.');
   else if (code === CLOSE.removed) exitRoom('The host removed you from this game.', { forget: true });
   else if (code === CLOSE.gone) exitRoom(session.view ? 'This game is over.' : 'No game with this code.', { forget: true });
+  else if (code === CLOSE.update) {
+    // Too old to join here: back on the start screen with the code still typed, so after the update it is one tap.
+    exitRoom();
+    askUpdate();
+  }
 }
 
 /**
@@ -783,6 +805,7 @@ const ACTIONS = {
     openSheet(null);
   },
   create: () => {
+    if (!mayPlay(APP.version, session.gate)) return askUpdate();
     if (needName()) return;
     session.setup = true;
     render();
@@ -805,16 +828,25 @@ const ACTIONS = {
     render();
     try {
       enterRoom(await createRoom(device.settings));
-    } catch {
-      toast('Could not create a game. Try again.');
+    } catch (error) {
+      if (error.status === STATUS.update) askUpdate();
+      else toast('Could not create a game. Try again.');
     } finally {
       session.creating = false;
       render();
     }
   },
   join() {
-    if (needName()) return;
     const code = session.invite || (($('code') || {}).value || '').toUpperCase();
+    if (!mayPlay(APP.version, session.gate)) {
+      // Remembered for after the update (the code field shows it), so the game is one tap away.
+      if (isRoomCode(code)) {
+        device.lastRoom = code;
+        saveDevice();
+      }
+      return askUpdate();
+    }
+    if (needName()) return;
     if (!isRoomCode(code)) {
       toast('Enter the 4-letter code');
       const input = $('code');
@@ -1089,6 +1121,11 @@ if (!inApp()) {
   paintApp(landingScreen(isRoomCode(code) ? code : null));
 } else {
   syncPhotoNeeds();
+  // Once per start: whether a newer version is out, and whether this one may still play.
+  fetchGate().then((gate) => {
+    session.gate = gate;
+    render();
+  });
   // The photo bucket starts filling as soon as the terms are accepted and the app may read photos.
   if (device.agreed === termsToken()) checkAccess();
   if (device.room && device.name && device.agreed === termsToken()) enterRoom(device.room);

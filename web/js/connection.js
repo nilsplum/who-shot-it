@@ -12,8 +12,8 @@
  *   the background (`checkNow`, also called by `main.js` when the app resumes).
  * - A missing pong means a dead connection: the socket is dropped and replaced at once,
  *   without waiting for the WebView's slow close.
- * - Close codes that end the session (`CLOSE.replaced/full/gone/left/removed`) stop reconnecting
- *   and are reported to `onEnd`; everything else is retried.
+ * - Close codes that end the session (`CLOSE.replaced/full/gone/left/removed/update`) stop
+ *   reconnecting and are reported to `onEnd`; everything else is retried.
  * - Messages sent while disconnected are dropped (the banner tells the player).
  */
 
@@ -21,7 +21,7 @@ import { CLOSE } from '../shared/api.js';
 import { TIMING } from '../shared/config.js';
 import { socketUrl } from './api.js';
 
-const FINAL = new Set([CLOSE.replaced, CLOSE.full, CLOSE.gone, CLOSE.left, CLOSE.removed]);
+const FINAL = new Set([CLOSE.replaced, CLOSE.full, CLOSE.gone, CLOSE.left, CLOSE.removed, CLOSE.update]);
 
 export class RoomSocket {
   /**

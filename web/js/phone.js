@@ -3,7 +3,8 @@
  * and the chosen photos, keeping the screen on, opening the app's settings and the store's
  * own rating window (the app's own native plugin `Phone`, `docs/apps.md`), the share sheet,
  * invite links, the Android back button and vibration (Capacitor's official App, Share and
- * Haptics plugins), which platform it runs on, and where the server is.
+ * Haptics plugins), which platform it runs on, where the server is, and where this build
+ * gets a newer version.
  *
  * Mechanisms: inside the store apps Capacitor injects `window.Capacitor` with a proxy per
  * native plugin. The same page opened in a plain browser has no `Phone` plugin: it is the
@@ -18,8 +19,8 @@
  * - The app's own page runs at one of `SERVER.appOrigins` and talks to the server of the
  *   environment its build was made for (`ENVIRONMENTS`, `environment.js`: production, or
  *   staging for a test build); anywhere else (the website, local development, the tests) it
- *   talks to the origin it came from. `serverOrigin` and `codeFromLink` are pure, so they are
- *   unit-tested.
+ *   talks to the origin it came from. `serverOrigin`, `updateLink` and `codeFromLink` are
+ *   pure, so they are unit-tested.
  */
 
 import { APP, ENVIRONMENTS, LIMITS, SERVER, TIMING, isRoomCode } from '../shared/config.js';
@@ -36,6 +37,15 @@ export const platform = () => (typeof window !== 'undefined' && window.Capacitor
 /** Where the API, the room sockets and the photos are, seen from a page at `origin` of a build for `environment`. */
 export function serverOrigin(origin = location.origin, environment = ENVIRONMENT) {
   return SERVER.appOrigins.includes(origin) ? ENVIRONMENTS[environment].origin : origin;
+}
+
+/**
+ * Where a build for `environment` on `on` (`platform`) gets a newer version: its store page,
+ * or TestFlight for a test build (`ENVIRONMENTS[...].update`); null in a plain browser. It
+ * opens like any outside link: the phone hands it to the store's app.
+ */
+export function updateLink(environment = ENVIRONMENT, on = platform()) {
+  return ENVIRONMENTS[environment].update[on] || null;
 }
 
 /**

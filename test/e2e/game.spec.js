@@ -24,14 +24,17 @@
  * their arrow pages through (turning at each end), and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
  * swaps (the turn to the swaps left, ✕ at none, a refused tap), the hold and "No →"'s slide
- * in the photo choice ("How to play" explaining them, with its quiet "⭐ Rate the game"), the terms
- * after an update, and the website (the same page in a plain browser): invite page and
- * legal page.
+ * in the photo choice ("How to play" explaining them, with its quiet "⭐ Rate the game"), the
+ * version gate (a newer version out: "✨ Update" on the start screen; too old: "Update to
+ * play", only on Create game or Join, from the gate the app knows or from the server's own
+ * answer, the code still typed afterwards), the terms after an update, and the website (the
+ * same page in a plain browser): invite page and legal page.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { LIMITS, REACTIONS, STORES } from '../../web/shared/config.js';
+import { CLOSE, STATUS } from '../../web/shared/api.js';
+import { ENVIRONMENTS, LIMITS, REACTIONS, STORES } from '../../web/shared/config.js';
 import { RATING } from '../../web/js/review.js';
 import { addBots } from './bots.js';
 import { library, newPhone } from './fake-phone.js';
@@ -659,6 +662,59 @@ test('choosing photos: a tap swaps one and shows the swaps left (✕ at none), a
   await expect(phone.locator('[data-cell="leaving"]')).toHaveCount(0);
   await tiles.nth(0).click();
   await expect(count).toHaveText('2');
+});
+
+test('the version gate: "✨ Update" when a newer version is out; "Update to play" only on Create game or Join, the code still typed', async ({ browser }) => {
+  // The local server has no version gate (a deployed one gets it at its deploy), so these
+  // phones hear the answers of a server that has one. The fake phone is an iPhone running a
+  // production build: its store page is the App Store's.
+  const store = ENVIRONMENTS.production.update.ios;
+  const sheet = (page) => page.getByRole('heading', { name: 'Update to play' });
+  const openWith = async (page, name, gate) => {
+    if (gate) await page.route('**/api/gate', (route) => route.fulfill({ json: gate }));
+    await page.goto('/');
+    await page.getByRole('button', { name: 'I agree, let’s play' }).click();
+    await page.fill('#name', name);
+  };
+
+  // A newer version is out and this one may still play: only the small link, straight to the store.
+  const newer = await newPhone(browser);
+  await openWith(newer, 'Ann', { min: null, newest: { ios: '99.0.0', android: null } });
+  await expect(newer.getByRole('link', { name: '✨ Update' })).toHaveAttribute('href', store);
+  await newer.getByRole('button', { name: 'Create game' }).click();
+  await expect(newer.getByRole('button', { name: 'Start game' })).toBeVisible();
+  await expect(sheet(newer)).toHaveCount(0);
+
+  // Too old for the gate it knows: Create game and Join ask at once, before anything else.
+  const old = await newPhone(browser);
+  await openWith(old, 'Ben', { min: '99.0.0', newest: { ios: '99.0.0', android: null } });
+  await old.getByRole('button', { name: 'Create game' }).click();
+  await expect(sheet(old)).toBeVisible();
+  await expect(old.getByText('It takes about a minute.')).toBeVisible();
+  await expect(old.getByRole('link', { name: 'Update', exact: true })).toHaveAttribute('href', store);
+  await old.getByRole('button', { name: 'Not now' }).click();
+  await expect(sheet(old)).toHaveCount(0);
+  await join(old, 'ABCD');
+  await expect(sheet(old)).toBeVisible();
+  // The code is kept for after the update (the app starts again then).
+  await old.reload();
+  await expect(old.locator('#code')).toHaveValue('ABCD');
+
+  // The gate did not come (an old server, no network at the start): the server's own answer
+  // to Create, and to Join, which ends on the start screen with the code still typed.
+  const late = await newPhone(browser);
+  await late.route('**/api/rooms', (route) => (route.request().method() === 'POST' ? route.fulfill({ status: STATUS.update, json: { error: 'update' } }) : route.fallback()));
+  await late.routeWebSocket(/\/socket$/, (ws) => ws.close({ code: CLOSE.update, reason: 'update' }));
+  await openWith(late, 'Cleo');
+  await expect(late.getByRole('link', { name: '✨ Update' })).toHaveCount(0);
+  await late.getByRole('button', { name: 'Create game' }).click();
+  await late.getByRole('button', { name: 'Start game' }).click();
+  await expect(sheet(late)).toBeVisible();
+  await late.getByRole('button', { name: 'Not now' }).click();
+  await late.getByRole('button', { name: 'Back' }).click();
+  await join(late, 'ABCD');
+  await expect(sheet(late)).toBeVisible();
+  await expect(late.locator('#code')).toHaveValue('ABCD');
 });
 
 test('the terms come back after an update: a phone that accepted an older version sees them again', async ({ browser }) => {

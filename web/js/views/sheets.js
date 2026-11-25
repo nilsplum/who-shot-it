@@ -3,8 +3,9 @@
  * quiet "⭐ Rate the game" link: the player's own choice, so a plain link to the store's
  * review page, never a prompt), avatar picker, invite (QR and share), and the confirmations for leaving, reporting a photo
  * (opened by ⚑: the others wait while it is open, and Delete counts down to the room's own
- * deletion, `flagLeft` from `main.js`), removing a player, and "Is everyone here?" on the
- * last player's phone before their Yes starts a group's first game.
+ * deletion, `flagLeft` from `main.js`), removing a player, "Is everyone here?" on the
+ * last player's phone before their Yes starts a group's first game, and "Update to play"
+ * when this app is too old for its server.
  *
  * Mechanisms: `main.js` keeps the open sheet's name in `session.sheet` and paints the
  * result of `sheetScreen` into `#sheet` with the same part mechanism as the screens, so a
@@ -133,6 +134,19 @@ function removeBody({ view, session }) {
     ${buttons('<button class="btn bg-red text-white" data-act="removenow">Remove</button>', '<button class="btn" data-act="close">Cancel</button>')}`;
 }
 
+/**
+ * "Update to play": this app is too old for its server, found when the player taps "Create
+ * game" or "Join" (`main.js` `askUpdate`). As little as possible between them and the store:
+ * what it is for, how long it takes (an honest estimate for an app of a few megabytes, which
+ * keeps people going), one big button straight to this build's store page (`c.updateLink`),
+ * and "Not now" small, so the button stands alone. The code they typed stays, so after the
+ * update the game is one tap away.
+ */
+const updateBody = ({ updateLink }) => `<div class="mb-1 text-center text-6xl leading-none">✨</div>
+  ${title('Update to play')}
+  ${text('It takes about a minute.')}
+  ${buttons(updateLink ? `<a class="btn bg-yellow text-navy" href="${esc(updateLink)}" target="_blank" rel="noopener">Update</a>` : '', '<button class="link" data-act="close">Not now</button>')}`;
+
 /** `{ key, layout, parts }` for the open sheet, or null. */
 export function sheetScreen(c) {
   const name = c.session.sheet;
@@ -147,6 +161,7 @@ export function sheetScreen(c) {
     report: () => (inRoom ? reportBody(c) : ''),
     remove: () => (inRoom ? removeBody(c) : ''),
     start: () => (inRoom ? START : ''),
+    update: () => updateBody(c),
   };
   const body = bodies[name] ? bodies[name]() : '';
   if (!body) return null;

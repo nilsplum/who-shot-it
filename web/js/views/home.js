@@ -7,6 +7,8 @@
  * creating a new game as a small link below. "Create game" leads to the "New game" step
  * (`views/newgame.js`). Actions (`data-act`) are handled in `main.js`. The logo, the name
  * and the form sit in the middle of the free space; the legal link stays at the bottom.
+ * When a newer version of the app is out (the server's version gate, `main.js`), "✨ Update"
+ * sits small in the top left: a link straight to this build's store page.
  */
 
 import { LIMITS } from '../../shared/config.js';
@@ -19,10 +21,21 @@ export const legalLink = (text = 'Legal &amp; privacy') => `<a href="${esc(serve
 /** The legal link at the bottom of the start screen and the website. */
 export const legalFooter = () => `<div class="mt-6 text-center text-xs text-muted">${legalLink()}</div>`;
 
+/**
+ * "✨ Update", when a newer version is out (`c.newer`): small, so it never crowds the start
+ * screen, in yellow, so it is seen; one tap opens the store page (`c.updateLink`). Its own
+ * margin undoes the top bar's, which lines up the glyph buttons there. A part of its own,
+ * since the server's answer comes after the screen is painted.
+ */
+const updateLink = (c) => (c.newer && c.updateLink
+  ? `<a class="ml-2 inline-flex min-h-9 items-center rounded-full bg-raised px-3.5 text-sm font-extrabold text-yellow" href="${esc(c.updateLink)}" target="_blank" rel="noopener">✨ Update</a>`
+  : '');
+
 /** The two text fields (name and code): dark, with a yellow border while typing. */
 const FIELD = 'w-full rounded-2xl border-2 border-transparent bg-raised px-4 py-3.75 text-ink outline-hidden placeholder:text-hint focus:border-yellow';
 
-export function homeScreen({ device, session }) {
+export function homeScreen(c) {
+  const { device, session } = c;
   const invite = session.invite;
   const actions = invite
     ? `<button class="btn bg-coral text-white" data-act="join">Join ${esc(invite)}</button>`
@@ -31,7 +44,7 @@ export function homeScreen({ device, session }) {
   return {
     key: `home|${invite || ''}`,
     layout: `<div class="screen">
-      ${topBar('', '', HELP_BUTTON)}
+      ${topBar('<span data-part="update"></span>', '', HELP_BUTTON)}
       <div class="my-auto pt-4">
         ${hero(NAME_TITLE)}
         <div class="space-y-3">
@@ -43,6 +56,7 @@ export function homeScreen({ device, session }) {
       ${legalFooter()}
     </div>`,
     parts: {
+      update: updateLink(c),
       avatar: `<button class="grid size-14 place-items-center rounded-2xl border-2 border-player bg-player-fill text-5xl leading-none active:scale-95" data-act="avatar" aria-label="Pick your avatar" style="--player:${colourOf(device.avatar)}">${esc(device.avatar)}</button>`,
     },
   };

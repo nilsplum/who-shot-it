@@ -1,13 +1,13 @@
 /**
  * The pure parts of the app's phone bridge (web/js/phone.js): where the server is, seen
- * from each place the page runs and for each environment a build is made for, and which
- * invite links open a game.
+ * from each place the page runs and for each environment a build is made for, where a build
+ * gets a newer version, and which invite links open a game.
  */
 import { describe, expect, test } from 'vitest';
 import { APP, ENVIRONMENTS, SERVER } from '../../web/shared/config.js';
 import { ENVIRONMENT } from '../../web/js/environment.js';
 import environmentJs from '../../web/js/environment.js?raw';
-import { codeFromLink, serverOrigin } from '../../web/js/phone.js';
+import { codeFromLink, serverOrigin, updateLink } from '../../web/js/phone.js';
 
 const SITE = ENVIRONMENTS.production.origin;
 
@@ -28,6 +28,16 @@ describe('the server origin', () => {
     // The single line scripts/helpers/environments.sh rewrites in a native project's copy.
     expect(environmentJs.match(/^export const ENVIRONMENT = '[a-z]+';$/gm)).toEqual(["export const ENVIRONMENT = 'production';"]);
   });
+});
+
+test('a build gets a newer version where it came from: its store, TestFlight for a test iPhone build, nothing in a browser', () => {
+  expect(updateLink('production', 'ios')).toBe(ENVIRONMENTS.production.update.ios);
+  expect(updateLink('production', 'android')).toBe(ENVIRONMENTS.production.update.android);
+  expect(updateLink('staging', 'ios')).toBe(ENVIRONMENTS.staging.update.ios);
+  expect(updateLink('staging', 'android')).toBe(ENVIRONMENTS.staging.update.android);
+  expect(updateLink('production', 'web')).toBeNull();
+  // In the tests (no Capacitor) the page is a browser.
+  expect(updateLink()).toBeNull();
 });
 
 describe('invite links', () => {

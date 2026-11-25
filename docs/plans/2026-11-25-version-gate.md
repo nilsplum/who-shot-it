@@ -192,7 +192,7 @@ Status: done (25 November 2026; its decisions in section 7).
 sheet). Tests: unit (`updateLink`), e2e (the link on the start screen, the sheet from the
 known gate, from Create's answer and from Join's close; the code stays).
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 7).
 
 ### Commit 4: scripts: the deploy asks for the gate, sets it, reads it back; status shows it
 
@@ -239,3 +239,12 @@ Status: planned.
   own players (who say no version) still play; the end-to-end server runs without one, like
   `./scripts/dev.sh`. "This version is newer than `SILENT_VERSION`" is checked with the version
   change (commit 5), when it becomes true.
+- **Commit 3:** "✨ Update" is a part of the start screen of its own: the server's answer
+  comes after the first paint, and a screen's layout is painted only when the screen
+  changes. On "Create game" and "Join" the gate the app knows is checked first (before the
+  name), so a player never fills in the "New game" step for nothing; the server's own answer
+  stays the authority (an app whose gate did not come, or a server whose gate rose since).
+  Refused on joining, the app goes back to the start screen without a word and opens the
+  sheet; the code it tried stays in the field (`device.lastRoom`). The end-to-end test gives
+  the phones the answers of a server with a gate (Playwright's `route` and
+  `routeWebSocket`), since the local server has none, like `./scripts/dev.sh`.
