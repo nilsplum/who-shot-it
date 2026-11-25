@@ -13,8 +13,9 @@
 #       the public TestFlight link (after typing "submit <version> to App Review"); an iPhone
 #       build of this version uploaded before is sent as it is, without building again.
 #   ./scripts/release-apps.sh status
-#       Where App Store Connect stands: the newest builds with their environment, TestFlight,
-#       the versions and App Review.
+#       Which app versions each server lets play and the newest it offers (its version gate,
+#       set by ./scripts/deploy.sh), then where App Store Connect stands: the newest builds
+#       with their environment, TestFlight, the versions and App Review.
 #   ./scripts/release-apps.sh withdraw
 #       Takes the version waiting for or in App Review back (after typing "take it back from
 #       App Review"), so a newer production build can take its place with --submit.
@@ -75,6 +76,7 @@ if [ "$mode" = status ] || [ "$mode" = withdraw ]; then
     || fail "$mode takes no platform or option." "Use: ./scripts/release-apps.sh $mode"
   preflight_stores
   [ "$mode" = status ] || confirm_phrase "take it back from App Review" "The version waiting for or in App Review comes back; nothing goes live until a production build is submitted again (./scripts/release-apps.sh production ios --submit)."
+  [ "$mode" = withdraw ] || node scripts/helpers/gate.mjs show
   exec node scripts/helpers/app-store.mjs "$mode"
 fi
 
@@ -156,6 +158,13 @@ copy_game() {
   mark_app_environment "$environment" "$1"
 }
 
+# The step after an upload: once people can install this version from where its platform
+# updates ($2), the server learns it is the newest (its version gate), so older apps show
+# "✨ Update" on their start screen.
+tell_newest() {
+  echo "→ Once it can be installed from $2: ./scripts/deploy.sh $environment --newest $1=$version (older apps then show \"✨ Update\")"
+}
+
 # The upload key: made once, kept in secrets/ (never committed).
 ensure_android_upload_key() {
   local key=secrets/android-upload.jks props=secrets/android-upload.properties
@@ -188,6 +197,7 @@ release_android() {
   if [ "$upload" = true ]; then
     echo "→ Android: uploading to Google Play ($track track)"
     node scripts/helpers/play-upload.mjs "$aab" "$track" "$version"
+    tell_newest android "Google Play's $track track"
   else
     echo "✓ $aab: upload it in the Google Play Console (docs/apps.md)."
   fi
@@ -237,9 +247,11 @@ release_ios() {
   elif [ "$submit" = true ]; then
     echo "→ iPhone: filling in the App Store page and sending it to App Review and the public TestFlight link"
     node scripts/helpers/app-store.mjs submit --wait
+    tell_newest ios "the App Store, after Apple's approval"
   elif [ "$environment" = staging ]; then
     echo "→ iPhone: putting it on the public TestFlight link too"
     node scripts/helpers/app-store.mjs testflight staging --wait
+    tell_newest ios "TestFlight"
   else
     echo "✓ Uploaded $version ($build). In about 15 minutes it is in TestFlight for the team, talking to production; to send it to App Review: ./scripts/release-apps.sh production ios --submit"
   fi

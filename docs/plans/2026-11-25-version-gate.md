@@ -201,7 +201,7 @@ Status: done (25 November 2026; its decisions in section 7).
 shows the gates), `wrangler.jsonc` (its comment), README, `docs/apps.md` (Releasing),
 AGENTS.md (the gate is the one value a deploy is given).
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 7).
 
 ### Commit 5: chore(release): version 1.0.11
 
@@ -248,3 +248,16 @@ Status: planned.
   sheet; the code it tried stays in the field (`device.lastRoom`). The end-to-end test gives
   the phones the answers of a server with a gate (Playwright's `route` and
   `routeWebSocket`), since the local server has none, like `./scripts/dev.sh`.
+- **Commit 4:** the asking and checking is one Node helper (`scripts/helpers/gate.mjs`), which
+  talks to the person on stderr and hands the script two lines on stdout (the gate, and the
+  minimum if it went up), so the typed phrase stays the scripts' one `confirm_phrase`. Only
+  values not given as options are asked, and only in a terminal; without one the live values
+  stay, so an unattended run never waits. A server that does not answer is started from no
+  gate with a warning (opening is the direction that never blocks anyone); one that answers
+  "not found" (deployed before the gate) has none. The minimum may not be above any newest
+  version that is set; a platform without one is not checked (nothing can be known about
+  it). Every upload prints the deploy command that tells the server the new version is out
+  (`tell_newest`), and `./scripts/release-apps.sh status` shows both servers' gates next to
+  App Store Connect, so "approved" and "newest on the server" are seen together. Test players
+  (`demo-players.mjs`) run the real page from the server, so they say the server's own version
+  and are never refused.

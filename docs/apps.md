@@ -68,8 +68,8 @@ number times ten plus 0 (staging) or 1 (production), so 1.0.9 is 100090 or 10009
 **Releasing it (production):**
 1. Merge into `main`.
 2. If the server changed: `./scripts/deploy.sh production` (it asks you to type "deploy to
-   production"). Installed apps update slowly, so the server must keep understanding the
-   app versions people still have.
+   production"). Installed apps update slowly, so the server must keep understanding every
+   app version its version gate lets play (below).
 3. `./scripts/release-apps.sh production ios` uploads the store build to TestFlight's team:
    try it against production (and record App Review's video with it, below). Then
    `./scripts/release-apps.sh production ios --submit` fills in the App Store page from the
@@ -80,10 +80,27 @@ number times ten plus 0 (staging) or 1 (production), so 1.0.9 is 100090 or 10009
    (type "release <version> on Google Play"): Google reviews it (hours to a few days), then
    it goes live.
 
-`./scripts/release-apps.sh status` shows where App Store Connect stands (the newest builds
-with their environment, TestFlight, App Review); `./scripts/release-apps.sh withdraw` takes a
-version Apple has not approved yet back, so `--submit` can send a newer build in its place.
-`--no-upload` only builds (`dist/who-shot-it-<version>-<environment>.aab`,
+**Which app versions may play (the version gate):** every `./scripts/deploy.sh
+<environment>` shows what that server lets play now and asks for each value (Enter keeps it;
+the options answer in advance). The values live only on the live server, never in the repo.
+- The oldest version that may create or join a game there (`--min <version>`): an older app
+  gets "Update to play" with one button to where it updates (the App Store or Google Play for
+  production, TestFlight or Google Play for staging); a game it is already in goes on. Raise
+  it only when the server stops understanding older apps, and never above the newest version
+  out (the script refuses; on production it asks you to type "raise the minimum to
+  <version>"). Apps up to 1.0.10 say no version and count as 1.0.10: they cannot show the
+  update screen, so a minimum above it tells them only "This game is full." (joining) or
+  "Could not create a game." (creating).
+- The newest version people can install, per platform (`--newest ios=<version>`,
+  `android=<version>`): older apps show a small "✨ Update" on the start screen. Set it once a
+  version can be installed (staging: in TestFlight; production: live in the App Store or on
+  Google Play); every upload prints the command for it. App Review is never blocked: the
+  minimum stays at or below a version that is out.
+
+`./scripts/release-apps.sh status` shows both servers' gates and where App Store Connect
+stands (the newest builds with their environment, TestFlight, App Review);
+`./scripts/release-apps.sh withdraw` takes a version Apple has not approved yet back, so
+`--submit` can send a newer build in its place. `--no-upload` only builds (`dist/who-shot-it-<version>-<environment>.aab`,
 `dist/ios/App.ipa`).
 
 **Tools:** Android needs Android Studio (it brings Java and the SDK). iPhone needs a Mac with

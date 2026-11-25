@@ -28,8 +28,8 @@ room, stored in the EU.
 | `./scripts/setup.sh` | Installs the pinned dependencies and the test browser. Run once and after dependency changes. |
 | `./scripts/test.sh` | All tests: unit + integration (inside the Workers runtime), then phone-sized browsers playing a full game with a stand-in photo library. `--no-e2e` skips the browsers. |
 | `./scripts/dev.sh [android\|ios\|store\|drafts]` | The server locally at `http://localhost:8787`; with a platform also the app on a phone or emulator, loading the game live from this computer. `store`: both store pages as players will see them, at `http://localhost:8788`. `drafts`: pick a draft to try out in the browser, at `http://localhost:8789`. |
-| `./scripts/deploy.sh staging\|production` | Checks, runs every test, deploys the server to that environment on Cloudflare. Production only from a clean `main`, after typing "deploy to production". |
-| `./scripts/release-apps.sh staging\|production [ios] [android]` | Runs every test, builds the signed apps for that environment's server and uploads them: staging to TestFlight and Google Play's internal track, production to TestFlight's team and Google Play's production track; `--submit` sends the production iPhone version to App Review (`--no-upload`: only build into `dist/`). `status`: where App Store Connect stands. |
+| `./scripts/deploy.sh staging\|production` | Checks, asks which app versions may play there (`--min`, `--newest ios=<version>`), runs every test, deploys the server to that environment on Cloudflare. Production only from a clean `main`, after typing "deploy to production". |
+| `./scripts/release-apps.sh staging\|production [ios] [android]` | Runs every test, builds the signed apps for that environment's server and uploads them: staging to TestFlight and Google Play's internal track, production to TestFlight's team and Google Play's production track; `--submit` sends the production iPhone version to App Review (`--no-upload`: only build into `dist/`). `status`: which versions each server lets play, and where App Store Connect stands. |
 
 Needs Node.js 22.12 or newer (`package.json`, `engines`); app builds need Android Studio
 (Android) or a Mac with Xcode 26+ (iPhone), see [docs/apps.md](docs/apps.md).
@@ -39,7 +39,7 @@ Needs Node.js 22.12 or newer (`package.json`, `engines`); app builds need Androi
 **Three environments:** local (`./scripts/dev.sh`, the tests), **staging** (the test builds
 and their own server, rooms and photos) and **production** (the store apps everyone
 installs, the website). New work goes to staging first and to production once it is ready;
-production keeps understanding every app version people still have. Every script that
+production keeps understanding every app version its version gate lets play. Every script that
 reaches one names it, and production comes only from a clean `main`, after a typed
 confirmation (`--confirm "<phrase>"` gives it in advance).
 
@@ -47,12 +47,17 @@ confirmation (`--confirm "<phrase>"` gives it in advance).
 `./scripts/deploy.sh staging` or `./scripts/deploy.sh production`. It refuses while a
 `TODO_OPERATOR:` value is left or the machine is not logged in, and deploys only if every
 test passes. Keep Cloudflare's cookie-setting extras (Bot Fight Mode, Web Analytics, Zaraz)
-off: the privacy policy promises no cookies and no analytics.
+off: the privacy policy promises no cookies and no analytics. Every deploy also sets that
+server's **version gate**: the oldest app version that may create or join a game there
+(older ones are asked to update) and, per platform, the newest one people can install (older
+apps show a small "✨ Update"). It starts from what the live server serves (Enter keeps it),
+and lives only there, never in the repo.
 
 **Apps:** raise `"version"` in `package.json` and `APP.version` (a test keeps them equal), then
 `./scripts/release-apps.sh staging` for TestFlight, and `./scripts/release-apps.sh
 production --submit` for the stores (the same version: its build number says which
-environment it is for). Store setup and the first release by hand: [docs/apps.md](docs/apps.md);
+environment it is for). Once people can install it, `./scripts/deploy.sh <environment>
+--newest ios=<version>`. Store setup and the first release by hand: [docs/apps.md](docs/apps.md);
 everything the stores get (texts, images, form answers): `store/`.
 
 **The servers' addresses** are `ENVIRONMENTS` in `web/shared/config.js` (and `wrangler.jsonc`;
@@ -72,7 +77,7 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 
 | Where | What |
 |---|---|
-| `web/shared/config.js` | **The single source of truth**: brand and app id, server address, settings with their help and the presets, limits, timings, scoring, terms version. Used by the app and the server. |
+| `web/shared/config.js` | **The single source of truth**: brand and app id, the servers' addresses and where their builds update, the version gate's rules, settings with their help and the presets, limits, timings, scoring, terms version. Used by the app and the server. |
 | `web/shared/api.js` | Every path, socket message and close code, and the route parser both sides use. |
 | `src/game/` | Pure game logic: `rules.js` (state machine and timers), `plan.js` (which photo when), `score.js`, `view.js` (what an app may see), `state.js` (room shape, name filter). No I/O, fully unit-tested. |
 | `src/room.js` | The room: turns messages, uploads and its alarm into events, then persists, deletes unreferenced photos, broadcasts views and sets the next alarm. |
@@ -86,7 +91,8 @@ app (web/ inside Capacitor) ── HTTPS ──>  Worker (src/worker.js)  ──
 | `test/` | `unit/`, `integration/` (Vitest in workerd), `e2e/` (Playwright, with a fake photo plugin and light bots that fill a table of 16; `speed.spec.js` plays a game on a phone slowed to phone speed and prints what players wait for). |
 
 **A game's life.** A new player accepts the terms once (16+, only photos everyone in them
-would be okay with). "Create game", pick Classic or Tricky (or tune the settings), "Start
+would be okay with); an app too old for its server is asked to update when it creates or
+joins a game (one button to its store page). "Create game", pick Classic or Tricky (or tune the settings), "Start
 game": a 4-letter code (no look-alike letters). Friends join with the code, a shared link
 or the QR code. Each phone gets a random secret key for that game, so a closed app lands
 back as the same player. The server alone runs phases, timers, scores and the host role:

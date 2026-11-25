@@ -7,7 +7,9 @@
 // the test builds. The two are ENVIRONMENTS in web/shared/config.js (their Worker names and
 // addresses pinned to this file by test/unit/config.test.js).
 // `./scripts/deploy.sh staging|production` deploys one of them; `./scripts/dev.sh` and the
-// tests run the top level locally.
+// tests run the top level locally. Each deploy also gives the Worker its version gate (which
+// app versions may play, the newest out) as the value GATE: never in this file, the deploy
+// asks for it starting from what the live server serves (normalizeGate in web/shared/config.js).
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "who-shot-it",
