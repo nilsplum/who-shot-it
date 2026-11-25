@@ -28,14 +28,14 @@ const promotionalText = 'Your next party game is already on your phones: random 
  * What players notice in this version, in plain sentences: the App Store's "What's New"
  * (Apple takes it only for updates) and TestFlight's "What to Test" for this version's build.
  */
-const whatsNew = 'The 3, 2, 1 before the first photo now runs like the countdown at the start of an old film. Each answer comes step by step: first the card of whoever took the photo turns green, then yours if you were wrong, and your points rise off your card (or “Wrong”). In the lobby, the players take two rows that you can swipe sideways, so your photos stay big even with 16 players.';
+const whatsNew = 'Starting is quicker: whoever says Yes last sees START stamped on their Yes, and their tap starts the game for everyone. While the group waits for that last player, a comic speech bubble teases them on everyone else’s phone. Tap a photo to swap it: it turns over to show how many swaps you have left, then the new photo pops in, and No → slides in a whole new set. The 3, 2, 1 before the first photo runs like the countdown at the start of an old film and gets the photos ready right there. Each answer comes step by step: first the card of whoever took the photo turns green, then yours if you were wrong, and your points rise off your card (or “Wrong”). Right answers in a row build a tower of bonus points, and the leaderboard shows who overtakes whom, with a gold medal for the leader. In the lobby, the players take two rows that you can swipe sideways, so your photos stay big even with 16 players.';
 
 /** The test steps, for App Review (below its answers) and for TestFlight's beta review. */
 const howToTest = `HOW TO TEST
 A game needs at least two devices, each with a few photos.
 Device A: accept the terms, enter a name, tap Create game, keep Classic, tap Start game. A four letter code appears.
 Device B: accept the terms, enter a name, type the code, tap Join.
-On both: tap Continue and allow photo access. Tap No for other random photos, or Yes to play with them. When everyone is ready, the app asks “Is everyone here?”: tap Yes, start. Tap the player you think took the photo.
+On both: tap Continue and allow photo access. Tap No → for other random photos, or Yes to play with them. The last player’s Yes says START; in a group’s first game it asks “Is everyone here?” on that phone: tap Yes, start. Tap the player you think took the photo.
 
 PHOTOS AND SAFETY
 Only photos a player confirms with Yes leave the phone, and only to the players of that one game. Each photo is deleted from our server right after its round.

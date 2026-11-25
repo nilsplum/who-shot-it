@@ -1,9 +1,9 @@
 # Lobby and start: the last Yes, the bubble, the photo choice, the 3-2-1's loading, the rating (plan)
 
-Status: planned on 25 November 2026 against `main` at 3829a5e (app 1.0.8), and being
-implemented on the branch `feat/lobby-and-start` in its own worktree
-(`.claude/worktrees/lobby-and-start`); each commit's status line in section 8 says how far it
-is. Another piece of work (the leaderboard's entrance in `web/js/board.js`, the streaks in
+Status: planned on 25 November 2026 against `main` at 3829a5e (app 1.0.8), implemented the
+same day on the branch `feat/lobby-and-start` in its own worktree
+(`.claude/worktrees/lobby-and-start`), all eight commits done, and merged into `main` (app
+1.0.9, not deployed or released yet: Operator handoff). Another piece of work (the leaderboard's entrance in `web/js/board.js`, the streaks in
 `web/js/streak.js`, with changes to the room's rules) was in progress, uncommitted, in the main
 folder at the same time and touches many of the same files. The operator chose to keep the two
 apart (25 November 2026): this branch starts from `main` as it was, and the two meet when they
@@ -62,24 +62,42 @@ to date with every commit.
   open-source rule. The legal page changed (one privacy sentence, "Licences", the date): it
   goes live with the next deploy, the app asks for the terms again with 1.0.9 anyway. To try:
   to do 3.
-- Next: commit 8 (the release), then the merge into `main` (The branch and the merge, above).
+- Commit 8: version 1.0.9 (`package.json`, `APP.version`); What's New names everything since
+  1.0.5 (the version in App Review), now with the new start, the bubble, the swap and slide,
+  the leader's loading, the streaks and the leaderboard's story; How to test describes the
+  START Yes; the store screenshots are redrawn (`node scripts/helpers/store-images.mjs`:
+  the photo choice with Yes left and "No →" in ice blue, the leaderboard with the leader's
+  medal) and committed, so the release needs no `--store-images`.
 
-**To do by hand, once the commits are in (in this order)**
-1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
-   asks before it runs it). The new server keeps every installed app working (section 6), and
-   the new app needs it: on the old server its "Yes, start" would still make every phone ask
-   "Is everyone here?".
-2. Try it on a real iPhone and a real Android phone with the test players
-   (`docs/guides/demo-players.md`), as listed in commit 8 ("Try on both phones").
-3. The rating window: an iPhone build from Xcode (`./scripts/dev.sh ios`) always shows it
-   (Apple's development mode), TestFlight never does. On Android it only appears for an app
-   installed from Google Play (the internal testing track); a build from this Mac completes
-   silently. So the real check on Android waits for the Android release.
-4. Release 1.0.9 (`./scripts/release-apps.sh --store-images --submit`, after reading commit 8):
-   the store screenshot of the photo choice changes (Yes left, "No →" in ice blue, no hint
-   line), and the first App Review note mentions "Is everyone here?", which now is a sheet on
-   the last player's phone: record the review video again with the build that goes to review,
-   or reword the note (commit 8).
+**To do by hand (in this order)**
+1. **Deploy the server** (`./scripts/deploy.sh`, a critical command: ask Claude to run it, or
+   run it yourself). It carries both pieces of work: the group's game count and the confirmed
+   last Yes from this plan, the streak's results and the leaderboard's time from the other
+   plan, and the legal page of 25 November 2026. It keeps every installed app working
+   (section 6), and 1.0.9 needs it: on the old server its "Yes, start" would make every phone
+   ask "Is everyone here?".
+2. **Try 1.0.9 on a real iPhone and a real Android phone** with the test players
+   (`docs/guides/demo-players.md`), what the browser tests cannot feel:
+   - the START stamp landing and Yes moving left; "Is everyone here?" on the last phone;
+   - the bubble: its slide in from a side, the chorus, the bulging fat text, the pop-art dots,
+     a 16-letter name, on the iPhone SE size and an iPad; it never covers a tap;
+   - a swap: the turn, the number, the pop, the ✕ on the last swap and on a refused tap, with
+     the vibrations; "No →"'s slide (snappy, no flicker, nothing scrolls);
+   - the 3-2-1's loading on a slow network (Low Data Mode or a throttled Wi-Fi), the ring
+     filling and the cut to the 3;
+   - each of these with Reduce Motion on.
+3. **The rating window**: an iPhone build from Xcode (`./scripts/dev.sh ios`) usually shows it
+   every time (Apple's development mode), TestFlight never does: play three games with the
+   test players under one code, the third one close (the test players answer at random, so it
+   may take a try). On Android it appears only in an app installed from Google Play (the
+   internal testing track); a build from this Mac completes silently, so the real check there
+   waits for the Android release.
+4. **Release 1.0.9** (`./scripts/release-apps.sh --submit`, or `ios` first). The other plan's
+   handoff (`docs/plans/2026-11-22-game-feel-overhaul.md`, to do 3 to 5) says where each store
+   stands: 1.0.5 in App Review, 1.0.7 and 1.0.8 in TestFlight, the Android keys to restore
+   first. The first App Review note says the attached video was made with the build under
+   review and shows "Is everyone here?" (now a sheet on the last player's phone): record the
+   video again with the 1.0.9 build, or change that note in `store/ios_listing.js`.
 
 ## 1. What the operator asked for
 
@@ -1001,7 +1019,9 @@ of `com.google.android.play:review` and Apple's `AppStore.requestReview` first (
 
 ### Commit 8: release: version 1.0.9, store texts and images, docs
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11). The "Try on both phones" list
+below is kept as planned; the Operator handoff (to do 2) has the version that matches the app
+(the bubble is opaque, round 5).
 
 - `package.json` and `APP.version` to 1.0.9 (the test keeps them equal).
 - `store/ios_listing.js`: What's New (the start with the START stamp, the bubble, the photo
@@ -1237,3 +1257,24 @@ Status: planned.
   the fold inside the sheet), as a long sheet does; on usual phones everything fits.
 - **The legal page's date moves to 25 November 2026** (`LEGAL.version`); 1.0.9 shows the terms
   once more anyway, as every new version does.
+
+**25 November 2026, commit 8 (the release) and the merge into `main`**
+
+- **What's New names everything since 1.0.5**, the version in App Review, as 1.0.7's did:
+  the leaderboard's story and the streaks (from the other plan) ship in 1.0.9 too, so they are
+  in it, in one sentence; the rest is this plan's work and 1.0.7's text, unchanged.
+- **The store screenshots were redrawn in this commit** (all eight that changed, both
+  stores), not at release time: the images in the repo then match the app, and `--submit`
+  uploads them as they are.
+- **The first review note stays as it is**: it is true once the video is recorded with 1.0.9
+  (to do 4); rewording it for an old video would describe a build Apple does not review.
+- **The speed test's "No" limit (250 ms) failed twice on this branch, both times while other
+  sessions loaded this Mac** (load averages of 24 and 33): one tap of twenty took 330 ms, and
+  in another run 820 ms, the rest 4 to 99 ms. Every run at normal load stayed under 100 ms
+  (before and after "No →"'s slide); a run before the merge already had one at 168 ms. The
+  rerun passed. If it fails at normal load, look at the bucket (`photos.js`): a "No" waits
+  only when the bucket has no set ready.
+- **The branch went into `main` as a fast-forward**: `main` had not moved since it was merged
+  into the branch, so there was nothing left to resolve; the main folder's untracked copy of
+  `drafts/bubble_animations` was compared with the committed one (identical) and removed first,
+  so git could write the committed one in its place.

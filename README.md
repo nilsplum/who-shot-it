@@ -93,9 +93,10 @@ stops the clock; when its time is up it waits until every phone holds the next r
 photo) → *end*. The last photo's reveal goes straight to *end*, and the board before it says
 only "FINAL ROUND", so the standings stay secret until the podium. "Play again" is
 anyone's: the first tap opens the next game under the same code, the others join it when
-they are done looking at the results. An app gets a full snapshot whenever what it shows
-changed (with the photo's owner hidden until the reveal) and counts every timer down to its
-end on the server's clock.
+they are done looking at the results. From a group's 3rd game on, the end of a close game
+asks each phone still on it for the store's own rating window (once per app start). An app
+gets a full snapshot whenever what it shows changed (with the photo's owner hidden until the
+reveal) and counts every timer down to its end on the server's clock.
 
 **Photos.** With the player's permission, the app picks n random photos on the phone and
 shows small previews. A bucket of checked previews (and the big versions of the next set,

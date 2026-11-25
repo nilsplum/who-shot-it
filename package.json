@@ -1,6 +1,6 @@
 {
   "name": "who-shot-it",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "Who Shot It? The party game with the photos on your phones. iOS and Android apps (Capacitor) and a Cloudflare Workers + Durable Objects server.",
   "type": "module",
