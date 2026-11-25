@@ -207,7 +207,8 @@ Status: done (25 November 2026; its decisions in section 7).
 
 `package.json`, `package-lock.json`, `APP.version`.
 
-Status: planned.
+Status: done (25 November 2026). `test/unit/config.test.js` now also holds that the app's
+version comes after `SILENT_VERSION`.
 
 ## 7. Decision log
 

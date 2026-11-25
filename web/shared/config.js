@@ -34,7 +34,7 @@ export const APP = {
    * both equal). Every new version asks for the terms once more (`termsToken`), and the app
    * tells it to its server when it creates or joins a game (the version gate, `mayPlay`).
    */
-  version: '1.0.10',
+  version: '1.0.11',
 };
 
 /**

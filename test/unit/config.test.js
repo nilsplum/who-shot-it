@@ -137,6 +137,8 @@ describe('the version gate', () => {
     expect(mayPlay(undefined, gate)).toBe(false);
     expect(mayPlay('nonsense', gate)).toBe(false);
     expect(mayPlay(undefined, normalizeGate({ min: SILENT_VERSION }))).toBe(true);
+    // Every version that says it comes after the last one that said none, so the server tells them apart.
+    expect(olderThan(SILENT_VERSION, APP.version)).toBe(true);
   });
 
   test('every build updates where it was installed from: the stores for production, TestFlight and Google Play for staging', () => {
