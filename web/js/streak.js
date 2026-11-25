@@ -3,12 +3,15 @@
  * right answer earned a streak bonus, my points do not rise off my card and fade. They settle
  * just above the streak's badge at the bottom of the photo, slide aside, and to their right a
  * second number appears, the bonus, under a tower of blocks. A block drops in for every
- * number of the streak, 2, 3, 4 and on, each a little later and a little more lively than the
- * one before, and shows what that number adds (+100, "MAX" once the bonus is capped); the
- * bonus counts up with every block, in a colour that warms with the streak. When the tower is
- * done, the bonus slides into my points, which count up with a pop, a ring of light and a few
- * coins; the badge ticks to the new number. Then the total pulses once and fades out where it
- * stands.
+ * number of the streak, 2, 3, 4 and on, each a little sooner and a little more lively than the
+ * one before, like a drumroll speeding up, and shows what that number adds (+100, "MAX" once
+ * the bonus is capped). The moment a block hits the tower (`IMPACT`), the bonus counts up in a
+ * colour that warms with the streak, a ring of light goes out, and it is felt, stronger as the
+ * tower grows (`blockFeel`: light taps, then firm pulses, then heavy thuds). When the tower is
+ * done, the bonus slides into my points, which count up with a pop, a ring of light, a few
+ * coins and a heavy thud; the badge, which showed my streak before this round from the
+ * reveal's first frame (`showStreak`), changes to the new number. Then the total pulses once
+ * and fades out where it stands.
  *
  * Mechanisms: `reveal.js` calls `playStreak` at the pop of my card (the same moment its rising
  * word would start), with what the room said (`results[me]`: `points`, `streak`, `bonus`; the
@@ -16,8 +19,9 @@
  * told, which is smaller when the "Own photo" share cut it). The numbers and the tower are
  * elements of a layer over the screen (`fixed`, inside the screen, so they go with it); a
  * number is a pin whose wrapper moves and whose text is counted and scaled, so counting never
- * moves it. The badge is `ui.js` `streakBadge`, painted by `views/game.js` in its slot, swapped
- * here for the number it had before the round until the bonus arrives. The light is the
+ * moves it. The badge is `ui.js` `streakBadge`, painted by `views/game.js` in its slot in its
+ * final state; `reveal.js` puts back the badge of before the round in the same task as the
+ * paint (`showStreak`), so it changes exactly once, as the bonus arrives. The light is the
  * sparks canvas (`sparks.js`).
  *
  * Invariants:
@@ -43,6 +47,16 @@ const CAP_AT = SCORING.streakMax / SCORING.streakStep + 1;
 const BLOCKS = 4;
 const PITCH = 31;
 const LAND = 220;
+/** When in its landing a block hits the tower (a share of LAND): its fall ends there, then it squashes; what the hit causes happens then. */
+const IMPACT = 0.72;
+/**
+ * The pause before each block (ms): a short one after my points have settled, then shrinking
+ * from block to block, so the tower comes faster and faster (one block every 0.39 s at first,
+ * every 0.27 s at the end, the landing included). The last pause also serves any later block.
+ */
+const GAPS = [80, 170, 125, 90, 65, 50];
+/** How a block is felt by its number: light taps for the first ones, firm pulses, heavy thuds for a long streak (phone.js HAPTICS). */
+const FEELS = [{ upTo: 3, kind: 'tap' }, { upTo: 5, kind: 'yes' }, { upTo: Infinity, kind: 'land' }];
 /** The story's other times (ms): my points settling, the beat after the last block, the tower being swallowed, the bonus sliding into my points, their count, the total's stay and its fade. */
 const SETTLE = 280;
 const BEAT = 160;
@@ -57,12 +71,25 @@ const FILLS = ['bg-green', 'bg-yellow', 'bg-p6', 'bg-coral', 'bg-p8', 'bg-violet
 /** How lively the number `k` is, 0 to 1: a streak of 2 is a small thing, from 7 on the story is at its liveliest. */
 const drama = (k) => Math.min(1, 0.15 + 0.17 * (k - 2));
 
-/** The blocks of a streak of `streak`: each with its number, how lively it is and the pause before it drops (it grows). */
-function blocksFor(streak) {
+/** How the block for the number `k` is felt as it hits the tower (`FEELS`). */
+export const blockFeel = (k) => FEELS.find((f) => k <= f.upTo).kind;
+
+/** The blocks of a streak of `streak`: each with its number, how lively it is, the pause before it drops (it shrinks) and how it is felt. */
+export function blocksFor(streak) {
   const upTo = Math.min(streak, CAP_AT);
   const numbers = Array.from({ length: upTo - 1 }, (_, i) => i + 2);
   if (streak > upTo) numbers.push(streak);
-  return numbers.map((k, i) => ({ k, drama: drama(k), gap: i ? 60 + 30 * i : 80 }));
+  return numbers.map((k, i) => ({ k, drama: drama(k), gap: GAPS[Math.min(i, GAPS.length - 1)], feel: blockFeel(k) }));
+}
+
+/**
+ * The streak badge in the reveal's slot shows a streak of `n` (none below 2): the one before
+ * this round while the story is to come (`reveal.js`, in the same task as the paint), the new
+ * one when it ends. Nothing without a slot.
+ */
+export function showStreak(screen, n) {
+  const slot = screen.querySelector('[data-streak-slot]');
+  if (slot) slot.innerHTML = n >= 2 ? streakBadge(n) : '';
 }
 
 /** How long the story takes from the pop of my card on (ms), for a streak of `streak`. */
@@ -115,7 +142,11 @@ function tower(grp, u, room, label) {
     return `<div class="absolute -mt-7 -ml-12 flex h-7 w-24 items-center justify-between rounded-lg ${FILLS[(k - 2) % FILLS.length]} px-2.5 font-display font-extrabold text-navy streak-edge"><span class="text-xl leading-none">${k}</span><span class="text-base leading-none tabular-nums">${step ? `+${step}` : 'MAX'}</span>${crown}</div>`;
   }
 
-  /** Block `k` drops in on top, `lively` (0 to 1) deciding how high it falls and how hard it squashes; the lowest block of a full tower is knocked out sideways. */
+  /**
+   * Block `k` drops in on top, `lively` (0 to 1) deciding how high it falls and how hard it
+   * squashes; the lowest block of a full tower is knocked out sideways. Returns as the block
+   * hits the tower (`IMPACT`); its squash and the tower's sway go on by themselves.
+   */
   async function drop(k, lively, last) {
     if (blocks.length === BLOCKS) {
       const lowest = blocks.shift();
@@ -137,10 +168,10 @@ function tower(grp, u, room, label) {
     // As high as the story wants, but never above the top of the photo (a block is 28 tall).
     const height = Math.max(36, Math.min(110 + 60 * lively, room + spot(i).y - 28));
     const squash = 1.06 + 0.14 * lively;
-    piece.animate([{ translate: `${spot(i).x}px ${spot(i).y - height}px` }, { translate: place(i), offset: 0.72, easing: EASE.out }, { translate: place(i) }], { duration: LAND, easing: 'ease-in' });
-    piece.animate([{ scale: '1' }, { scale: '1', offset: 0.72 }, { scale: `${squash} ${2 - squash}`, offset: 0.8 }, { scale: `${2 - squash * 0.9} ${squash * 0.92}`, offset: 0.9 }, { scale: last ? '1.08' : '1' }], { duration: LAND, fill: 'forwards' });
-    setTimeout(() => sway(0.5 + 0.8 * lively + 0.2 * blocks.length), LAND * 0.78);
-    await wait(LAND);
+    piece.animate([{ translate: `${spot(i).x}px ${spot(i).y - height}px` }, { translate: place(i), offset: IMPACT, easing: EASE.out }, { translate: place(i) }], { duration: LAND, easing: 'ease-in' });
+    piece.animate([{ scale: '1' }, { scale: '1', offset: IMPACT }, { scale: `${squash} ${2 - squash}`, offset: IMPACT + 0.08 }, { scale: `${2 - squash * 0.9} ${squash * 0.92}`, offset: IMPACT + 0.18 }, { scale: last ? '1.08' : '1' }], { duration: LAND, fill: 'forwards' });
+    setTimeout(() => sway(0.5 + 0.8 * lively + 0.2 * blocks.length), LAND * (IMPACT + 0.06));
+    await wait(LAND * IMPACT);
   }
 
   /** The tower is swallowed by `target` (a point of the screen): its blocks shrink into it, lowest first. */
@@ -158,7 +189,9 @@ function tower(grp, u, room, label) {
  * Tells my streak's story over `screen`, the reveal just painted in its final state, from the
  * pop of my card (`at`, `box`: its middle and its box). `base` is my points without the
  * streak, `bonus` what the streak earned, `streak` how long it is (2 or more, `bonus` above 0);
- * `buzz` (phone.js) makes the tower's landings and the bonus's arrival felt.
+ * `buzz` (phone.js) makes each block's hit (`blockFeel`) and the bonus's arrival (a heavy
+ * thud) felt. The badge shows my streak before this round until the bonus arrives
+ * (`showStreak`, set by `reveal.js` from the reveal's first frame).
  */
 export async function playStreak(screen, { at, box, base, bonus, streak }, buzz) {
   const alive = () => screen.isConnected;
@@ -168,8 +201,6 @@ export async function playStreak(screen, { at, box, base, bonus, streak }, buzz)
   layer.className = 'pointer-events-none fixed inset-0 z-25 overflow-hidden';
   layer.setAttribute('aria-hidden', 'true');
   screen.append(layer);
-  // The badge shows the streak I had before this round until the bonus is added.
-  if (slot) slot.innerHTML = streak > 2 ? streakBadge(streak - 1) : '';
   try {
     const look = streakLook(streak);
     const u = Math.min(1, stage.height / 360);
@@ -216,22 +247,24 @@ export async function playStreak(screen, { at, box, base, bonus, streak }, buzz)
       }, outCubic);
     };
 
-    // The tower grows block by block, each later and livelier, the bonus counting up with it.
+    // The tower grows block by block, each sooner and livelier, the bonus counting up with it.
     await wait(SETTLE);
     const blocks = blocksFor(streak);
     for (const [i, b] of blocks.entries()) {
       await wait(b.gap);
       if (!alive()) return;
       const last = i === blocks.length - 1;
-      const landing = stack.drop(b.k, b.drama, last);
+      const hitting = stack.drop(b.k, b.drama, last);
       if (!i) {
         // My points make room, and the bonus appears under the tower.
         glide(figures, centre, left, 260, EASE.out);
         bonusFigure.style.opacity = '';
         bonusFigure.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160 });
       }
-      await landing;
+      await hitting;
       if (!alive()) return;
+      // The block hits the tower: in the same instant it is felt, the bonus jumps and counts up, a ring of light goes out.
+      buzz(b.feel);
       const d = b.drama;
       const hit = middle(bonusText);
       const tint = colour(streakLook(b.k).tint);
@@ -239,8 +272,8 @@ export async function playStreak(screen, { at, box, base, bonus, streak }, buzz)
       bonusText.animate([{ scale: 1.08 + 0.25 * d }, { scale: 1 }], { duration: 320, easing: EASE.bounce });
       ring({ ...hit, from: 8, to: 36 + 60 * d, life: 0.3 + 0.15 * d, width: 3 + 4 * d, tint, strength: 0.4 + 0.3 * d });
       spray(hit, tint, 3 + Math.round(12 * d), 45 + 35 * d);
-      // A light tap for the first block and every second one after it, and for the last.
-      if (i % 2 === 0 || last) buzz('tap');
+      await wait(LAND * (1 - IMPACT));
+      if (!alive()) return;
     }
     await wait(BEAT);
     if (!alive()) return;
@@ -261,7 +294,7 @@ export async function playStreak(screen, { at, box, base, bonus, streak }, buzz)
     spray(there, tint, 6 + 4 * look.level, 75);
     coins(there, 80, 8 + 3 * look.level);
     if (look.level >= 3) flash(0.08, 240);
-    buzz(look.level >= 3 ? 'land' : 'yes');
+    buzz('land');
     if (slot) {
       slot.innerHTML = streakBadge(streak);
       slot.firstElementChild.animate([{ scale: 1.5 }, { scale: 1 }], { duration: 400, easing: EASE.bounce });
@@ -276,6 +309,6 @@ export async function playStreak(screen, { at, box, base, bonus, streak }, buzz)
     await figures.animate([{ translate: `${X}px ${restY}px`, opacity: 1, scale: 1 }, { translate: `${X}px ${restY}px`, opacity: 1, scale: 1.1, offset: 0.25 }, { translate: `${X}px ${restY - 16}px`, opacity: 0, scale: 0.85 }], { duration: FADE, easing: 'ease-in', fill: 'forwards' }).finished;
   } finally {
     layer.remove();
-    if (slot) slot.innerHTML = streakBadge(streak);
+    showStreak(screen, streak);
   }
 }

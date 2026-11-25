@@ -8,7 +8,9 @@
  * and "Wrong" rising off it. The verdict is felt with the pop: one firm pulse right, two for
  * anything else (also without an answer, when there is no card of mine to pop). Then the
  * reactions come. When my right answer earned a streak bonus, my points do not rise off my
- * card: they stay, and the story of my streak is told with them (`streak.js`).
+ * card: they stay, and the story of my streak is told with them (`streak.js`); until then my
+ * streak's badge shows what it was before this round, from the first frame on, so it changes
+ * only once, as the bonus arrives.
  *
  * Mechanisms: main.js `startReveal` calls `playReveal` once per round's reveal
  * (`session.shown`), in the same task as the reveal is painted in its final state
@@ -31,7 +33,7 @@
  *   the verdict felt at once.
  */
 import { wait } from './motion.js';
-import { playStreak } from './streak.js';
+import { playStreak, showStreak } from './streak.js';
 import { coins, colour, flash, ring, spray } from './sparks.js';
 
 /** The steps' times (ms): the blink before the answer, between the answer, my red card and the pop, and from the pop to the reactions. */
@@ -80,6 +82,8 @@ export async function playReveal(screen, { verdict, points, streak = 0, bonus = 
   const alive = () => screen.isConnected;
   const card = (name) => screen.querySelector(`[data-card="${name}"]`);
   screen.setAttribute('data-playing', '');
+  // A streak's story to come: its badge shows the streak before this round until the bonus arrives (none before a first streak).
+  if (bonus > 0) showStreak(screen, streak - 1);
   try {
     await wait(STEPS.hold);
     if (!alive()) return;
@@ -105,7 +109,7 @@ export async function playReveal(screen, { verdict, points, streak = 0, bonus = 
         flash(POP.flash, POP.flashMs);
         // A streak that earned a bonus: my points stay and its story is told with them, on its own.
         if (bonus > 0) playStreak(screen, { ...popped, base: points - bonus, bonus, streak }, buzz);
-      }
+      } else if (bonus > 0) showStreak(screen, streak);
     }
     buzz(verdict === 'right' ? 'yes' : 'no');
     await wait(STEPS.after);

@@ -132,15 +132,15 @@ export function askForRating() {
  * vibration of `ms` (felt longer than an impact), or a pause before the next step.
  */
 const HAPTICS = {
-  /** A light tap: a new photo appears, a photo is swapped, a tick of a podium place's charge, each bang of the winner's fireworks. */
+  /** A light tap: a new photo appears, a photo is swapped, a tick of a podium place's charge, each bang of the winner's fireworks, the first blocks of my streak's tower. */
   tap: [{ impact: 'LIGHT' }],
-  /** One firm pulse: my guess was right; third place bursts onto the podium (the podium's bursts grow: firm, then heavy). */
+  /** One firm pulse: my guess was right; third place bursts onto the podium (the podium's bursts grow: firm, then heavy); the middle blocks of my streak's tower (it grows the same way). */
   yes: [{ impact: 'MEDIUM' }],
   /** Two firm pulses: my guess was wrong (or I gave none), a swap was refused. */
   no: [{ impact: 'MEDIUM' }, { pause: 150 }, { impact: 'MEDIUM' }],
   /** A longer buzz: each number of the 3-2-1; the winner's orb, full, just before it bursts. */
   count: [{ ms: 120 }],
-  /** A heavy thud: second place or the winner bursts onto the podium, FINAL ROUND lands. */
+  /** A heavy thud: second place or the winner bursts onto the podium, FINAL ROUND lands, a long streak's blocks and my streak's bonus arriving in my points. */
   land: [{ impact: 'HEAVY' }],
 };
 

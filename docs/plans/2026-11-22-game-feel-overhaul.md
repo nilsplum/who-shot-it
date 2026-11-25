@@ -1332,3 +1332,17 @@ smaller and gentler than the draft: `web/js/streak.js` tells it over the reveal,
 | Gentler than the draft | Numbers and blocks about a quarter smaller, fewer and softer sparks, no jolt of the screen, a flash only from a streak of 7, a light tap on every second block | The operator: not exaggerated, smaller on the photo. |
 | Shared motion | `web/js/motion.js` (pause, easings, frame loop) replaces the copies in `reveal.js`, `podium.js` and `board.js`; `sparks.js` gains `coins` | Uniformity: a fourth story would have been a fourth copy. |
 | The server | **Deploy needed:** `./scripts/deploy.sh` (a critical command: ask first) | A new app on the old server shows no streak and plays the reveal as before; an older app on the new server ignores the new fields and waits a little longer on the reveal of a long streak, which is harmless. |
+
+**Notes of 25 November 2026, after TestFlight 1.0.10** (the operator, trying it):
+- The leaderboard: a leader who stays keeps the medal where it is (no loop, no ring, no
+  pulse); only a change at the top moves a medal (`board.js` `medalMoves`). The podium's
+  fireworks are felt bang by bang to their end (they were felt only for their first six bangs),
+  bangs within 90 ms sharing one tap (`motion.js` `atMostEvery`).
+- The streak: every block is felt the moment it hits the tower (`streak.js` `IMPACT`), no
+  longer every second one after its whole landing; the vibrations build up (light taps for the
+  blocks 2 and 3, firm pulses for 4 and 5, heavy thuds from 6, the bonus's arrival always a heavy
+  thud) and the pauses between blocks shrink (80 ms, then 170 down to 50 ms), within the time the
+  room gives the reveal (unchanged, so no deploy for it). The badge shows the streak before this
+  round from the reveal's first frame (`showStreak`, set by `reveal.js` in the same task as the
+  paint); before, the story swapped it only at the pop, so a first streak's badge showed for
+  0.7 s, vanished and came back.

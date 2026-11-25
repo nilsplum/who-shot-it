@@ -1,13 +1,14 @@
 /**
  * The streak (right answers in a row): its bonus formula, that its story fits the time the
- * room gives the reveal, and the badge on the two screens it shows on (web/js/streak.js,
+ * room gives the reveal, the tower's beat (faster and felt stronger as it grows), and the
+ * badge on the two screens it shows on (web/js/streak.js,
  * web/js/ui.js, web/js/views/game.js and board.js). The motion itself only a browser shows
  * (drafts/streak_animations has the app's own story beside its draft).
  */
 import { expect, test } from 'vitest';
 import { REACTIONS, SCORING, TIMING, streakBonus, streakExtraMs } from '../../web/shared/config.js';
 import { POP_MS } from '../../web/js/reveal.js';
-import { storyMs } from '../../web/js/streak.js';
+import { blockFeel, blocksFor, storyMs } from '../../web/js/streak.js';
 import { streakBadge, streakLook } from '../../web/js/ui.js';
 import { boardScreen } from '../../web/js/views/board.js';
 import { gameScreen } from '../../web/js/views/game.js';
@@ -25,6 +26,20 @@ test('the story of every streak fits the reveal, which is longer only from a str
   for (let n = 2; n <= 40; n++) {
     expect(POP_MS + storyMs(n) + REST, `a streak of ${n}`).toBeLessThanOrEqual(TIMING.revealMs + streakExtraMs(n));
     expect(streakExtraMs(n)).toBeLessThanOrEqual(TIMING.streakExtraMaxMs);
+  }
+});
+
+test('the tower comes faster and is felt stronger as it grows: light taps, firm pulses, heavy thuds', () => {
+  expect([2, 3, 4, 5, 6, 9].map(blockFeel)).toEqual(['tap', 'tap', 'yes', 'yes', 'land', 'land']);
+  const strength = { tap: 1, yes: 2, land: 3 };
+  for (const n of [2, 3, 5, 7, 12]) {
+    const blocks = blocksFor(n);
+    // A block for every number from 2 on (the cap's, then the streak's own).
+    expect(blocks[0].k).toBe(2);
+    expect(blocks.at(-1).k).toBe(n);
+    // After the first, every pause is shorter than the one before; no block is felt weaker than the one before.
+    for (let i = 2; i < blocks.length; i++) expect(blocks[i].gap).toBeLessThan(blocks[i - 1].gap);
+    for (let i = 1; i < blocks.length; i++) expect(strength[blocks[i].feel]).toBeGreaterThanOrEqual(strength[blocks[i - 1].feel]);
   }
 });
 
