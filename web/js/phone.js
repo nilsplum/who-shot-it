@@ -114,7 +114,7 @@ export function keepAwake(on) {
  * vibration of `ms` (felt longer than an impact), or a pause before the next step.
  */
 const HAPTICS = {
-  /** A light tap: a new photo appears, a photo flips (swap), a tick of a podium place's charge, one of the first bangs of the winner's fireworks. */
+  /** A light tap: a new photo appears, a photo is swapped, a tick of a podium place's charge, one of the first bangs of the winner's fireworks. */
   tap: [{ impact: 'LIGHT' }],
   /** One firm pulse: my guess was right; third place bursts onto the podium (the podium's bursts grow: firm, then heavy). */
   yes: [{ impact: 'MEDIUM' }],

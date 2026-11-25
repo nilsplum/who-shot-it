@@ -57,6 +57,7 @@ function helpBody() {
     ['📱', `Everyone opens ${esc(APP.name)} on their phone.`],
     ['🔗', 'One person creates a game. The others join with the code.'],
     ['📷', 'Everyone gets a few random photos from their phone. Don’t like them? Tap No. Nothing is shared until you tap Yes.'],
+    ['👆', 'Tap a photo to swap just that one. Hold it to see it big.'],
     ['🤔', 'A photo pops up: tap whose it is. Fast and right scores more.'],
     ['🗑️', 'Each photo is deleted right after its round.'],
   ])}

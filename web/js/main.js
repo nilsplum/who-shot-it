@@ -20,7 +20,7 @@
  * - Vibrations come only from `phone.buzz` and its five meanings: the room's moments
  *   (`moments`), each new number of the 3-2-1 (when it is painted, `paintStart`), the
  *   reveal's verdict (as my card pops, `reveal.js`, which `startReveal` hands `buzz`), a
- *   swap's flip or refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the
+ *   swap or its refusal (action `swap`), FINAL ROUND landing (`startBoard`), and the
  *   podium's charges, bursts and first fireworks (`podium.js`, which `startPodium` hands
  *   `buzz`).
  * - Entrances: a screen that tells a story when it appears (the reveal: the answer, my
@@ -918,7 +918,10 @@ const ACTIONS = {
     openSheet(null);
     if (kind) readyAs(kind, true);
   },
-  /** A tap on a photo of the choice: it flips to another one (a light tap), or the refusal is felt twice. */
+  /**
+   * A tap on a photo of the choice: it turns to the swaps left and the new photo pops in (a
+   * light tap), or it is refused: the photo shakes, with a red ✕ when none is left (felt twice).
+   */
   swap: (index) => {
     if (session.sending) return;
     buzz(swap(Number(index), render) ? 'tap' : 'no');

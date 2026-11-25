@@ -26,17 +26,20 @@
  * The photos: a grid of 2 x 2 to 5 x 5 places (by "Photos per player") filling the room
  * between the players and the buttons, exactly as wide as No and Yes; on a short screen
  * (`short:`) the code and the gaps above it are smaller to leave it more. Tapping a photo
- * swaps it (`photos.swap`): the tile turns over like a card, the old photo away and the new
- * one in. The line under the grid counts the swaps left ("(3 left)" in green, bumping as it
- * goes down, red and shaking at 0 and again on every refused tap); holding a photo shows it
- * big (`main.js`, hold to look). "Yes" makes the player ready at once: the set stays with
+ * swaps it (`photos.swap`): the tile turns over like a card and shows how many swaps are left
+ * (a number, or a red ✕ when this was the last), then the new photo pops out over it; a
+ * refused tap shakes the photo with a red ✕ over it. No line under the grid explains it: the
+ * tile itself does ("How to play" says it in one line). Holding a photo shows it big
+ * (`main.js`, hold to look). "No →" slides the set out to the right while the new one comes in
+ * from the left and snaps in place (`photos.leaving`); the first set of a game fades in. "Yes" makes the player ready at once: the set stays with
  * "✓ Ready" while its photos go in the background (`session.sending`; only if the group
  * waits for them does the start show how far they are, `views/overlays.js`). Every wait
  * shows itself: "Picking photos…" under a spinner before the first set, and the set dimmed
  * under a spinner while No waits for new photos.
  *
- * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so what
- * changes often (the swap counter) never repaints the grid and its photos.
+ * The photo area is five parts (`title`, `pick`, `note`, `actions`, `links`), so a change to
+ * the buttons or the lines under the grid never repaints the grid and its photos (a swap
+ * does: its tile turns).
  *
  * The bubble: while the group waits for one last player, the others' phones show a comic
  * bubble over the photos teasing them (`web/js/nudge.js` decides when and what, `context.nudge`
@@ -72,51 +75,63 @@ const SIDES = { 2: 'grid-cols-2 grid-rows-2', 3: 'grid-cols-3 grid-rows-3', 4: '
  * taller box it sits in the middle. Its rows and columns stretch, so the tiles take the free
  * space's shape. Only below 9rem of free height (7rem on a short screen, which has the least
  * to give) does the page scroll instead. Without container units (iOS 15) the tiles are square and the grid
- * takes the full width. `busy` dims it under a spinner while "No" waits for new photos.
+ * takes the full width. `busy` dims it under a spinner while "No →" waits for new photos.
+ * `leaving` (the previews of the set "No →" replaced) lies over it as a second grid of the
+ * same shape, sliding out to the right while the new one slides in from the left (`set-out`,
+ * `set-in`); with Reduce Motion the old one is simply gone. The screen clips them at its edges
+ * (`lobbyScreen`), so nothing ever makes the page scroll sideways.
  */
-function grid(tiles, size, busy = false) {
+function grid(tiles, size, { busy = false, leaving = [] } = {}) {
+  const side = SIDES[Math.ceil(Math.sqrt(size))];
   const wait = busy ? `<div class="absolute inset-0 grid place-items-center">${SPINNER}</div>` : '';
-  return `<div class="@container-size relative flex min-h-36 flex-1 flex-col justify-center short:min-h-28"><div class="grid w-full gap-1 supports-[width:1cqw]:h-[min(100cqh,calc(100cqw*4/3))] ${SIDES[Math.ceil(Math.sqrt(size))]} ${busy ? 'opacity-40' : ''}">${tiles.join('')}</div>${wait}</div>`;
+  const old = leaving.length
+    ? `<div class="pointer-events-none absolute inset-0 grid gap-1 ${side} animate-set-out motion-reduce:hidden" aria-hidden="true" data-cell="leaving">${leaving.map((url) => `<span class="${TILE}">${face(url)}</span>`).join('')}</div>`
+    : '';
+  const slide = leaving.length ? 'animate-set-in motion-reduce:animate-none' : '';
+  return `<div class="@container-size relative flex min-h-36 flex-1 flex-col justify-center short:min-h-28"><div class="relative w-full supports-[width:1cqw]:h-[min(100cqh,calc(100cqw*4/3))]"><div class="grid size-full gap-1 ${side} ${busy ? 'opacity-40' : ''} ${slide}">${tiles.join('')}</div>${old}</div>${wait}</div>`;
 }
 
 /** A place in the grid; it takes the shape the grid gives it (square without container units, see `grid`). */
 const TILE = 'relative grid place-items-center rounded-lg bg-card text-4xl text-white not-supports-[width:1cqw]:aspect-square';
 /** How a photo enters the set: dealt in (a fade), or turned over by a swap (`transform-3d` keeps its two faces in 3D). */
-const ENTRANCE = { in: 'animate-deal', flip: 'animate-flip transform-3d' };
+const ENTRANCE = { in: 'animate-deal', swap: 'animate-swap-turn transform-3d' };
+
+/** One face of a tile: the photo filling it; a face never shows its back, so a turn hides it half way. */
+const face = (url) =>
+  `<span class="absolute inset-0 rounded-lg bg-cover bg-center bg-no-repeat backface-hidden" style="background-image:url('${url}')"></span>`;
+
+/** What a swapped tile shows on its back: the swaps left in the yellow, or a red ✕ when none is, sized to the tile. */
+const mark = (left, extra = '') =>
+  `<b class="font-display leading-none font-extrabold tile-count ${left ? 'text-yellow' : 'text-red'} ${extra}" data-cell="count">${left || '✕'}</b>`;
 
 /**
- * One face of a tile: the photo filling it. The back face (the photo a swap replaced) is
- * turned away from the start (`rotate-y-180`), and a face never shows its back, so the turn
- * shows the old photo until half way, then the new one.
+ * The back of a swapped tile, turned away at first (`rotate-y-180`, so the turn brings it
+ * round): a plain card with the swaps left landing on it, and the new photo popping out over
+ * it once the turn is done. With Reduce Motion there is no turn: the back faces the player at
+ * once and the new photo simply stands there.
  */
-const face = (url, back = false) =>
-  `<span class="absolute inset-0 rounded-lg bg-cover bg-center bg-no-repeat backface-hidden ${back ? 'rotate-y-180' : ''}" style="background-image:url('${url}')"></span>`;
+const swapBack = (c) => `<span class="absolute inset-0 grid place-items-center rounded-lg bg-raised backface-hidden rotate-y-180 @container-size motion-reduce:rotate-y-0">${mark(c.left, 'animate-swap-count motion-reduce:hidden')}${face(c.url).replace('backface-hidden', 'animate-swap-pop motion-reduce:animate-none')}</span>`;
 
-/** The set on screen as tiles: tap to swap (unless `fixed`), hold to see big. */
+/**
+ * The set on screen as tiles: tap to swap (unless `fixed`), hold to see big. A swapped tile
+ * turns over like a card (`swap-turn`) from its old photo to its back (`swapBack`), and is
+ * painted plain once that has played (`photos.settleLater`). The tile of a refused tap
+ * (`photos.refused`) shakes (unless it is still turning, which it then finishes) and, when no
+ * swap was left, fades a red ✕ in and out over itself; each refusal is a new element
+ * (`data-try`), so it plays again.
+ */
 function chosenTiles(fixed) {
+  const refused = fixed ? null : photos.refused;
   return photos.chosen.map((c, i) => {
-    const cls = `${TILE} ${ENTRANCE[c.anim] || ''} motion-reduce:animate-none`;
-    const faces = `${face(c.url)}${c.from ? face(c.from, true) : ''}`;
+    const no = refused && refused.index === i ? refused : null;
+    const cls = `${TILE} ${ENTRANCE[c.anim] || (no ? 'animate-jiggle' : '')} motion-reduce:animate-none`;
+    const nope = no && no.none ? `<span class="pointer-events-none absolute inset-0 grid place-items-center rounded-lg bg-stage/60 opacity-0 animate-nope @container-size" data-cell="nope" data-try="${no.n}"><b class="font-display leading-none font-extrabold tile-count text-red">✕</b></span>` : '';
+    const faces = c.anim === 'swap' ? `${face(c.from).replace('backface-hidden', 'backface-hidden motion-reduce:hidden')}${swapBack(c)}` : `${face(c.url)}${nope}`;
     const hold = `data-hold="tile" data-v="${i}"`;
     return fixed
       ? `<div class="${cls}" ${hold} role="img" aria-label="Photo ${i + 1}">${faces}</div>`
       : `<button class="${cls}" data-act="swap" ${hold} aria-label="Photo ${i + 1}: tap to swap it">${faces}</button>`;
   });
-}
-
-/**
- * The line under the grid: "Tap to swap (2 left), hold to preview". The count is green and
- * bumps each time it goes down; at 0 it is red and shakes, again on every refused tap. Its
- * markup carries the number and, at 0, the refusals so far (`photos.refusals`), so every
- * change is a new element whose animation plays once, and a repaint with the same markup
- * changes nothing.
- */
-function swapsLine() {
-  const n = photos.swaps;
-  const count = n
-    ? `<span class="inline-block animate-bump text-green motion-reduce:animate-none" data-n="${n}">(${n} left)</span>`
-    : `<span class="inline-block animate-jiggle text-red motion-reduce:animate-none" data-n="0" data-try="${photos.refusals}">(0 left)</span>`;
-  return `<p class="mt-2 text-center text-xs text-muted">Tap to swap ${count}, hold to preview</p>`;
 }
 
 const withoutPhotos = '<button class="link" data-act="guess">Play without photos</button>';
@@ -175,8 +190,8 @@ function mine({ view, session }) {
       : '';
     return {
       title: '<h2 class="mb-3 text-center font-display text-2xl font-extrabold short:mb-2 short:text-xl">Play with these?</h2>',
-      pick: grid(chosenTiles(false), view.settings.photos, photos.rolling),
-      note: swapsLine(),
+      note: '',
+      pick: grid(chosenTiles(false), view.settings.photos, { busy: photos.rolling, leaving: photos.leaving.map((c) => c.url) }),
       actions: actions(view),
       links: `${limited}${withoutPhotos}`,
     };
@@ -353,7 +368,9 @@ export function lobbyScreen(c) {
   const host = view.hostId === view.me.id;
   return {
     key: `lobby|${view.code}`,
-    layout: `<div class="screen h-dvh">
+    // The screen clips sideways at its edges: the set "No →" slides out leaves it there, and
+    // nothing makes the page scroll sideways (the players' glow sits inside its padding).
+    layout: `<div class="screen h-dvh overflow-x-clip">
       ${topBar(LEAVE_BUTTON, '', HELP_BUTTON)}
       <button class="mx-auto mt-1.5 mb-2 flex justify-center gap-2 active:scale-97" data-act="invite" aria-label="Invite friends">${[...view.code].map((ch) => `<span class="grid h-16 w-13.5 place-items-center rounded-2xl bg-yellow font-display text-6xl font-extrabold text-navy short:h-12 short:w-10.5 short:text-4xl">${esc(ch)}</span>`).join('')}</button>
       <div data-part="cfg"></div>

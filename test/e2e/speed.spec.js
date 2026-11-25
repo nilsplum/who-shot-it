@@ -157,7 +157,7 @@ test('a game at phone speed: what the players wait for stays within its limits',
   for (let i = 0; i < SKIPS; i++) {
     await host.waitForTimeout(GLANCE_MS);
     const before = await firstTile(host);
-    await host.getByRole('button', { name: 'No' }).click();
+    await host.getByRole('button', { name: 'No, other photos' }).click();
     report.no.push(await msUntil(host, ([sel, style]) => { const el = document.querySelector(sel); return Boolean(el) && el.getAttribute('style') !== style; }, [TILE, before]));
   }
   for (const name of ['Ben', 'Cleo']) {

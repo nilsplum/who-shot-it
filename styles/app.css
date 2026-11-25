@@ -144,10 +144,20 @@
   --animate-bob: bob 4s ease-in-out infinite; /* the logo, floating */
   --animate-spin: spin 0.8s linear infinite; /* waiting */
   --animate-fade: fade 0.2s; /* a backdrop, banner or photo appearing */
-  --animate-deal: fade 0.3s; /* a photo dealt into the choice */
-  --animate-flip: flip 0.5s ease-in-out; /* a photo swapped: the tile turns over like a card (views/lobby.js) */
-  --animate-bump: bump 0.45s var(--ease-bounce); /* the swaps left, each time the number goes down */
-  --animate-jiggle: jiggle 0.5s ease-in-out; /* no swaps left: the count shakes (again on every refused tap); my wrong pick on the reveal */
+  --animate-deal: fade 0.3s; /* a photo dealt into the choice (the first set of a game) */
+  /* A swapped photo (views/lobby.js `chosenTiles`), one timeline of about 0.75 s: the tile
+     turns over like a card from the old photo to its back (`swap-turn`), the swaps left land
+     on it with a bump (`swap-count`), then the new photo pops out over them (`swap-pop`). */
+  --animate-swap-turn: swap-turn 0.24s ease-in both;
+  --animate-swap-count: bump 0.32s var(--ease-bounce) 0.2s both;
+  --animate-swap-pop: swap-pop 0.32s var(--ease-bounce) 0.42s both;
+  --animate-nope: nope 0.6s ease-out both; /* a refused swap with none left: a red ✕ fades in and out over the tile (opacity only, so also with Reduce Motion) */
+  --animate-jiggle: jiggle 0.5s ease-in-out; /* a refused swap: the tile shakes; my wrong pick on the reveal */
+  /* "No →" (views/lobby.js `grid`): the old set slides out to the right while the new one
+     comes in from the left right behind it, overshoots a hair and snaps in place. Both move
+     on the same timing, so they travel as one strip and never overlap. */
+  --animate-set-out: set-out 0.42s cubic-bezier(0.3, 1.25, 0.5, 1) both;
+  --animate-set-in: set-in 0.42s cubic-bezier(0.3, 1.25, 0.5, 1) both;
   --animate-appear: appear 0.35s var(--ease-bounce); /* the leaderboard: a round's points, a new rank */
   --animate-smash: smash 0.6s ease-out both; /* FINAL ROUND falling onto the leaderboard (it lands at 45%, main.js) */
   --animate-shake: shake 0.4s ease-out; /* the screen as FINAL ROUND lands */
@@ -172,10 +182,16 @@
   @keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fade { from { opacity: 0; transform: scale(0.96); } }
-  /* The tile starts turned over, its old face (pre-turned, `rotate-y-180`) towards the player,
-     and turns to its new face; the faces hide their back (`backface-hidden`). */
-  @keyframes flip { from { transform: perspective(600px) rotateY(-180deg); } to { transform: perspective(600px) rotateY(0deg); } }
+  /* The tile turns from its front (the old photo) to its back (pre-turned, `rotate-y-180`) and
+     stays there until it is painted plain; the faces hide their back (`backface-hidden`). */
+  @keyframes swap-turn { from { transform: perspective(600px) rotateY(0deg); } to { transform: perspective(600px) rotateY(180deg); } }
   @keyframes bump { 40% { transform: scale(1.35); } }
+  /* From the middle, a little too big, then its size. */
+  @keyframes swap-pop { from { scale: 0.4; opacity: 0; } 60% { scale: 1.06; opacity: 1; } to { scale: 1; opacity: 1; } }
+  @keyframes nope { 0%, 100% { opacity: 0; } 20%, 70% { opacity: 1; } }
+  /* Past the screen's edge (the set and its gap): the screen clips it there (views/lobby.js). */
+  @keyframes set-out { to { translate: 115% 0; } }
+  @keyframes set-in { from { translate: -115% 0; } }
   @keyframes appear { from { transform: scale(0.4); opacity: 0; } }
   /* From a fifth of its size to `--pop` times it (half way), then its own size. */
   @keyframes pop-in { from { scale: 0.2; opacity: 0; } 50% { scale: var(--pop, 1.3); opacity: 1; } }
@@ -307,6 +323,11 @@
 }
 @utility reveal-wait {
   [data-playing] &:not([data-go], [data-go] *) { visibility: hidden; }
+}
+
+/* The number (or ✕) a swapped or refused photo shows, sized to its tile (a size container), so it reads on a 5 x 5 grid as on a 2 x 2. */
+@utility tile-count {
+  font-size: 48cqmin;
 }
 
 /*

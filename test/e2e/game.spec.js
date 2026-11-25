@@ -20,7 +20,8 @@
  * the page, the lobby's photos are as wide as No and Yes, its players take two rows that
  * their arrow pages through (turning at each end), and the reaction row shows whole
  * buttons. Then "Which photos" on a phone with screenshots and a chat full of text, the
- * swaps (the count, the turn, a refused tap) and the hold in the photo choice, the terms
+ * swaps (the turn to the swaps left, ✕ at none, a refused tap), the hold and "No →"'s slide
+ * in the photo choice, the terms
  * after an update, and the website (the same page in a plain browser): invite page and
  * legal page.
  */
@@ -533,7 +534,7 @@ test('"Which photos" leaves out photos full of text, and screenshots if asked', 
   await expect(tiles).toHaveCount(4);
 });
 
-test('choosing photos: tap one to swap it (three times), hold one to see it big', async ({ browser }) => {
+test('choosing photos: a tap swaps one and shows the swaps left (✕ at none), a hold shows it big, "No →" slides in a new set', async ({ browser }) => {
   // Twelve photos (the fixtures twice), so the deck has more than enough to swap from.
   const phone = await openApp(browser, 'Ann', [...library, ...library]);
   await phone.getByRole('button', { name: 'Create game' }).click();
@@ -547,35 +548,35 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   // Big versions are prepared ahead for photos still waiting in the bucket, only from what
   // the phone stores (no download); the set on screen may download.
   await expect.poll(() => phone.evaluate(() => window.pulled.some((p) => p.download === false))).toBe(true);
-  // The line under the grid counts the swaps left, in green.
-  const line = phone.getByText(/^Tap to swap/);
-  await expect(line).toHaveText('Tap to swap (3 left), hold to preview');
-  await expect(phone.getByText('(3 left)', { exact: true })).toHaveCSS('color', themeColour('green'));
-  // A tile's photo is its front face; while it turns, the old photo is a second face behind it.
-  const faces = (i) => tiles.nth(i).locator('span');
-  const photoOf = (i) => faces(i).first().getAttribute('style');
+  // No line under the photos explains them: the tile itself shows what is left as it turns.
+  await expect(phone.getByText(/Tap to swap|hold to preview/)).toHaveCount(0);
+  // A tile's photo is its first face; a swapped tile turns to the swaps left (yellow, ✕ in
+  // red at none), the new photo pops over them, and then the tile is plain again.
+  const photoOf = (i) => tiles.nth(i).locator('span').first().getAttribute('style');
+  const count = tiles.nth(0).locator('[data-cell="count"]');
   const second = await photoOf(1);
-  for (let left = 2; left >= 0; left--) {
+  for (const left of [2, 1, 0]) {
     const before = await photoOf(0);
     await tiles.nth(0).click();
-    await expect.poll(() => photoOf(0)).not.toBe(before);
-    await expect(line).toHaveText(`Tap to swap (${left} left), hold to preview`);
-    await expect(faces(0)).toHaveCount(1);
+    await expect(count).toHaveText(left ? String(left) : '✕');
+    await expect(count).toHaveCSS('color', themeColour(left ? 'yellow' : 'red'));
+    await expect(count).toHaveCount(0);
+    expect(await photoOf(0)).not.toBe(before);
   }
   expect(await photoOf(1)).toBe(second);
-  // At 0 the count is red. The fourth tap is refused: the photo stays and gets no mark, and
-  // the count is drawn anew, so its shake plays again.
-  const zero = phone.getByText('(0 left)', { exact: true });
-  await expect(zero).toHaveCSS('color', themeColour('red'));
-  const shaken = await zero.elementHandle();
+  // The fourth tap is refused: the photo stays, shakes and shows a red ✕, anew on every
+  // refused tap (a new element, so it plays again).
   const kept = await photoOf(0);
   await tiles.nth(0).click();
-  await expect.poll(() => shaken.evaluate((el) => el.isConnected)).toBe(false);
-  await expect(zero).toBeVisible();
+  const nope = tiles.nth(0).locator('[data-cell="nope"]');
+  await expect(nope).toHaveText('✕');
   expect(await photoOf(0)).toBe(kept);
-  await expect(faces(0)).toHaveCount(1);
-  // Felt: a light tap for each turn, two firm pulses for the refusal.
-  await expect.poll(() => phone.evaluate(() => window.felt)).toEqual(['LIGHT', 'LIGHT', 'LIGHT', 'MEDIUM', 'MEDIUM']);
+  const first = await nope.elementHandle();
+  await tiles.nth(0).click();
+  await expect.poll(() => first.evaluate((el) => el.isConnected)).toBe(false);
+  await expect(nope).toHaveCount(1);
+  // Felt: a light tap for each swap, two firm pulses for each refusal.
+  await expect.poll(() => phone.evaluate(() => window.felt)).toEqual(['LIGHT', 'LIGHT', 'LIGHT', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'MEDIUM']);
   // Holding a photo shows it big until the finger lifts (anywhere); it swaps nothing.
   const box = await tiles.nth(1).boundingBox();
   await phone.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -589,9 +590,14 @@ test('choosing photos: tap one to swap it (three times), hold one to see it big'
   await phone.mouse.up();
   await expect(phone.locator('#look img')).toHaveCount(0);
   expect(await photoOf(1)).toBe(second);
-  // "No →" deals a new set and resets the swaps.
+  // "No →" slides in a new set (the old one slides out, gone a moment later) and the swaps
+  // start over.
   await phone.getByRole('button', { name: 'No, other photos' }).click();
-  await expect(line).toHaveText('Tap to swap (3 left), hold to preview');
+  await expect(phone.locator('[data-cell="leaving"]')).toHaveCount(1);
+  await expect.poll(() => photoOf(0)).not.toBe(kept);
+  await expect(phone.locator('[data-cell="leaving"]')).toHaveCount(0);
+  await tiles.nth(0).click();
+  await expect(count).toHaveText('2');
 });
 
 test('the terms come back after an update: a phone that accepted an older version sees them again', async ({ browser }) => {

@@ -245,7 +245,7 @@ export const LIMITS = {
    * photos were shown never tells whose comes next (`balancedRange`).
    */
   balancedSpread: 0.4,
-  /** How many single photos a player may swap in one set (tap a photo); a new set starts over. */
+  /** How many single photos a player may swap in one set (tap a photo: its tile shows how many are left as it turns); a new set starts over. */
   swapsPerSet: 3,
   /** Largest accepted JPEG. A Durable Object's SQLite row holds at most 2 MB. */
   photoMaxBytes: 1_500_000,

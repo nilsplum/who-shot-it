@@ -25,8 +25,11 @@
  *   4. `fill`, only while nothing of 1 to 3 waits and no game runs: the next set's big
  *      versions (from the phone only), then previews up to LIMITS.bucketPreviews.
  * - `roll` deals a set from the front of the bucket, so its big versions are usually there
- *   already; `swap` replaces one photo with the bucket's next (the tile turns over, its old
- *   preview as the back face until the turn is done) or counts a refusal; `holdPhoto` puts
+ *   already; a set replacing one on screen ("No →") slides in while the replaced one slides
+ *   out, its previews kept loaded until the slide is done (`leaving`). `swap` replaces one
+ *   photo with the bucket's next (the tile turns over to the swaps left, `left`, and the new
+ *   photo pops in; the old preview stays loaded as the front face until the turn is done) or
+ *   notes a refusal (`refused`); `holdPhoto` puts
  *   a photo's big version first and makes it paintable (decoded, `loader.paintable`) before
  *   the view lays it over the preview; `chosenBlobs` gives "Yes" the big versions that are
  *   there first, waiting only while fewer than it sends are ready.
@@ -60,10 +63,16 @@ export const photos = {
    * replaced, as a link) } added.
    */
   chosen: [],
+  /** The set "No →" replaced, while it slides out (views/lobby.js `grid`): its previews, `{ url }`, let go once the slide is done; else empty. */
+  leaving: [],
   /** Swaps left in this set. */
   swaps: 0,
-  /** Swaps refused so far (it only grows): each one is a new number, so the count's shake plays again (`views/lobby.js`). */
-  refusals: 0,
+  /**
+   * The last refused tap on the set on screen, or null: `{ index (its tile), n (refusals so
+   * far, it only grows: each one is a new element, so its shake and its ✕ play again), none
+   * (no swap was left, which shows the ✕; else no photo was ready yet) }`.
+   */
+  refused: null,
   /** The set size and the "Which photos" value the set on screen was dealt for (`main.js` compares, to deal anew). */
   size: 0,
   filter: null,
@@ -96,6 +105,8 @@ let seen = new Set();
 let exhausted = false;
 /** Answers in a row the phone did not give (three count as having none left). */
 let failures = 0;
+/** Refused taps so far, while the app runs (`photos.refused.n`). */
+let refusals = 0;
 /** May the app read photos now (`startPhotos`). */
 let readable = false;
 /** The id of the photo held big, whose big version comes first. */
@@ -275,21 +286,42 @@ function slot(entry, anim) {
 }
 
 /**
- * How long a photo's entrance takes on screen: the deal's fade (0.3 s) and the swap's turn
- * (0.5 s), the `deal` and `flip` animations in styles/app.css, plus a little slack.
+ * How long a photo's entrance takes on screen, plus a little slack: the deal's fade (0.3 s,
+ * `deal`), a swap (the turn, the number and the new photo's pop, about 0.75 s: `swap-turn`,
+ * `swap-count`, `swap-pop`) and the set's slide (`set-in`, 0.42 s) in styles/app.css.
  */
-const ENTRANCE_MS = { in: 400, flip: 600 };
+const ENTRANCE_MS = { in: 400, swap: 850, slide: 500 };
 
 /**
- * Ends a photo's entrance once it has played: its mark goes and, after a turn, the old face's
- * preview is let go (it had to stay loaded while it was visible). Then repaints.
+ * Ends a photo's entrance once it has played: its mark goes and, after a swap, the old
+ * photo's preview is let go (it had to stay loaded while it was visible). Then repaints.
  */
 function settleLater(c) {
   setTimeout(() => {
     if (c.from) URL.revokeObjectURL(c.from);
-    Object.assign(c, { anim: null, from: null });
+    Object.assign(c, { anim: null, from: null, left: null });
     changed();
   }, ENTRANCE_MS[c.anim]);
+}
+
+/**
+ * The set "No →" replaced slides out while the new one slides in: only its previews are
+ * kept, and only until the slide is done (then they are let go and the grid is painted
+ * plain); a set replaced again meanwhile is let go at once.
+ */
+function slideOut(old) {
+  release(photos.leaving);
+  for (const c of old) {
+    for (const url of [c.sharp, c.from]) if (url) URL.revokeObjectURL(url);
+  }
+  const leaving = old.map((c) => ({ url: c.url }));
+  photos.leaving = leaving;
+  setTimeout(() => {
+    if (photos.leaving !== leaving) return;
+    release(leaving);
+    photos.leaving = [];
+    changed();
+  }, ENTRANCE_MS.slide);
 }
 
 // ---------- What main.js calls ----------
@@ -333,10 +365,12 @@ export function setNeeds(next) {
 /** Forgets the set on screen (leaving a room); the bucket stays for the next game. */
 export function leaveSet() {
   release(photos.chosen);
+  release(photos.leaving);
   photos.chosen = [];
+  photos.leaving = [];
   heldId = null;
   dealing = 0;
-  Object.assign(photos, { size: 0, filter: null, swaps: 0, spent: false, rolling: false, empty: false });
+  Object.assign(photos, { size: 0, filter: null, swaps: 0, refused: null, spent: false, rolling: false, empty: false });
   photos.rollId += 1;
 }
 
@@ -352,12 +386,15 @@ export function resetPhotos() {
 
 /**
  * Shows a new set of `size` photos that fit `filter` (the room's "Which photos"), right away
- * when the bucket has them. The set on screen stays until the new one is there; a phone with
- * fewer fitting photos gives a smaller set.
+ * when the bucket has them. The set on screen stays until the new one is there, which then
+ * slides in over it ("No →", a new photo count or "Which photos": `slideOut`); the first set
+ * of a game fades in. A phone with fewer fitting photos gives a smaller set.
  */
 export async function roll(size, filter, onChange) {
   changed = onChange;
   const id = ++photos.rollId;
+  // A spent set (the last game's) is not "on screen": the next game's first set fades in.
+  const fresh = photos.spent;
   setNeeds({ filter, size });
   const onScreen = photos.chosen.map((c) => c.id);
   Object.assign(photos, { size, filter, spent: false, rolling: true });
@@ -380,37 +417,41 @@ export async function roll(size, filter, onChange) {
   const set = bucket.splice(0, size);
   set.forEach((e) => seen.add(e.id));
   const old = photos.chosen;
-  photos.chosen = set.map((e) => slot(e, 'in'));
-  release(old);
+  const slide = !fresh && old.length > 0;
+  photos.chosen = set.map((e) => slot(e, slide ? null : 'in'));
+  if (slide) slideOut(old);
+  else release(old);
   heldId = null;
-  Object.assign(photos, { rolling: false, empty: set.length === 0, swaps: LIMITS.swapsPerSet });
-  photos.chosen.forEach(settleLater);
+  Object.assign(photos, { rolling: false, empty: set.length === 0, swaps: LIMITS.swapsPerSet, refused: null });
+  for (const c of photos.chosen) if (c.anim) settleLater(c);
   poke();
 }
 
 /**
- * Replaces photo `index` of the set on screen with the bucket's next one, at once: it turns
- * in over the old one, whose preview stays loaded as the back face until the turn is done
- * (`from`). Returns false when it is refused (no swaps left, or no photo ready), counted in
- * `photos.refusals`.
+ * Replaces photo `index` of the set on screen with the bucket's next one, at once: its tile
+ * turns over to the swaps left now (`left`) and the new photo pops in, while the old one's
+ * preview stays loaded as the front face until that is done (`from`). Returns false when it
+ * is refused (no swaps left, or no photo ready yet), noted in `photos.refused`.
  */
 export function swap(index, onChange) {
   changed = onChange;
   const old = photos.chosen[index];
   if (!old || photos.rolling) return false;
   if (photos.swaps <= 0 || !bucket.length) {
-    photos.refusals += 1;
+    refusals += 1;
+    photos.refused = { index, n: refusals, none: photos.swaps <= 0 };
     changed();
     return false;
   }
   const next = bucket.shift();
   seen.add(next.id);
-  const c = Object.assign(slot(next, 'flip'), { from: old.url });
+  photos.swaps -= 1;
+  const c = Object.assign(slot(next, 'swap'), { from: old.url, left: photos.swaps });
   photos.chosen = photos.chosen.map((x, i) => (i === index ? c : x));
+  photos.refused = null;
   // The old photo's sharp layer goes now; its preview with the turn (`settleLater`), and a
   // turn it was still in the middle of ends by its own timer.
   if (old.sharp) URL.revokeObjectURL(old.sharp);
-  photos.swaps -= 1;
   settleLater(c);
   poke();
   return true;

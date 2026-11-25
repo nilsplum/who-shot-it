@@ -42,6 +42,12 @@ to date with every commit.
   app is released (to do 1). The test players (`demo-players.mjs`) never take the START Yes:
   when recording, say Yes after them (`docs/guides/demo-players.md`). To try on the phones:
   the stamp landing, the sheet, the buttons (commit 8's list).
+- Commit 5: the hint line is gone; a swap turns the tile to the swaps left (✕ at none) and
+  pops the new photo, a refused tap shakes it with a red ✕, "No →" slides the set; "How to
+  play" explains the swap and the hold in one line. App only, nothing to deploy. To try on the
+  phones: the turn, the pop, the slide, with Reduce Motion too (commit 8's list).
+- Next: commits 6 (the 3-2-1's loading), 7 (the rating) and 8 (the release), then the merge
+  into `main` (The branch and the merge, above).
 
 **To do by hand, once the commits are in (in this order)**
 1. Deploy the server first (`./scripts/deploy.sh`, a critical command: the implementing agent
@@ -837,7 +843,7 @@ Read: `web/js/views/lobby.js`, `views/sheets.js`, `views/overlays.js`, `web/js/m
 
 ### Commit 5: photo choice: the swap shows what is left and pops the new photo, "No →" slides the set, the hint line goes
 
-Status: planned.
+Status: done (25 November 2026; its decisions in section 11).
 
 Read: `web/js/photos.js`, `views/lobby.js`, `main.js` (actions `no`, `swap`, `HOLDS.tile`),
 `styles/app.css`, `views/sheets.js` (`helpBody`), `test/e2e/game.spec.js` (the choosing test,
@@ -1122,3 +1128,26 @@ Status: planned.
   takes the sheet's path (not the room-wide question).
 - **`gridEdges`** (the e2e check that the photos line up with the buttons) now measures from
   Yes's left edge to "No →"'s right edge.
+
+**25 November 2026, commit 5 (the swap shows what is left, "No →" slides the set, the hint line goes)**
+
+- **Both sets of the slide move on one timing** (0.42 s, overshooting a hair): the old one
+  slides out to the right, the new one comes in right behind it, so they travel as one strip.
+  A first try let the old set start slowly (ease-in, 0.3 s) while the new one started fast,
+  and the two overlapped for a moment.
+- **The screen clips sideways** (`overflow-x-clip` on the lobby's screen) instead of a wrapper
+  spanning the screen with negative margins: on a phone the set leaves at the screen's edge,
+  on a tablet at the column's, nothing scrolls, and the players' glow stays inside its
+  padding. The bubble's slide is clipped the same way.
+- **Which sets slide**: every set replacing one on screen ("No →", and a new photo count or
+  "Which photos"). The first set of a game fades in, also after "Play again" (the last game's
+  set is spent, not on screen).
+- **A refused tap on a tile still turning** (within 0.85 s of its swap) is only felt: the tile
+  finishes its turn, so no shake and no ✕ cut into it. Otherwise a refusal shakes the tile,
+  and with no swap left a red ✕ fades in and out over it.
+- **Reduce Motion**: a swap shows the new photo at once (no turn, no number); the ✕ of a
+  refusal still fades in and out (opacity only); "No →" swaps the set without a slide.
+- **Sizes and timings**: the number on the card is 48% of the tile's shorter side
+  (`tile-count`, a container size), so it reads on a 5 x 5 grid as on a 2 x 2; a swap's
+  entrance ends after 0.85 s, a slide's after 0.5 s (`ENTRANCE_MS`), when the tile or the grid
+  is painted plain.
