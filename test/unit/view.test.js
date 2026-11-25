@@ -43,6 +43,8 @@ test('the owner and the picks stay hidden until the reveal', () => {
   const revealed = viewFor(room, idOf(room, 'Ben'), now + 2000);
   expect(revealed.round.owner).toBe(owner);
   expect(revealed.round.results[ann].pick).toBe(owner);
+  // Every result carries the player's streak and what it earned, for the badge and its story.
+  expect(revealed.round.results[ann]).toMatchObject({ streak: expect.any(Number), bonus: expect.any(Number) });
 });
 
 test('the leaderboard: everyone sees who holds "Show again" as a shared flag, and the frozen time', () => {

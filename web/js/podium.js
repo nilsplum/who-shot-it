@@ -26,7 +26,8 @@
  *   it); main.js clears the sparks when the screen changes.
  * - With Reduce Motion main.js does not call it: the final state simply stays.
  */
-import { colour, fireworks, flash, inflow, ring, shade, spray } from './sparks.js';
+import { wait } from './motion.js';
+import { colour, fireworks, flash, inflow, middle, ring, shade, spray } from './sparks.js';
 
 /**
  * The timing in ms and the size of each place's charge: how long it charges, in how many
@@ -46,14 +47,6 @@ const PODIUM = {
     1: { ms: 3060, jumps: 5, squeeze: 160, tremble: 7, wave: 0, sparks: 90, felt: 'land', jolt: 10, grow: 0.55, after: 0 },
   },
 };
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** The middle of an element on the screen. */
-function middle(el) {
-  const r = el.getBoundingClientRect();
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-}
 
 /** The orb trembles, `px` at most, jumping between six spots ten times a second; returns the animation (to replace or cancel). */
 function tremble(el, px) {

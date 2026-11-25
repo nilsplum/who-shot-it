@@ -10,6 +10,7 @@ players, the start, "No" again and again), also on `main`. Its server is deploye
 is in App Review (23 November); 1.0.6 (the lobby's players in two rows that swipe
 sideways) and 1.0.7 (the 3-2-1 as a film leader, the reveal step by step, chosen from the
 drafts) are in TestFlight, and 1.0.7 follows once 1.0.5 is live (Operator handoff, below).
+The leaderboard's story from the drafts (section 15) and the streak's tower (section 16) are on `main` but not released yet.
 
 ## Operator handoff
 
@@ -1297,3 +1298,37 @@ Testing 1.0.4 on a real iPhone, the operator asked for six changes; they are fiv
 Measured after the five commits (speed test): "No" 4 to 18 ms, "Yes" to "✓ Ready" about
 10 ms, the last "Yes" to the question about 15 ms, "Yes, start" to the 3-2-1 about 0.2 s,
 the 3-2-1 painted "3 2 1", the room never waiting after it.
+
+## 15. Follow-up of 25 November 2026: the leaderboard's story from the drafts (not released yet)
+
+The "Leaderboard" draft (`drafts/leaderboard_animations`: coins into the totals, the totals
+rolling up, the gold medal flying to the new leader) replaces the board's old entrance in
+the app. Built like the reveal and the podium: `web/js/board.js` plays it over the view's
+final state (`views/board.js`), its pieces are in `styles/app.css`.
+
+| Question | Decision | Why |
+|---|---|---|
+| How long the board lasts | `TIMING.boardStoryMs` 4000 (the story, always to the millisecond: a shorter variant waits at its end), `TIMING.boardRestMs` 1500, `TIMING.boardMs` their sum, 5500 (was 5000) | The operator: the game resumes 1.5 s after the animation has finished, on every phone and every table. `test/unit/board.test.js` holds the story's steps within its time. |
+| The server | **The room's timer is the server's:** the 1.5 s is true only once the server is deployed with this `config.js` together with the app (`./scripts/deploy.sh`, a critical command: ask first) | The new app on the old server rests 1 s after its story; the older apps on the new server wait 3.3 s after their shorter story, which is harmless. |
+| The timer bar | Gone from the board; its slot (`h-7`) stays empty and holds the table's loading bar when the board waits for photos | The board's length is the story's now, a bar would run down beside it. A slot that appeared only when waiting would push the rows down. |
+| Who wears the medal | Everyone leading with more than 0 points, tied leaders each; the first points of a game drop one in from above; a leader who stays sends theirs on a loop | The draft's players never tie and all have points, a real first round has everyone at 0 and, with fixed points (no timer), ties. |
+| The coins | Thrown within 240 ms however many players (35 ms apart at most); slide at 1.9 s, medal at 2.6 s | The draft's 12 players already rolled while the rows slid; 16 would more so. |
+| The horizontal overflow | The board's list leaves room at its sides (`-mx-2 px-2`); `e2e` lifts a row and measures it | A list that scrolls vertically scrolls sideways too (`overflow-y-auto` makes `overflow-x` auto), so a row lifted by `data-lift` (3 % bigger) stuck out 5 px while the rows overtook: in the drafts and, with the same row, in the app. Only the leaderboard's list had it. |
+| The store images | Not redrawn | The board's image shows the medal now (`store-images.mjs` waits for the story's end); `./scripts/release-apps.sh --store-images` redraws them with the next release. |
+
+## 16. Follow-up of 25 November 2026: the streak, from the drafts (not released yet)
+
+A streak (right answers in a row) was counted and paid (+100 for each beyond the first, at most
++500) but never shown. The "Tower" draft (`drafts/streak_animations`) is built into the app,
+smaller and gentler than the draft: `web/js/streak.js` tells it over the reveal, `ui.js`
+`streakBadge` is its badge on the reveal and the leaderboard.
+
+| Question | Decision | Why |
+|---|---|---|
+| What the room sends | `round.results[id]` gains `streak` (right answers in a row after the round; 0 when "Streak bonus" is off) and `bonus` (the part of the points the streak earned) | The apps must not recompute a rule: the "Own photo" share scales the points, bonus included, so a formula in the app would be wrong for the owner. `bonus` is what the points lack without the streak (`pointsFor` with a streak of 1), whatever the cap, the share or the setting did. Streaks are derived from answers and points, which the players already see (`web/legal.html`): no new kind of data. |
+| One formula | `streakBonus` moved into `web/shared/config.js`; `score.js` and the story's steps use it | Both sides need it (single source of truth); the story shows the formula's steps scaled to the `bonus` it was told. |
+| The reveal's time | `timerMs`: `TIMING.revealMs` plus `streakExtraMs(longest streak that earned a bonus)`, 400 ms per step beyond the third, at most 1500 ms | Every phone stays on the reveal until the longest story is told, and the room's timer is the server's. `test/unit/streak.test.js` holds, for every streak, that the story (`storyMs`) ends at least 300 ms before the reveal does. The leaderboard's time did not change. |
+| What is shown | A small badge (a white card with the number and a flame, its band warming with the tier) at the bottom middle of the photo on the reveal, and on the avatar of every row of the leaderboard with a streak of 2 or more; the story only on the reveal, only when my answer earned a bonus | The operator: the leaderboard shows the streak only, no animation there. The badge is the final state the views paint; the story swaps it for the streak I had before until the bonus arrives. |
+| Gentler than the draft | Numbers and blocks about a quarter smaller, fewer and softer sparks, no jolt of the screen, a flash only from a streak of 7, a light tap on every second block | The operator: not exaggerated, smaller on the photo. |
+| Shared motion | `web/js/motion.js` (pause, easings, frame loop) replaces the copies in `reveal.js`, `podium.js` and `board.js`; `sparks.js` gains `coins` | Uniformity: a fourth story would have been a fourth copy. |
+| The server | **Deploy needed:** `./scripts/deploy.sh` (a critical command: ask first) | A new app on the old server shows no streak and plays the reveal as before; an older app on the new server ignores the new fields and waits a little longer on the reveal of a long streak, which is harmless. |

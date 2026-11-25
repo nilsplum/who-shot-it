@@ -34,10 +34,13 @@
  *   Final:  { players: [{ id, name, avatar, score }], stats: Game.stats }
  *   Game:   { plan: [{ owner, photo }], round, mode, zoom: { x, y }, options: [id],
  *             answers: { [id]: { pick, ms } }, loaded: { [id]: round }, waiting, shownAt,
- *             results: { [id]: { pick, points } } | null,
+ *             results: { [id]: { pick, points, streak, bonus } } | null,
  *             peeks: { [id]: until }, flag: { by, until } | null, pausedAt: ms | null,
  *             stats: { fastest: { id, ms } | null, fooled: { [id]: count } } }
- *   (The game exists from its deal on: once everyone's photos are in during the start
+ *   (`results`: each player's pick and points of the round, their streak after it (right
+ *   answers in a row, 0 when the "Streak bonus" setting is off) and the part of the points
+ *   that streak earned (`bonus`, after the "Own photo" share), so an app never recomputes a
+ *   rule. The game exists from its deal on: once everyone's photos are in during the start
  *   (`countdown`), `round` 0 until it starts. `loaded`: the round each phone is ready for;
  *   `waiting`: during the start, the phones are getting the first photo before the 3-2-1;
  *   in a game, a leaderboard whose time is up waits for the phones to be ready for the next
@@ -47,7 +50,7 @@
  *   since when, `rules.js` `settleClock`.)
  */
 
-import { BLOCKED_WORDS, EMOJIS, LIMITS, TIMING, normalizeSettings } from '../../web/shared/config.js';
+import { BLOCKED_WORDS, EMOJIS, LIMITS, TIMING, normalizeSettings, streakExtraMs } from '../../web/shared/config.js';
 
 /** A room code from the unambiguous code alphabet. */
 export function makeCode(rng) {
@@ -168,9 +171,19 @@ export function answerTimeMs(settings, untimedReferenceMs) {
 }
 
 /**
+ * The longest streak of the round on the reveal whose last answer earned a bonus (0: none),
+ * which decides how long the reveal runs: every phone tells its own streak's story, and the
+ * room waits for the longest. A room saved before results carried streaks counts none.
+ */
+export function longestBonusStreak(results) {
+  return Math.max(0, ...Object.values(results || {}).map((r) => (r.bonus > 0 ? r.streak : 0)));
+}
+
+/**
  * The full length of the timer the players see in the room's phase (ms), or null when the
  * phase has none: the 3-2-1 (not while the start still waits for photos or phones), the
- * answer time (when there is a clock), the reveal, and the leaderboard (when the next round
+ * answer time (when there is a clock), the reveal (longer while a streak's story is told,
+ * `streakExtraMs`), and the leaderboard (when the next round
  * comes by itself, and not while it waits for the phones' photos). The one place that says
  * how long each phase's timer runs: `rules.js` sets its deadlines from it, `view.js` hands
  * it to the apps as the timer bar's length.
@@ -179,7 +192,7 @@ export function timerMs(room) {
   switch (room.phase) {
     case 'countdown': return room.game && !room.game.waiting ? TIMING.countdownMs : null;
     case 'show': return room.settings.time ? room.settings.time * 1000 : null;
-    case 'reveal': return TIMING.revealMs;
+    case 'reveal': return TIMING.revealMs + streakExtraMs(longestBonusStreak(room.game.results));
     case 'board': return room.settings.auto && !room.game.waiting ? TIMING.boardMs : null;
     default: return null;
   }

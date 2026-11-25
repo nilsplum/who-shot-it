@@ -8,6 +8,10 @@
  * `data-medal`).
  *
  * Mechanisms: screen.js paints it with the app's painter (web/js/render.js).
+ *
+ * Invariant: the list has room at its sides for a row lifted by `data-lift` (`-mx-2 px-2`): a
+ * list that scrolls vertically scrolls sideways too, so a bigger row without that room made
+ * it scroll sideways while the rows overtook (the app's board has the same room).
  */
 import { REACTIONS } from '/shared/config.js';
 import { LEAVE_BUTTON, avatar, esc, reactionsRow, timerBar, topBar } from '/js/ui.js';
@@ -54,7 +58,7 @@ export function boardScreen(g) {
       ${topBar(LEAVE_BUTTON)}
       <h2 class="mt-1 text-center font-display text-4xl font-extrabold">Round ${g.round.n} of ${g.round.total}</h2>
       <div data-part="timer"></div>
-      <div class="mt-1 min-h-0 flex-1 overflow-y-auto" data-part="board"></div>
+      <div class="-mx-2 mt-1 min-h-0 flex-1 overflow-y-auto px-2" data-part="board"></div>
       ${reactionsRow(REACTIONS)}
       <button class="btn mt-3 p-4.5 text-2xl active:bg-picked" aria-label="Show the photo again">📷 Show again</button>
     </div>`,

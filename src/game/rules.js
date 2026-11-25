@@ -37,7 +37,8 @@
  *   rejoin the room. `flag` and `report` name the round they mean, so a late tap never hits
  *   the next photo.
  * - Phases: lobby -> countdown -> (load -> show -> reveal -> board) per round -> end ->
- *   lobby ("Play again"). The reveal is always timed; the board (the leaderboard between
+ *   lobby ("Play again"). The reveal is always timed (longer while a streak's story is told,
+ *   `timerMs`); the board (the leaderboard between
  *   the photos) is timed when "Next round" is automatic and waits for the host's "Next"
  *   otherwise. The last round has no board: its reveal ends the game, so the final
  *   standings stay secret until the podium (the board before it is the apps' "FINAL
@@ -204,14 +205,18 @@ function reveal(room, now) {
     const a = g.answers[p.id];
     if (!a) {
       p.streak = 0;
-      results[p.id] = { pick: null, points: 0 };
+      results[p.id] = { pick: null, points: 0, streak: 0, bonus: 0 };
       continue;
     }
     const correct = a.pick === owner;
     p.streak = correct ? p.streak + 1 : 0;
-    const points = pointsFor({ correct, ms: a.ms, streak: p.streak, own: p.id === owner }, s);
+    const own = p.id === owner;
+    const points = pointsFor({ correct, ms: a.ms, streak: p.streak, own }, s);
     p.score += points;
-    results[p.id] = { pick: a.pick, points };
+    // What the streak earned is what the points lack without it: whatever the rules do with it
+    // (the cap, the "Own photo" share, the setting being off) is already in it. The apps show
+    // it and never recompute it. With the setting off no streak is shown (it still counts).
+    results[p.id] = { pick: a.pick, points, streak: s.streak ? p.streak : 0, bonus: points - pointsFor({ correct, ms: a.ms, streak: 1, own }, s) };
     // Stats only count other people's guesses: the owner knows their own photo.
     if (p.id !== owner) {
       if (correct && (!g.stats.fastest || a.ms < g.stats.fastest.ms)) g.stats.fastest = { id: p.id, ms: a.ms };

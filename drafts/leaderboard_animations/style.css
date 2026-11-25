@@ -1,80 +1,14 @@
 /*
  * The leaderboard animations' stylesheet, built by Tailwind like the app's: it imports the
- * app's (styles/app.css) and adds what the story needs, written the way app.css writes
- * it, so a chosen one moves over as it is: entrances in the theme (`--animate-…`, used as
- * classes), and utilities for the pieces and the states the story sets.
+ * app's (styles/app.css) and scans this folder's sources for the classes they write.
  *
- * Mechanisms: views.js and board.js use these as whole class names; `data-playing` on the
- * screen hides the medal until the story sets `data-go` on it.
+ * Mechanisms: this draft was chosen and moved into the app, so what its story needs (the
+ * `lb-` coin, reels and medal, the `--animate-lb-…` entrances) now lives in the app's own
+ * stylesheet, and the draft's views.js and board.js use it from there like the app does.
  *
- * Invariant: only theme colours (`var(--color-…)`), and every entrance animates transform,
- * scale, rotate or opacity, or a colour, so nothing lays out again.
+ * Invariant: nothing is defined here that the app's stylesheet has; a new piece for this
+ * draft goes here, written the way app.css writes it, so it can move over as it is.
  */
 
 @import '../../styles/app.css';
 @source '.';
-
-@theme {
-  --animate-lb-hit: lb-hit 0.38s ease-out; /* a total, hit by its coin */
-  --animate-lb-medal: lb-medal 0.5s var(--ease-bounce) both; /* the gold medal landing on the new leader */
-
-  @keyframes lb-hit { 35% { scale: 1.2; color: var(--color-white); } }
-  /* Lands as big as it flew (`board.js`), squashes a little with a wobble, and settles at its own tilt (`lb-medal`). */
-  @keyframes lb-medal { from { scale: 1.35; } 55% { scale: 0.85; rotate: -10deg; } }
-}
-
-/* A coin thrown from a points chip into its total: a small glowing gold disc. */
-@utility lb-coin {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 25;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle at 35% 35%, var(--color-white), var(--color-yellow) 45%, var(--color-p6));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-yellow) 80%, transparent);
-}
-
-/*
- * A total rolling up like a slot machine: a window one digit high, a reel of digits per place
- * (`data-reel`); the digits fade at the window's top and bottom edge, like a reel turning away.
- */
-@utility lb-odo {
-  display: inline-flex;
-  height: 1.2em;
-  overflow: hidden;
-  vertical-align: bottom;
-  mask: linear-gradient(transparent, black 22%, black 78%, transparent);
-}
-@utility lb-reel {
-  display: flex;
-  flex-direction: column;
-  & > i { height: 1.2em; line-height: 1.2em; font-style: normal; }
-}
-
-/*
- * The leader's gold medal, tilted on the top left of their avatar, inside the row (the list
- * scrolls, so anything above the first row would be cut off); and the one in flight.
- */
-@utility lb-medal {
-  position: absolute;
-  left: -0.8rem;
-  top: -0.2rem;
-  font-size: var(--text-4xl);
-  line-height: 1;
-  rotate: -22deg;
-  filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--color-stage) 80%, transparent));
-}
-@utility lb-flyer {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 25;
-  margin: -0.5em 0 0 -0.5em;
-  font-size: var(--text-4xl);
-  line-height: 1;
-  pointer-events: none;
-}

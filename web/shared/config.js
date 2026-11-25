@@ -264,6 +264,15 @@ export function balancedRange(count, owners) {
   return { low: Math.round(share * (1 - LIMITS.balancedSpread)), high: Math.round(share * (1 + LIMITS.balancedSpread)) };
 }
 
+/**
+ * The leaderboard's story (`web/js/board.js`: the points counted into the totals, the rows
+ * overtaking, the medal flying to the leader) takes this long on every phone, and the game
+ * goes on this long after it ends. The room's board time is the two together, so the
+ * pause after the story is the same on every phone and every table.
+ */
+const BOARD_STORY_MS = 4000;
+const BOARD_REST_MS = 1500;
+
 /** All durations in milliseconds. The server owns every timer; apps only display them. */
 export const TIMING = {
   /** The 3-2-1 before the first round, once every phone holds its photo (`src/game/rules.js`, the start). */
@@ -277,10 +286,20 @@ export const TIMING = {
   loadMaxMs: 6000,
   /** Extra time after the answer timer, for answers still on the wire. */
   answerGraceMs: 1500,
-  /** How long the reveal (green and red cards) stays before the leaderboard. */
+  /**
+   * How long the reveal (green and red cards) stays before the leaderboard, plus what its
+   * streak story needs when a streak earned a bonus (`streakExtraMs`).
+   */
   revealMs: 3500,
-  /** How long the leaderboard stays when "Next round" is automatic (paused while someone holds "Show again"). */
-  boardMs: 5000,
+  /** The reveal lasts this much longer for every step of a streak beyond the third, at most `streakExtraMaxMs`. */
+  streakExtraStepMs: 400,
+  streakExtraMaxMs: 1500,
+  /** How long the story of the leaderboard takes (`web/js/board.js` ends exactly then, the pause after it starts). */
+  boardStoryMs: BOARD_STORY_MS,
+  /** How long the game waits after the story ends, before the next round. */
+  boardRestMs: BOARD_REST_MS,
+  /** How long the leaderboard stays when "Next round" is automatic: its story, then the rest (paused while someone holds "Show again"). */
+  boardMs: BOARD_STORY_MS + BOARD_REST_MS,
   /** A "Show again" hold ends by itself this long after the app last renewed it (a lost connection). */
   peekHoldMs: 2500,
   /**
@@ -324,6 +343,17 @@ export const TIMING = {
   previewCloudMs: 4000,
 };
 
+/**
+ * How much longer the reveal lasts when a right answer earned a streak bonus: the story of a
+ * streak (`web/js/streak.js`) takes longer the longer the streak is, and every phone stays
+ * on the reveal until the longest one is told. `streak` is the longest streak of the round
+ * that earned a bonus; a streak of 3 or less fits the reveal's own time. The story's length
+ * is held within this by `test/unit/streak.test.js`.
+ */
+export function streakExtraMs(streak) {
+  return Math.min(TIMING.streakExtraMaxMs, Math.max(0, streak - 3) * TIMING.streakExtraStepMs);
+}
+
 /** Points: a right answer earns min..max by speed (or `fixed`), plus a streak bonus. */
 export const SCORING = {
   min: 500,
@@ -332,6 +362,15 @@ export const SCORING = {
   streakStep: 100,
   streakMax: 500,
 };
+
+/**
+ * What a streak of `streak` right answers in a row adds to the points of its last answer
+ * (before the "Own photo" share): `SCORING.streakStep` for every answer beyond the first, at
+ * most `SCORING.streakMax`, nothing for a streak of 1. The one formula both sides use: the
+ * room scores with it (`src/game/score.js`), and the app builds the streak's story from its
+ * steps (`web/js/streak.js`).
+ */
+export const streakBonus = (streak) => (streak > 1 ? Math.min(SCORING.streakMax, (streak - 1) * SCORING.streakStep) : 0);
 
 export const SETTINGS_DEFAULTS = Object.freeze(Object.fromEntries(SETTINGS.map((s) => [s.key, s.default])));
 

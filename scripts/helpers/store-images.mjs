@@ -100,10 +100,10 @@ async function takeScreens(browser, library) {
   await host.locator('[data-act="answer"]').nth(1).click();
   await guests[1].locator('[data-act="answer"]').nth(2).click();
   await host.locator('[data-part="board"] [data-rank]').first().waitFor({ timeout: 20000 });
-  // Taken as soon as the leaderboard's entrance (the points, the rows overtaking, the new
-  // ranks: `BOARD_STEPS` in web/js/main.js, about 2.2 s with `snap`'s pause) has ended, so
-  // its timer bar still shows about half of the board's time.
-  await host.waitForTimeout(1700);
+  // Taken once the leaderboard's story (the points into the totals, the rows overtaking, the
+  // medal on the leader: web/js/board.js) has ended, which is when the screen lets go of
+  // `data-playing`. The board stays 1.5 s longer (TIMING.boardRestMs), `snap`'s pause included.
+  await host.waitForFunction(() => !document.querySelector('[data-playing]'));
   await snap(host, 'board');
   for (const page of everyone) await page.context().close();
   return screens;
